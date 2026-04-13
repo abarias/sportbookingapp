@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum FacilityType {
+  BASKETBALL_WHOLE
+  BASKETBALL_HALF
+  PICKLEBALL
+  BADMINTON
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentProvider {
+  MOCK
+  PAYMONGO
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum PricingBillingMode {
+  PER_HOUR
+  PER_BLOCK
+}
+
+model User {
+  id                 String            @id @default(cuid())
+  email              String            @unique
+  passwordHash       String
+  fullName           String
+  phone              String?
+  role               UserRole          @default(CUSTOMER)
+  bookings           Booking[]
+  createdBlocks      BlockedSchedule[] @relation("BlockedScheduleCreator")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([role])
+}
+
+model Facility {
+  id                           String                  @id @default(cuid())
+  name                         String
+  slug                         String                  @unique
+  description                  String
+  type                         FacilityType
+  timezone                     String                  @default("Asia/Manila")
+  isEnabled                    Boolean                 @default(true)
+  slotIntervalMinutes          Int                     @default(30)
+  cancellationEnabledOverride  Boolean?
+  images                       FacilityImage[]
+  operatingHours               FacilityOperatingHour[]
+  pricingRules                 PricingRule[]
+  bookings                     Booking[]
+  blockedSchedules             BlockedSchedule[]
+  createdAt                    DateTime                @default(now())
+  updatedAt                    DateTime                @updatedAt
+
+  @@index([type, isEnabled])
+}
+
+model FacilityImage {
+  id         String   @id @default(cuid())
+  facilityId String
+  url        String
+  altText    String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId, sortOrder])
+}
+
+model FacilityOperatingHour {
+  id               String   @id @default(cuid())
+  facilityId       String
+  dayOfWeek        Int
+  opensAtMinutes   Int
+  closesAtMinutes  Int
+  isClosed         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  facility         Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, dayOfWeek])
+  @@index([facilityId])
+}
+
+model PricingRule {
+  id              String             @id @default(cuid())
+  facilityId      String
+  currency        String             @default("PHP")
+  amountMinor     Int
+  billingMode     PricingBillingMode @default(PER_HOUR)
+  minimumMinutes  Int                @default(30)
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  facility        Facility           @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId, isActive])
+}
+
+model Booking {
+  id                   String        @id @default(cuid())
+  userId               String
+  facilityId           String
+  status               BookingStatus
+  startAtUtc           DateTime
+  endAtUtc             DateTime
+  timezone             String        @default("Asia/Manila")
+  slotCount            Int
+  amountMinor          Int
+  currency             String        @default("PHP")
+  paymentHoldExpiresAt DateTime?
+  cancellationReason   String?
+  cancelledAt          DateTime?
+  payment              Payment?
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  facility             Facility      @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([facilityId, startAtUtc, endAtUtc])
+  @@index([userId, startAtUtc])
+  @@index([status, paymentHoldExpiresAt])
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  bookingId         String          @unique
+  provider          PaymentProvider
+  providerReference String?         @unique
+  checkoutUrl       String?
+  status            PaymentStatus
+  amountMinor       Int
+  currency          String          @default("PHP")
+  paidAt            DateTime?
+  expiresAt         DateTime?
+  rawPayload        Json?
+  booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([status, expiresAt])
+}
+
+model BlockedSchedule {
+  id              String   @id @default(cuid())
+  facilityId      String
+  title           String
+  reason          String?
+  startAtUtc      DateTime
+  endAtUtc        DateTime
+  createdByUserId String
+  facility        Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  createdBy       User     @relation("BlockedScheduleCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([facilityId, startAtUtc, endAtUtc])
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
