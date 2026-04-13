@@ -103,6 +103,7 @@ export function BookingPanel({
 
             setStartMinutes(nextStart?.startMinutes ?? null);
           }}
+          required
           value={durationMinutes}
         >
           {durationOptions.map((minutes) => (
@@ -111,6 +112,7 @@ export function BookingPanel({
             </option>
           ))}
         </select>
+        {state.fieldErrors?.durationMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.durationMinutes}</p> : null}
       </div>
 
       <div className="space-y-2">
@@ -122,6 +124,7 @@ export function BookingPanel({
           id="startMinutes"
           name="startMinutes"
           onChange={(event) => setStartMinutes(Number.parseInt(event.target.value, 10))}
+          required
           value={startMinutes ?? ""}
         >
           {startOptions.length === 0 ? <option value="">No start times available for this duration</option> : null}
@@ -131,6 +134,7 @@ export function BookingPanel({
             </option>
           ))}
         </select>
+        {state.fieldErrors?.startMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.startMinutes}</p> : null}
       </div>
 
       {state.error ? <p className="text-sm text-rose-300">{state.error}</p> : null}

@@ -91,6 +91,7 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
                   id="date"
                   min={minDateKey}
                   name="date"
+                  required
                   type="date"
                 />
               </div>

@@ -28,25 +28,25 @@ export function RegisterForm() {
     <form action={action} className="space-y-5">
       <div className="space-y-2">
         <Label htmlFor="fullName">Full name</Label>
-        <Input id="fullName" name="fullName" placeholder="Juan Dela Cruz" required />
+        <Input autoComplete="name" id="fullName" maxLength={120} minLength={2} name="fullName" placeholder="Juan Dela Cruz" required />
         {state.fieldErrors?.fullName ? <p className="text-sm text-rose-300">{state.fieldErrors.fullName}</p> : null}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" placeholder="you@example.com" required type="email" />
+        <Input autoComplete="email" id="email" maxLength={255} name="email" placeholder="you@example.com" required type="email" />
         {state.fieldErrors?.email ? <p className="text-sm text-rose-300">{state.fieldErrors.email}</p> : null}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
-        <Input id="password" name="password" required type="password" />
+        <Input autoComplete="new-password" id="password" maxLength={72} minLength={8} name="password" required type="password" />
         {state.fieldErrors?.password ? <p className="text-sm text-rose-300">{state.fieldErrors.password}</p> : null}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="confirmPassword">Confirm password</Label>
-        <Input id="confirmPassword" name="confirmPassword" required type="password" />
+        <Input autoComplete="new-password" id="confirmPassword" maxLength={72} minLength={8} name="confirmPassword" required type="password" />
         {state.fieldErrors?.confirmPassword ? (
           <p className="text-sm text-rose-300">{state.fieldErrors.confirmPassword}</p>
         ) : null}

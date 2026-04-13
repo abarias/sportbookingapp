@@ -1,6 +1,11 @@
+"use client";
+
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+
 import type { Facility, FacilityImage, FacilityOperatingHour, PricingRule } from "@prisma/client";
 
-import { updateFacilityAction } from "@/features/admin/actions";
+import { updateFacilityAction, type FacilityActionState } from "@/features/admin/actions";
 import { Button } from "@/components/ui/button";
 
 type FacilityWithAdminFields = Facility & {
@@ -15,12 +20,20 @@ type FacilityFormProps = {
 };
 
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const initialState: FacilityActionState = {};
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+
+  return <Button disabled={pending} type="submit">{pending ? "Saving..." : "Save Facility"}</Button>;
+}
 
 export function FacilityForm({ facility }: FacilityFormProps) {
   const activePricing = facility.pricingRules[0];
+  const [state, action] = useActionState(updateFacilityAction, initialState);
 
   return (
-    <form action={updateFacilityAction} className="space-y-5 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
+    <form action={action} className="space-y-5 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
       <input name="facilityId" type="hidden" value={facility.id} />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -38,23 +51,28 @@ export function FacilityForm({ facility }: FacilityFormProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-2 text-sm text-stone-200">
           <span>Name</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.name} name="name" />
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.name} maxLength={120} name="name" required />
+          {state.fieldErrors?.name ? <p className="text-sm text-rose-300">{state.fieldErrors.name}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Slot interval minutes</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.slotIntervalMinutes} min={30} name="slotIntervalMinutes" step={30} type="number" />
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.slotIntervalMinutes} max={240} min={30} name="slotIntervalMinutes" required step={30} type="number" />
+          {state.fieldErrors?.slotIntervalMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.slotIntervalMinutes}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200 md:col-span-2">
           <span>Description</span>
-          <textarea className="min-h-24 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-white" defaultValue={facility.description} name="description" />
+          <textarea className="min-h-24 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-white" defaultValue={facility.description} maxLength={1000} name="description" required />
+          {state.fieldErrors?.description ? <p className="text-sm text-rose-300">{state.fieldErrors.description}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Price (PHP)</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={((activePricing?.amountMinor ?? 0) / 100).toFixed(2)} min="0" name="amount" step="0.01" type="number" />
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={((activePricing?.amountMinor ?? 0) / 100).toFixed(2)} min="0" name="amount" required step="0.01" type="number" />
+          {state.fieldErrors?.amount ? <p className="text-sm text-rose-300">{state.fieldErrors.amount}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Minimum minutes</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={activePricing?.minimumMinutes ?? 30} min={30} name="minimumMinutes" step={30} type="number" />
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={activePricing?.minimumMinutes ?? 30} max={480} min={30} name="minimumMinutes" required step={30} type="number" />
+          {state.fieldErrors?.minimumMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.minimumMinutes}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200 md:col-span-2">
           <span>Image URLs, one per line</span>
@@ -62,7 +80,9 @@ export function FacilityForm({ facility }: FacilityFormProps) {
             className="min-h-28 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-white"
             defaultValue={facility.images.map((image) => image.url).join("\n")}
             name="imageUrls"
+            required
           />
+          {state.fieldErrors?.imageUrls ? <p className="text-sm text-rose-300">{state.fieldErrors.imageUrls}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Cancellation policy override</span>
@@ -95,11 +115,11 @@ export function FacilityForm({ facility }: FacilityFormProps) {
                 <div className="text-sm font-medium text-white">{label}</div>
                 <label className="space-y-1 text-sm text-stone-300">
                   <span>Open</span>
-                  <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.opensAtMinutes ?? 480} name={`opensAtMinutes_${dayOfWeek}`} type="number" />
+                  <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.opensAtMinutes ?? 480} max={1440} min={0} name={`opensAtMinutes_${dayOfWeek}`} required type="number" />
                 </label>
                 <label className="space-y-1 text-sm text-stone-300">
                   <span>Close</span>
-                  <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.closesAtMinutes ?? 1320} name={`closesAtMinutes_${dayOfWeek}`} type="number" />
+                  <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.closesAtMinutes ?? 1320} max={1440} min={0} name={`closesAtMinutes_${dayOfWeek}`} required type="number" />
                 </label>
                 <label className="flex items-center gap-2 self-end text-sm text-stone-300">
                   <input defaultChecked={hour?.isClosed ?? false} name={`isClosed_${dayOfWeek}`} type="checkbox" />
@@ -111,7 +131,11 @@ export function FacilityForm({ facility }: FacilityFormProps) {
         </div>
       </div>
 
-      <Button type="submit">Save Facility</Button>
+      {state.fieldErrors?.operatingHours ? <p className="text-sm text-rose-300">{state.fieldErrors.operatingHours}</p> : null}
+      {state.message ? <p className="text-sm text-rose-300">{state.message}</p> : null}
+      {state.success ? <p className="text-sm text-emerald-300">{state.success}</p> : null}
+
+      <SubmitButton />
     </form>
   );
 }

@@ -18,12 +18,14 @@ export function LoginForm({ callbackUrl = "/facilities", registered = false }: L
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<"email" | "password", string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const normalizedCallbackUrl = callbackUrl.startsWith("/") ? callbackUrl : "/facilities";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage(null);
+    setFieldErrors({});
 
     const parsed = loginSchema.safeParse({
       email,
@@ -32,6 +34,12 @@ export function LoginForm({ callbackUrl = "/facilities", registered = false }: L
     });
 
     if (!parsed.success) {
+      const flattened = parsed.error.flatten().fieldErrors;
+
+      setFieldErrors({
+        email: flattened.email?.[0],
+        password: flattened.password?.[0]
+      });
       setErrorMessage("Enter a valid email and password.");
       return;
     }
@@ -74,6 +82,7 @@ export function LoginForm({ callbackUrl = "/facilities", registered = false }: L
           type="email"
           value={email}
         />
+        {fieldErrors.email ? <p className="text-sm text-rose-300">{fieldErrors.email}</p> : null}
       </div>
 
       <div className="space-y-2">
@@ -87,6 +96,7 @@ export function LoginForm({ callbackUrl = "/facilities", registered = false }: L
           type="password"
           value={password}
         />
+        {fieldErrors.password ? <p className="text-sm text-rose-300">{fieldErrors.password}</p> : null}
       </div>
 
       {errorMessage ? <p className="text-sm text-rose-300">{errorMessage}</p> : null}

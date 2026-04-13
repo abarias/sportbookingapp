@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 
+import { blockedScheduleSchema, facilityUpdateSchema } from "@/features/admin/schemas";
 import { requireAdminSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 
@@ -20,23 +21,25 @@ function parseNullableBoolean(value: string) {
 
 function parseMinutes(value: FormDataEntryValue | null) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
-
-  if (!Number.isFinite(parsed)) {
-    throw new Error("Invalid numeric value.");
-  }
-
   return parsed;
 }
 
 function parseAmountMinor(value: FormDataEntryValue | null) {
   const amount = Number.parseFloat(String(value ?? ""));
-
-  if (!Number.isFinite(amount) || amount < 0) {
-    throw new Error("Invalid price value.");
-  }
-
   return Math.round(amount * 100);
 }
+
+export type FacilityActionState = {
+  success?: string;
+  message?: string;
+  fieldErrors?: Partial<Record<"name" | "description" | "slotIntervalMinutes" | "amount" | "minimumMinutes" | "imageUrls" | "operatingHours", string>>;
+};
+
+export type BlockScheduleActionState = {
+  success?: string;
+  message?: string;
+  fieldErrors?: Partial<Record<"title" | "reason" | "startDate" | "endDate" | "startTime" | "endTime", string>>;
+};
 
 export async function updateCancellationSettingAction(formData: FormData) {
   await requireAdminSession();
@@ -56,7 +59,10 @@ export async function updateCancellationSettingAction(formData: FormData) {
   revalidatePath("/admin/facilities");
 }
 
-export async function updateFacilityAction(formData: FormData) {
+export async function updateFacilityAction(
+  _prevState: FacilityActionState,
+  formData: FormData
+): Promise<FacilityActionState> {
   await requireAdminSession();
 
   const facilityId = String(formData.get("facilityId") ?? "");
@@ -72,47 +78,78 @@ export async function updateFacilityAction(formData: FormData) {
     isClosed: parseBoolean(formData.get(`isClosed_${dayOfWeek}`))
   }));
 
+  const parsed = facilityUpdateSchema.safeParse({
+    facilityId,
+    name: String(formData.get("name") ?? ""),
+    description: String(formData.get("description") ?? ""),
+    isEnabled: parseBoolean(formData.get("isEnabled")),
+    slotIntervalMinutes: parseMinutes(formData.get("slotIntervalMinutes")),
+    amountMinor: parseAmountMinor(formData.get("amount")),
+    minimumMinutes: parseMinutes(formData.get("minimumMinutes")),
+    imageUrls,
+    cancellationEnabledOverride: String(formData.get("cancellationEnabledOverride") ?? "inherit"),
+    operatingHours: weekdays
+  });
+
+  if (!parsed.success) {
+    const flattened = parsed.error.flatten().fieldErrors;
+    const operatingHourIssue = parsed.error.issues.find((issue) => issue.path[0] === "operatingHours");
+
+    return {
+      message: "Please correct the facility details and try again.",
+      fieldErrors: {
+        name: flattened.name?.[0],
+        description: flattened.description?.[0],
+        slotIntervalMinutes: flattened.slotIntervalMinutes?.[0],
+        amount: flattened.amountMinor?.[0],
+        minimumMinutes: flattened.minimumMinutes?.[0],
+        imageUrls: flattened.imageUrls?.[0],
+        operatingHours: operatingHourIssue?.message
+      }
+    };
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.facility.update({
-      where: { id: facilityId },
+      where: { id: parsed.data.facilityId },
       data: {
-        name: String(formData.get("name") ?? ""),
-        description: String(formData.get("description") ?? ""),
-        isEnabled: parseBoolean(formData.get("isEnabled")),
-        slotIntervalMinutes: parseMinutes(formData.get("slotIntervalMinutes")),
-        cancellationEnabledOverride: parseNullableBoolean(String(formData.get("cancellationEnabledOverride") ?? "inherit")),
+        name: parsed.data.name,
+        description: parsed.data.description,
+        isEnabled: parsed.data.isEnabled,
+        slotIntervalMinutes: parsed.data.slotIntervalMinutes,
+        cancellationEnabledOverride: parseNullableBoolean(parsed.data.cancellationEnabledOverride),
         images: {
           deleteMany: {},
-          create: imageUrls.map((url, index) => ({
+          create: parsed.data.imageUrls.map((url, index) => ({
             url,
-            altText: `${String(formData.get("name") ?? "")} image ${index + 1}`,
+            altText: `${parsed.data.name} image ${index + 1}`,
             sortOrder: index
           }))
         },
         operatingHours: {
           deleteMany: {},
-          create: weekdays
+          create: parsed.data.operatingHours
         }
       }
     });
 
     const activePricing = await tx.pricingRule.findFirst({
-      where: { facilityId, isActive: true },
+      where: { facilityId: parsed.data.facilityId, isActive: true },
       orderBy: { createdAt: "desc" }
     });
 
-    const nextPrice = parseAmountMinor(formData.get("amount"));
-    const nextMinimumMinutes = parseMinutes(formData.get("minimumMinutes"));
+    const nextPrice = parsed.data.amountMinor;
+    const nextMinimumMinutes = parsed.data.minimumMinutes;
 
     if (!activePricing || activePricing.amountMinor !== nextPrice || activePricing.minimumMinutes !== nextMinimumMinutes) {
       await tx.pricingRule.updateMany({
-        where: { facilityId, isActive: true },
+        where: { facilityId: parsed.data.facilityId, isActive: true },
         data: { isActive: false }
       });
 
       await tx.pricingRule.create({
         data: {
-          facilityId,
+          facilityId: parsed.data.facilityId,
           currency: "PHP",
           amountMinor: nextPrice,
           billingMode: "PER_HOUR",
@@ -126,39 +163,63 @@ export async function updateFacilityAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/facilities");
   revalidatePath("/facilities");
+
+  return {
+    success: "Facility details saved."
+  };
 }
 
-export async function createBlockedScheduleAction(formData: FormData) {
+export async function createBlockedScheduleAction(
+  _prevState: BlockScheduleActionState,
+  formData: FormData
+): Promise<BlockScheduleActionState> {
   const session = await requireAdminSession();
 
-  const facilityId = String(formData.get("facilityId") ?? "");
-  const title = String(formData.get("title") ?? "").trim();
-  const reason = String(formData.get("reason") ?? "").trim();
-  const date = String(formData.get("date") ?? "");
-  const startTime = String(formData.get("startTime") ?? "");
-  const endTime = String(formData.get("endTime") ?? "");
+  const parsed = blockedScheduleSchema.safeParse({
+    facilityId: String(formData.get("facilityId") ?? ""),
+    title: String(formData.get("title") ?? ""),
+    reason: String(formData.get("reason") ?? ""),
+    startDate: String(formData.get("startDate") ?? ""),
+    endDate: String(formData.get("endDate") ?? ""),
+    startTime: String(formData.get("startTime") ?? ""),
+    endTime: String(formData.get("endTime") ?? "")
+  });
+
+  if (!parsed.success) {
+    const flattened = parsed.error.flatten().fieldErrors;
+
+    return {
+      message: "Please correct the blocked schedule form and try again.",
+      fieldErrors: {
+        title: flattened.title?.[0],
+        reason: flattened.reason?.[0],
+        startDate: flattened.startDate?.[0],
+        endDate: flattened.endDate?.[0],
+        startTime: flattened.startTime?.[0],
+        endTime: flattened.endTime?.[0]
+      }
+    };
+  }
 
   const facility = await prisma.facility.findUnique({
-    where: { id: facilityId },
+    where: { id: parsed.data.facilityId },
     select: { timezone: true }
   });
 
   if (!facility) {
-    throw new Error("Facility not found.");
+    return {
+      message: "Facility not found."
+    };
   }
 
-  const startAtUtc = fromZonedTime(`${date}T${startTime}:00`, facility.timezone);
-  const endAtUtc = fromZonedTime(`${date}T${endTime}:00`, facility.timezone);
-
-  if (startAtUtc >= endAtUtc) {
-    throw new Error("Block end must be after the start time.");
-  }
+  const startAtUtc = fromZonedTime(`${parsed.data.startDate}T${parsed.data.startTime}:00`, facility.timezone);
+  const endAtUtc = fromZonedTime(`${parsed.data.endDate}T${parsed.data.endTime}:00`, facility.timezone);
 
   await prisma.blockedSchedule.create({
     data: {
-      facilityId,
-      title,
-      reason: reason || null,
+      facilityId: parsed.data.facilityId,
+      title: parsed.data.title,
+      reason: parsed.data.reason || null,
       startAtUtc,
       endAtUtc,
       createdByUserId: session.user.id
@@ -168,4 +229,8 @@ export async function createBlockedScheduleAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/admin/facilities");
   revalidatePath("/facilities");
+
+  return {
+    success: "Blocked schedule created."
+  };
 }
