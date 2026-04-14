@@ -3,6 +3,7 @@ import { BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingBillingMo
 import { prisma } from "@/lib/db/prisma";
 import { buildUtcDateFromLocalMinutes, getDayOfWeek, getLocalMinutesForDate } from "@/lib/time/slots";
 import { buildDaySlots, canFitDuration, rangesOverlapByMinute, rangesOverlap, type DaySlot, type MinuteInterval } from "@/server/bookings/core";
+import { canCustomerCancelBooking, resolveCancellationEnabled } from "@/server/bookings/policies";
 
 export type FacilityDayAvailability = {
   dateKey: string;
@@ -479,6 +480,61 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable
     }
   );
+}
+
+export async function cancelBookingByCustomer(input: { bookingId: string; userId: string }) {
+  const now = new Date();
+
+  return prisma.$transaction(async (tx) => {
+    const [booking, cancellationSetting] = await Promise.all([
+      tx.booking.findFirst({
+        where: {
+          id: input.bookingId,
+          userId: input.userId
+        },
+        include: {
+          facility: {
+            select: {
+              name: true,
+              cancellationEnabledOverride: true
+            }
+          }
+        }
+      }),
+      tx.appSetting.findUnique({
+        where: { key: "booking.cancellationEnabled" }
+      })
+    ]);
+
+    if (!booking) {
+      throw new Error("Booking not found.");
+    }
+
+    const cancellationEnabled = resolveCancellationEnabled(
+      cancellationSetting?.value === true,
+      booking.facility.cancellationEnabledOverride
+    );
+
+    if (
+      !canCustomerCancelBooking({
+        bookingStatus: booking.status,
+        startAtUtc: booking.startAtUtc,
+        now,
+        cancellationEnabled
+      })
+    ) {
+      throw new Error("This booking can no longer be cancelled.");
+    }
+
+    return tx.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: BookingStatus.CANCELLED,
+        cancelledAt: now,
+        cancellationReason: "Cancelled by customer"
+      }
+    });
+  });
 }
 
 export function rangesOverlapUtc(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {

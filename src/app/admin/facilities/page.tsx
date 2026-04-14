@@ -1,5 +1,6 @@
 import { AdminNav } from "@/components/admin/admin-nav";
 import { BlockScheduleForm } from "@/components/admin/block-schedule-form";
+import { DeleteBlockScheduleButton } from "@/components/admin/delete-block-schedule-button";
 import { FacilityForm } from "@/components/admin/facility-form";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { requireAdminSession } from "@/lib/auth/session";
@@ -30,10 +31,15 @@ export default async function AdminFacilitiesPage() {
           {blocks.length === 0 ? <p className="text-sm text-stone-400">No blocked schedules yet.</p> : null}
           {blocks.map((block) => (
             <article key={block.id} className="rounded-2xl border border-white/10 bg-stone-950/40 p-4 text-sm text-stone-300">
-              <p className="font-medium text-white">{block.facility.name} • {block.title}</p>
-              <p className="mt-1">{formatDateTimeRange(block.startAtUtc, block.endAtUtc, block.facility.timezone ?? "Asia/Manila")}</p>
-              <p className="mt-1">Created by {block.createdBy.fullName}</p>
-              {block.reason ? <p className="mt-1 text-stone-400">{block.reason}</p> : null}
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="font-medium text-white">{block.facility.name} • {block.title}</p>
+                  <p className="mt-1">{formatDateTimeRange(block.startAtUtc, block.endAtUtc, block.facility.timezone ?? "Asia/Manila")}</p>
+                  <p className="mt-1">Created by {block.createdBy.fullName}</p>
+                  {block.reason ? <p className="mt-1 text-stone-400">{block.reason}</p> : null}
+                </div>
+                <DeleteBlockScheduleButton blockId={block.id} />
+              </div>
             </article>
           ))}
         </div>

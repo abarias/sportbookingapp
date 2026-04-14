@@ -1,6 +1,7 @@
 import { PaymentStatus } from "@prisma/client";
 import { BookingStatus } from "@prisma/client";
 
+import { CancelBookingButton } from "@/components/bookings/cancel-booking-button";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { formatDateTimeRange } from "@/lib/time/slots";
 import { formatInTimeZone } from "date-fns-tz";
@@ -16,6 +17,7 @@ type BookingListItem = {
   endAtUtc: Date;
   timezone: string;
   paymentHoldExpiresAt: Date | null;
+  isCancellable: boolean;
 };
 
 type BookingListProps = {
@@ -61,6 +63,11 @@ export function BookingList({ title, items, emptyMessage }: BookingListProps) {
                   <p className="text-sm text-amber-200">
                     Payment hold expires at {formatInTimeZone(item.paymentHoldExpiresAt, item.timezone, "h:mm a")}
                   </p>
+                ) : null}
+                {item.isCancellable ? (
+                  <div className="pt-1">
+                    <CancelBookingButton bookingId={item.id} />
+                  </div>
                 ) : null}
               </div>
               <span className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.18em] ${statusTone[item.status]}`}>

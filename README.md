@@ -1,23 +1,21 @@
 # Sport Booking PH
 
-MVP sports facility booking app for Philippine operators. The product supports customer booking flows and admin operations for whole basketball courts, half basketball courts, pickleball courts, and badminton courts.
+MVP sports facility booking app for Philippine operators. The app supports customer booking flows and internal admin operations for full basketball courts, half basketball courts, pickleball courts, and badminton courts.
 
 ## Current Status
 
-Phase 3 is in place:
+Phase 6 is in place:
 
-- Next.js App Router scaffold
-- TypeScript strict mode
-- Tailwind CSS baseline
-- lean domain-oriented folder structure
-- Prisma schema and seed script
-- credentials auth for customer and admin accounts
-- protected admin route and customer login/register pages
-- database-backed facility browsing
-- date-based availability view with 30-minute slots
-- server-validated pending booking creation
-- real customer bookings page backed by PostgreSQL
-- architecture and schema proposal in `docs/architecture.md`
+- Next.js App Router + TypeScript strict mode
+- Tailwind CSS UI scaffold
+- Prisma + PostgreSQL schema, migrations, and seed data
+- Credentials auth for customer and admin accounts
+- Database-backed facility browsing and availability
+- Server-side booking creation with overlap checks
+- Mock payment flow that auto-confirms bookings
+- Customer booking history and cancellation flow
+- Admin overview, facility management, blocked schedules, customers, and reports
+- Basic automated coverage for availability, cancellation policy, and blocked schedule validation
 
 ## Tech Stack
 
@@ -27,21 +25,15 @@ Phase 3 is in place:
 - PostgreSQL
 - Prisma
 - NextAuth
-- PayMongo
 - Vercel
 
 ## Local Development
 
 1. Copy `.env.example` to `.env`.
-2. Start PostgreSQL locally. Example with Docker:
+2. Start PostgreSQL:
 
 ```bash
-docker run --name sportbookingapp-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=sportbookingapp \
-  -p 5432:5432 \
-  -d postgres:16
+docker compose up -d postgres
 ```
 
 3. Install dependencies:
@@ -50,11 +42,11 @@ docker run --name sportbookingapp-postgres \
 npm install
 ```
 
-4. Generate Prisma client and apply the initial migration:
+4. Generate Prisma client and apply migrations:
 
 ```bash
 npm run db:generate
-npx prisma migrate dev --name init
+npx prisma migrate dev
 ```
 
 5. Seed sample data:
@@ -63,19 +55,33 @@ npx prisma migrate dev --name init
 npm run db:seed
 ```
 
-6. Start the dev server:
+6. Start the app:
 
 ```bash
 npm run dev
 ```
 
-7. Validate the codebase:
+7. Validate locally:
 
 ```bash
 npm run typecheck
 npm run lint
+npm test
 npm run build
 ```
+
+If Next.js shows stale chunk errors, clear the build output once:
+
+```bash
+rm -rf .next
+```
+
+## Seeded Accounts
+
+- Admin: `admin@sportbooking.local` / `Admin12345!`
+- Customer: `player@sportbooking.local` / `Player12345!`
+
+These can be overridden with seed env vars in `.env`.
 
 ## Environment Variables
 
@@ -91,39 +97,65 @@ Defined in `.env.example`:
 - `APP_TIMEZONE`
 - `PAYMENT_HOLD_MINUTES`
 - `NEXT_PUBLIC_APP_NAME`
+- `SEED_ADMIN_EMAIL`
+- `SEED_ADMIN_PASSWORD`
+- `SEED_CUSTOMER_EMAIL`
+- `SEED_CUSTOMER_PASSWORD`
 
 ## Project Structure
 
 ```text
 src/
   app/          Route entry points and layouts
-  components/   Shared UI and layout primitives
-  features/     Domain-facing feature modules
-  lib/          Utilities, config, formatting, validation
-  server/       Server-only business orchestration
-docs/           Architecture and planning docs
-prisma/         Schema, migration, and seed data
+  components/   Reusable UI and form components
+  features/     Server actions and feature schemas
+  lib/          Shared utilities, auth, db, formatting, time helpers
+  server/       Booking, policy, facility, and admin business logic
+docs/           Architecture notes
+prisma/         Schema, migrations, and seed data
 ```
 
-## MVP Assumptions
+## Deployment
 
-- Single venue/branch only for MVP.
-- Customers use email/password accounts.
-- Admins are internal staff users with role-based access.
-- Fixed 30-minute slot increments.
-- Bookings are only confirmed after verified payment success.
-- Pricing is facility-based for MVP, without peak/off-peak tiers yet.
-- Refunds are manual/off-platform for MVP.
+Recommended MVP deployment:
 
-## Seeded Accounts
+1. Create a hosted Postgres database on Neon or Supabase.
+2. Set all production env vars in Vercel.
+3. Run Prisma migrations against production:
 
-- Admin: `admin@sportbooking.local` / `Admin12345!`
-- Customer: `player@sportbooking.local` / `Player12345!`
+```bash
+npx prisma migrate deploy
+```
 
-These can be overridden through the seed env vars in `.env`.
+4. Optionally seed an initial admin account from a secure environment.
+5. Deploy the Next.js app to Vercel.
 
-## Next Phases
+Production notes:
 
-1. PayMongo checkout and webhook confirmation
-2. Admin management pages and reporting
-3. Tests, deployment guide, and polish
+- Keep `NEXTAUTH_SECRET` unique per environment.
+- Use a strong production database password.
+- Mock payment is still enabled in this MVP and should be disabled or replaced before launch.
+- Refund handling is still manual.
+
+## Assumptions
+
+- Single branch/location only
+- Customers use email/password accounts
+- Admins are internal staff only
+- Fixed 30-minute slot increments
+- Pricing is per facility without peak/off-peak tiers
+- Mock payment is temporary until a real gateway is chosen
+- Cancellation is allowed only for future confirmed bookings when policy permits it
+
+## Post-MVP Recommendations
+
+- Replace mock payments with verified PayMongo or another gateway
+- Add webhook-driven payment confirmation and expiry handling
+- Add refund tracking and staff workflows
+- Add booking filters, pagination, and richer reporting
+- Add email notifications and audit history
+- Add multi-branch support if operations expand
+
+## Architecture Notes
+
+See [docs/architecture.md](docs/architecture.md) for the MVP architecture, schema direction, and core tradeoffs.

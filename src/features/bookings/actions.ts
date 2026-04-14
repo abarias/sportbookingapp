@@ -3,13 +3,19 @@
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 
 import { requireUserSession } from "@/lib/auth/session";
-import { createConfirmedBookingWithMockPayment } from "@/server/bookings/service";
+import { cancelBookingByCustomer, createConfirmedBookingWithMockPayment } from "@/server/bookings/service";
 
 export type BookingActionState = {
   error?: string;
   fieldErrors?: Partial<Record<"durationMinutes" | "startMinutes", string>>;
+};
+
+export type CancelBookingActionState = {
+  error?: string;
+  success?: string;
 };
 
 const createBookingSchema = z.object({
@@ -28,6 +34,10 @@ const createBookingSchema = z.object({
     .min(30, "Duration must be at least 30 minutes.")
     .max(240, "Duration is too long.")
     .refine((value) => value % 30 === 0, "Duration must be in 30-minute increments.")
+});
+
+const cancelBookingSchema = z.object({
+  bookingId: z.string().min(1, "Booking is required.")
 });
 
 export async function createBookingAction(
@@ -78,6 +88,53 @@ export async function createBookingAction(
 
     return {
       error: "Booking could not be created."
+    };
+  }
+}
+
+export async function cancelBookingAction(
+  _prevState: CancelBookingActionState,
+  formData: FormData
+): Promise<CancelBookingActionState> {
+  try {
+    const session = await requireUserSession();
+    const parsed = cancelBookingSchema.safeParse({
+      bookingId: String(formData.get("bookingId") ?? "")
+    });
+
+    if (!parsed.success) {
+      return {
+        error: "Booking could not be cancelled."
+      };
+    }
+
+    await cancelBookingByCustomer({
+      bookingId: parsed.data.bookingId,
+      userId: session.user.id
+    });
+
+    revalidatePath("/bookings");
+    revalidatePath("/admin");
+    revalidatePath("/admin/customers");
+    revalidatePath("/admin/reports");
+    revalidatePath("/facilities");
+
+    return {
+      success: "Booking cancelled. Any refund handling remains manual for MVP."
+    };
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    if (error instanceof Error) {
+      return {
+        error: error.message
+      };
+    }
+
+    return {
+      error: "Booking could not be cancelled."
     };
   }
 }

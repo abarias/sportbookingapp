@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
+import { z } from "zod";
 
 import { blockedScheduleSchema, facilityUpdateSchema } from "@/features/admin/schemas";
 import { requireAdminSession } from "@/lib/auth/session";
@@ -40,6 +41,15 @@ export type BlockScheduleActionState = {
   message?: string;
   fieldErrors?: Partial<Record<"title" | "reason" | "startDate" | "endDate" | "startTime" | "endTime", string>>;
 };
+
+export type DeleteBlockScheduleActionState = {
+  success?: string;
+  error?: string;
+};
+
+const deleteBlockScheduleSchema = z.object({
+  blockId: z.string().min(1, "Blocked schedule is required.")
+});
 
 export async function updateCancellationSettingAction(formData: FormData) {
   await requireAdminSession();
@@ -232,5 +242,34 @@ export async function createBlockedScheduleAction(
 
   return {
     success: "Blocked schedule created."
+  };
+}
+
+export async function deleteBlockedScheduleAction(
+  _prevState: DeleteBlockScheduleActionState,
+  formData: FormData
+): Promise<DeleteBlockScheduleActionState> {
+  await requireAdminSession();
+
+  const parsed = deleteBlockScheduleSchema.safeParse({
+    blockId: String(formData.get("blockId") ?? "")
+  });
+
+  if (!parsed.success) {
+    return {
+      error: "Blocked schedule could not be deleted."
+    };
+  }
+
+  await prisma.blockedSchedule.delete({
+    where: { id: parsed.data.blockId }
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/facilities");
+  revalidatePath("/facilities");
+
+  return {
+    success: "Blocked schedule deleted."
   };
 }

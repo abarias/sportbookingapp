@@ -6,6 +6,7 @@ import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { canCustomerCancelBooking, resolveCancellationEnabled } from "@/server/bookings/policies";
 
 export const dynamic = "force-dynamic";
 
@@ -39,26 +40,34 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   }
 
   const now = new Date();
-  const bookings = await prisma.booking.findMany({
-    where: {
-      userId: session.user.id
-    },
-    orderBy: {
-      startAtUtc: "asc"
-    },
-    include: {
-      facility: {
-        select: {
-          name: true
-        }
+  const [bookings, cancellationSetting] = await Promise.all([
+    prisma.booking.findMany({
+      where: {
+        userId: session.user.id
       },
-      payment: {
-        select: {
-          status: true
+      orderBy: {
+        startAtUtc: "asc"
+      },
+      include: {
+        facility: {
+          select: {
+            name: true,
+            cancellationEnabledOverride: true
+          }
+        },
+        payment: {
+          select: {
+            status: true
+          }
         }
       }
-    }
-  });
+    }),
+    prisma.appSetting.findUnique({
+      where: { key: "booking.cancellationEnabled" }
+    })
+  ]);
+
+  const globalCancellationEnabled = cancellationSetting?.value === true;
 
   const upcoming = bookings.filter((booking) => booking.endAtUtc >= now && booking.status !== BookingStatus.CANCELLED);
   const history = bookings.filter((booking) => booking.endAtUtc < now || booking.status === BookingStatus.CANCELLED || booking.status === BookingStatus.EXPIRED);
@@ -94,7 +103,13 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             startAtUtc: booking.startAtUtc,
             endAtUtc: booking.endAtUtc,
             timezone: booking.timezone,
-            paymentHoldExpiresAt: booking.paymentHoldExpiresAt
+            paymentHoldExpiresAt: booking.paymentHoldExpiresAt,
+            isCancellable: canCustomerCancelBooking({
+              bookingStatus: booking.status,
+              startAtUtc: booking.startAtUtc,
+              now,
+              cancellationEnabled: resolveCancellationEnabled(globalCancellationEnabled, booking.facility.cancellationEnabledOverride)
+            })
           }))}
           title="Upcoming"
         />
@@ -110,7 +125,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             startAtUtc: booking.startAtUtc,
             endAtUtc: booking.endAtUtc,
             timezone: booking.timezone,
-            paymentHoldExpiresAt: booking.paymentHoldExpiresAt
+            paymentHoldExpiresAt: booking.paymentHoldExpiresAt,
+            isCancellable: false
           }))}
           title="History"
         />
