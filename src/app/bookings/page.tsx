@@ -77,18 +77,18 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
       <SectionHeading
         eyebrow="Customer"
         title="My bookings"
-        description="Track upcoming reservations, pending payment holds, and booking history from the live PostgreSQL data set."
+        description="Track upcoming reservations, payment status, and past visits in one place."
       />
       {params.created === "1" ? (
         <section className="rounded-[1.75rem] border border-emerald-400/15 bg-emerald-400/10 p-4 text-sm text-emerald-100">
           {params.mockPaid === "1"
-            ? "Booking confirmed and marked paid through the temporary mock payment path."
+            ? "Your reservation is confirmed and your payment has been recorded."
             : "Booking created successfully."}
         </section>
       ) : null}
       <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-sm text-stone-300">
         <p className="mb-3">Signed in as {session.user.email}</p>
-        <p>Mock payment mode is currently enabled, so new successful reservations move straight into confirmed and paid state.</p>
+        <p>Use this page to review upcoming reservations, cancellation eligibility, and your booking history.</p>
       </section>
       <div className="grid gap-6 xl:grid-cols-2">
         <BookingList

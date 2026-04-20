@@ -1,4 +1,4 @@
 export const siteConfig = {
   name: "Sport Booking PH",
-  description: "MVP sports facility booking app for Philippine operators."
+  description: "Sports facility booking platform for Philippine operators."
 } as const;

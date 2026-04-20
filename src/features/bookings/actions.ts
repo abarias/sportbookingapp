@@ -120,7 +120,7 @@ export async function cancelBookingAction(
     revalidatePath("/facilities");
 
     return {
-      success: "Booking cancelled. Any refund handling remains manual for MVP."
+      success: "Booking cancelled successfully. Any refund handling will be coordinated by staff."
     };
   } catch (error) {
     if (isRedirectError(error)) {

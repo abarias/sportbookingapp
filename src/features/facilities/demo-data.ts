@@ -46,8 +46,8 @@ export const demoFacilities: FacilityCardViewModel[] = [
     typeLabel: "Pickleball Court",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1622279457486-28f0ec1cae4d?auto=format&fit=crop&w=1200&q=80",
-        alt: "Pickleball court"
+        url: "https://commons.wikimedia.org/wiki/Special:FilePath/Outdoor_pickleball_courts.jpg",
+        alt: "Outdoor pickleball courts"
       }
     ],
     price: {
@@ -64,8 +64,8 @@ export const demoFacilities: FacilityCardViewModel[] = [
     typeLabel: "Badminton Court",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&w=1200&q=80",
-        alt: "Badminton court"
+        url: "https://commons.wikimedia.org/wiki/Special:FilePath/BOSE_Badminton_Court.jpg",
+        alt: "Indoor badminton court"
       }
     ],
     price: {

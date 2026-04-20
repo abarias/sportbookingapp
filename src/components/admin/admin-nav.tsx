@@ -1,11 +1,12 @@
 import Link from "next/link";
 
 type AdminNavProps = {
-  current: "overview" | "facilities" | "customers" | "reports";
+  current: "overview" | "calendar" | "facilities" | "customers" | "reports";
 };
 
 const items = [
   { key: "overview", href: "/admin", label: "Overview" },
+  { key: "calendar", href: "/admin/calendar", label: "Calendar" },
   { key: "facilities", href: "/admin/facilities", label: "Facilities" },
   { key: "customers", href: "/admin/customers", label: "Customers" },
   { key: "reports", href: "/admin/reports", label: "Reports" }

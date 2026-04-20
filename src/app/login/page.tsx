@@ -16,8 +16,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Customer and Admin Access</p>
         <h1 className="font-serif text-4xl text-white sm:text-5xl">Sign in to manage bookings and internal operations.</h1>
         <p className="max-w-xl text-base leading-7 text-stone-300">
-          Phase 2 adds credentials-based authentication backed by Prisma and PostgreSQL. Admin access is seeded for
-          internal staff only.
+          Customers can review and manage their reservations here, while staff can access the admin workspace for
+          schedules, facilities, and operations.
         </p>
       </section>
 

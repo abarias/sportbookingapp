@@ -7,7 +7,7 @@ export default function RegisterPage() {
         <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Create Account</p>
         <h1 className="font-serif text-4xl text-white sm:text-5xl">Register as a customer to book courts online.</h1>
         <p className="max-w-xl text-base leading-7 text-stone-300">
-          Self-registration creates customer accounts only. Admin users are seeded and managed internally for MVP.
+          Create your customer account to view availability, reserve courts, and keep track of upcoming and past bookings.
         </p>
       </section>
 

@@ -63,7 +63,7 @@ export function BookingPanel({
     return (
       <div className="space-y-4 rounded-[2rem] border border-white/10 bg-white/5 p-6">
         <p className="text-sm uppercase tracking-[0.2em] text-stone-400">Book this facility</p>
-        <p className="text-sm text-stone-300">Sign in to reserve an available slot and confirm it through the temporary mock payment flow.</p>
+        <p className="text-sm text-stone-300">Sign in to reserve an available slot and complete your booking online.</p>
         <Button asChild className="w-full">
           <Link href={`/login?callbackUrl=/facilities/${facilitySlug}`}>Sign in to book</Link>
         </Button>
@@ -80,7 +80,7 @@ export function BookingPanel({
       <div className="space-y-2">
         <p className="text-sm uppercase tracking-[0.2em] text-stone-400">Create booking</p>
         <p className="text-sm text-stone-300">{availableCount} open half-hour slots remain on this date.</p>
-        <p className="text-xs text-amber-200">Mock payment mode is active, so successful reservation is treated as immediately paid.</p>
+        <p className="text-xs text-amber-200">Reservations are confirmed as soon as checkout is completed successfully.</p>
       </div>
 
       <div className="space-y-2">
@@ -141,9 +141,7 @@ export function BookingPanel({
 
       <SubmitButton disabled={startOptions.length === 0 || startMinutes === null} />
 
-      <p className="text-xs leading-6 text-stone-400">
-        This placeholder payment path creates a payment record and auto-confirms it server-side. When a real gateway is selected, this flow will switch back to verified external payment confirmation.
-      </p>
+      <p className="text-xs leading-6 text-stone-400">Choose your time carefully before continuing to confirmation.</p>
     </form>
   );
 }

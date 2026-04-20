@@ -48,8 +48,8 @@ const facilities = [
     description: "Dedicated pickleball court with competition markings and evening lighting.",
     type: FacilityType.PICKLEBALL,
     priceMinor: 90000,
-    imageUrl: "https://images.unsplash.com/photo-1622279457486-28f0ec1cae4d?auto=format&fit=crop&w=1200&q=80",
-    imageAlt: "Pickleball court"
+    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Outdoor_pickleball_courts.jpg",
+    imageAlt: "Outdoor pickleball courts"
   },
   {
     slug: "badminton-court-1",
@@ -57,8 +57,8 @@ const facilities = [
     description: "Indoor badminton lane with rubberized flooring and spectator-side clearance.",
     type: FacilityType.BADMINTON,
     priceMinor: 70000,
-    imageUrl: "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&w=1200&q=80",
-    imageAlt: "Badminton court"
+    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/BOSE_Badminton_Court.jpg",
+    imageAlt: "Indoor badminton court"
   },
   {
     slug: "badminton-court-2",
@@ -66,8 +66,8 @@ const facilities = [
     description: "Second badminton court for doubles play, classes, and casual bookings.",
     type: FacilityType.BADMINTON,
     priceMinor: 70000,
-    imageUrl: "https://images.unsplash.com/photo-1595435934011-86ed7d35a2d1?auto=format&fit=crop&w=1200&q=80",
-    imageAlt: "Indoor badminton court"
+    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Badminton_courts.jpg",
+    imageAlt: "Badminton courts"
   }
 ] as const;
 

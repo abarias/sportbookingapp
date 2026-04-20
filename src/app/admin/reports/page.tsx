@@ -51,7 +51,7 @@ export default async function AdminReportsPage() {
       <SectionHeading
         eyebrow="Admin"
         title="Reports"
-        description="Basic MVP reporting for bookings by day, paid revenue, and utilization across the last 30 days."
+        description="Review bookings by day, paid revenue, and facility utilization across the last 30 days."
       />
       <AdminNav current="reports" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

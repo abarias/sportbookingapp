@@ -15,7 +15,7 @@ export default async function AdminPage() {
 
   const stats = [
     { label: "Confirmed Bookings", value: String(overviewStats.confirmedCount), hint: "Recent confirmed records" },
-    { label: "Pending Payment", value: String(overviewStats.pendingCount), hint: "Should stay near zero in mock mode" },
+    { label: "Pending Payment", value: String(overviewStats.pendingCount), hint: "Reservations still awaiting completion" },
     { label: "Paid Revenue", value: formatCurrency(overviewStats.paidRevenueMinor, "PHP"), hint: "From paid payment records" },
     { label: "Enabled Facilities", value: String(overviewStats.enabledFacilities), hint: "Currently bookable inventory" }
   ];
@@ -25,7 +25,7 @@ export default async function AdminPage() {
       <SectionHeading
         eyebrow="Admin"
         title="Operational overview"
-        description="Live internal overview of booking and payment state. Mock payment mode currently auto-confirms successful reservations."
+        description="Monitor booking activity, payment status, and facility operations from one admin workspace."
       />
       <AdminNav current="overview" />
       <section className="rounded-[1.75rem] border border-amber-400/15 bg-amber-400/10 p-4 text-sm text-amber-100">
@@ -68,7 +68,7 @@ export default async function AdminPage() {
             </button>
           </form>
           <div className="mt-6 rounded-2xl border border-white/10 bg-stone-950/40 p-4 text-sm text-stone-300">
-            Phase 5 admin modules are now split into dedicated pages for facilities, customers, and reports.
+            Use the calendar, facilities, customer, and reporting sections to manage daily operations.
           </div>
         </div>
       </section>
