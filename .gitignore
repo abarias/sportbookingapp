@@ -45,3 +45,4 @@ prisma/*.db-journal
 
 # local business docs
 docs/client-proposal-prompts.md
+.vercel
