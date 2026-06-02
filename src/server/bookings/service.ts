@@ -316,7 +316,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
 
   return prisma.$transaction(
     async (tx) => {
-      const [facility, holdSetting, mockSetting] = await Promise.all([
+      const [facility, mockSetting] = await Promise.all([
         tx.facility.findUnique({
           where: { id: input.facilityId },
           include: {
@@ -327,9 +327,6 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
               take: 1
             }
           }
-        }),
-        tx.appSetting.findUnique({
-          where: { key: "booking.paymentHoldMinutes" }
         }),
         tx.appSetting.findUnique({
           where: { key: "payments.mockAutoConfirmEnabled" }
@@ -439,28 +436,28 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         throw new Error("Selected time is no longer available.");
       }
 
-      const paymentHoldMinutes = getPaymentHoldMinutes(holdSetting?.value);
       const amountMinor = getBookingAmount(pricingRule.amountMinor, pricingRule.billingMode, input.durationMinutes);
 
-      const booking = await tx.booking.create({
+      return tx.booking.create({
         data: {
           userId: input.userId,
           facilityId: facility.id,
-          status: BookingStatus.PENDING_PAYMENT,
+          status: BookingStatus.CONFIRMED,
           startAtUtc,
           endAtUtc,
           timezone: facility.timezone,
           slotCount: input.durationMinutes / facility.slotIntervalMinutes,
           amountMinor,
           currency: pricingRule.currency,
-          paymentHoldExpiresAt: new Date(now.getTime() + paymentHoldMinutes * 60_000),
+          paymentHoldExpiresAt: null,
           payment: {
             create: {
               provider: PaymentProvider.MOCK,
               providerReference: `mock_${Date.now()}_${input.userId.slice(0, 6)}`,
-              status: PaymentStatus.PENDING,
+              status: PaymentStatus.PAID,
               amountMinor,
-              currency: pricingRule.currency
+              currency: pricingRule.currency,
+              paidAt: now
             }
           }
         },
@@ -468,22 +465,6 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
           payment: true
         }
       });
-
-      const confirmedBooking = await tx.booking.update({
-        where: { id: booking.id },
-        data: {
-          status: BookingStatus.CONFIRMED,
-          paymentHoldExpiresAt: null,
-          payment: {
-            update: {
-              status: PaymentStatus.PAID,
-              paidAt: now
-            }
-          }
-        }
-      });
-
-      return confirmedBooking;
     },
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable
