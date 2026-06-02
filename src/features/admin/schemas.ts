@@ -42,6 +42,16 @@ export const facilityUpdateSchema = z.object({
   operatingHours: z.array(operatingHourSchema).length(7)
 });
 
+export const facilityCreateSchema = facilityUpdateSchema.omit({ facilityId: true }).extend({
+  slug: z
+    .string()
+    .trim()
+    .min(2, "Slug must be at least 2 characters.")
+    .max(120)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens only."),
+  type: z.enum(["BASKETBALL_WHOLE", "BASKETBALL_HALF", "PICKLEBALL", "BADMINTON"])
+});
+
 export const blockedScheduleSchema = z
   .object({
     facilityId: z.string().min(1, "Facility is required."),
@@ -65,5 +75,22 @@ export const blockedScheduleSchema = z
     }
   });
 
+export const adminWalkInBookingSchema = z.object({
+  fullName: z.string().trim().min(2, "Customer name is required.").max(120),
+  email: z.string().trim().email("Enter a valid email.").max(255).optional().or(z.literal("")),
+  phone: z.string().trim().regex(/^(\+63|0)9\d{9}$/, "Enter a valid Philippine mobile number."),
+  facilityId: z.string().min(1, "Facility is required."),
+  dateKey: dateKeySchema,
+  startTime: timeKeySchema,
+  durationMinutes: z
+    .number()
+    .int()
+    .min(30, "Duration must be at least 30 minutes.")
+    .max(240, "Duration is too long.")
+    .refine((value) => value % 30 === 0, "Duration must be in 30-minute increments.")
+});
+
 export type FacilityUpdateInput = z.infer<typeof facilityUpdateSchema>;
+export type FacilityCreateInput = z.infer<typeof facilityCreateSchema>;
 export type BlockedScheduleInput = z.infer<typeof blockedScheduleSchema>;
+export type AdminWalkInBookingInput = z.infer<typeof adminWalkInBookingSchema>;

@@ -2,8 +2,9 @@ import { BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingBillingMo
 
 import { prisma } from "@/lib/db/prisma";
 import { buildUtcDateFromLocalMinutes, getDayOfWeek, getLocalMinutesForDate } from "@/lib/time/slots";
+import { isDateWithinBookingWindow } from "@/server/bookings/booking-window";
 import { buildDaySlots, canFitDuration, rangesOverlapByMinute, rangesOverlap, type DaySlot, type MinuteInterval } from "@/server/bookings/core";
-import { canCustomerCancelBooking, resolveCancellationEnabled } from "@/server/bookings/policies";
+import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellationWindowHours } from "@/server/bookings/policies";
 
 export type FacilityDayAvailability = {
   dateKey: string;
@@ -206,6 +207,10 @@ export async function createPendingBooking(input: BookingCreationInput) {
         throw new Error("Facility is closed on the selected date.");
       }
 
+      if (!isDateWithinBookingWindow(input.dateKey, facility.timezone, now)) {
+        throw new Error("Bookings are only available within the current booking window.");
+      }
+
       const bookingRange = {
         startMinutes: input.startMinutes,
         endMinutes: input.startMinutes + input.durationMinutes
@@ -355,6 +360,10 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         throw new Error("Facility is closed on the selected date.");
       }
 
+      if (!isDateWithinBookingWindow(input.dateKey, facility.timezone, now)) {
+        throw new Error("Bookings are only available within the current booking window.");
+      }
+
       const bookingRange = {
         startMinutes: input.startMinutes,
         endMinutes: input.startMinutes + input.durationMinutes
@@ -486,7 +495,7 @@ export async function cancelBookingByCustomer(input: { bookingId: string; userId
   const now = new Date();
 
   return prisma.$transaction(async (tx) => {
-    const [booking, cancellationSetting] = await Promise.all([
+    const [booking, cancellationSetting, cancellationWindowSetting] = await Promise.all([
       tx.booking.findFirst({
         where: {
           id: input.bookingId,
@@ -496,13 +505,17 @@ export async function cancelBookingByCustomer(input: { bookingId: string; userId
           facility: {
             select: {
               name: true,
-              cancellationEnabledOverride: true
+              cancellationEnabledOverride: true,
+              cancellationWindowHoursOverride: true
             }
           }
         }
       }),
       tx.appSetting.findUnique({
         where: { key: "booking.cancellationEnabled" }
+      }),
+      tx.appSetting.findUnique({
+        where: { key: "booking.cancellationWindowHours" }
       })
     ]);
 
@@ -514,13 +527,20 @@ export async function cancelBookingByCustomer(input: { bookingId: string; userId
       cancellationSetting?.value === true,
       booking.facility.cancellationEnabledOverride
     );
+    const globalCancellationWindowHours = typeof cancellationWindowSetting?.value === "number" ? cancellationWindowSetting.value : 24;
+    const cancellationWindowHours = resolveCancellationWindowHours(
+      globalCancellationWindowHours,
+      booking.facility.cancellationWindowHoursOverride
+    );
 
     if (
       !canCustomerCancelBooking({
         bookingStatus: booking.status,
         startAtUtc: booking.startAtUtc,
+        createdAt: booking.createdAt,
         now,
-        cancellationEnabled
+        cancellationEnabled,
+        cancellationWindowHours
       })
     ) {
       throw new Error("This booking can no longer be cancelled.");

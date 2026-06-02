@@ -8,11 +8,21 @@ export function resolveCancellationEnabled(globalEnabled: boolean, facilityOverr
   return facilityOverride;
 }
 
+export function resolveCancellationWindowHours(globalHours: number, facilityOverride: number | null) {
+  if (facilityOverride === null) {
+    return globalHours;
+  }
+
+  return facilityOverride;
+}
+
 export function canCustomerCancelBooking(params: {
   bookingStatus: BookingStatus;
   startAtUtc: Date;
+  createdAt: Date;
   now: Date;
   cancellationEnabled: boolean;
+  cancellationWindowHours: number;
 }) {
   if (!params.cancellationEnabled) {
     return false;
@@ -22,5 +32,11 @@ export function canCustomerCancelBooking(params: {
     return false;
   }
 
-  return params.startAtUtc > params.now;
+  if (params.startAtUtc <= params.now) {
+    return false;
+  }
+
+  const cancellationDeadline = new Date(params.createdAt.getTime() + params.cancellationWindowHours * 60 * 60 * 1000);
+
+  return params.now <= cancellationDeadline;
 }

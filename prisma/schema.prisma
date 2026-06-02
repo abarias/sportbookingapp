@@ -50,13 +50,16 @@ model User {
   passwordHash       String
   fullName           String
   phone              String?
+  phoneVerifiedAt    DateTime?
   role               UserRole          @default(CUSTOMER)
   bookings           Booking[]
   createdBlocks      BlockedSchedule[] @relation("BlockedScheduleCreator")
+  otpRequests        OtpRequest[]
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
   @@index([role])
+  @@index([phone])
 }
 
 model Facility {
@@ -69,6 +72,7 @@ model Facility {
   isEnabled                    Boolean                 @default(true)
   slotIntervalMinutes          Int                     @default(30)
   cancellationEnabledOverride  Boolean?
+  cancellationWindowHoursOverride Int?
   images                       FacilityImage[]
   operatingHours               FacilityOperatingHour[]
   pricingRules                 PricingRule[]
@@ -78,6 +82,21 @@ model Facility {
   updatedAt                    DateTime                @updatedAt
 
   @@index([type, isEnabled])
+}
+
+model OtpRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  phone       String
+  codeHash    String
+  attempts    Int       @default(0)
+  expiresAt   DateTime
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([phone])
 }
 
 model FacilityImage {

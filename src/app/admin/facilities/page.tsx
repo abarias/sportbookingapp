@@ -1,6 +1,7 @@
 import { AdminNav } from "@/components/admin/admin-nav";
 import { BlockScheduleForm } from "@/components/admin/block-schedule-form";
 import { DeleteBlockScheduleButton } from "@/components/admin/delete-block-schedule-button";
+import { FacilityCreateForm } from "@/components/admin/facility-create-form";
 import { FacilityForm } from "@/components/admin/facility-form";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { requireAdminSession } from "@/lib/auth/session";
@@ -24,6 +25,7 @@ export default async function AdminFacilitiesPage() {
       <section className="rounded-[1.75rem] border border-amber-400/15 bg-amber-400/10 p-4 text-sm text-amber-100">
         Global cancellation is currently {cancellationEnabled ? "enabled" : "disabled"}. Individual facilities can inherit or override it below.
       </section>
+      <FacilityCreateForm />
       <BlockScheduleForm facilities={facilities} />
       <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
         <h2 className="text-lg font-semibold text-white">Upcoming blocked schedules</h2>

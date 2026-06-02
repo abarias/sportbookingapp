@@ -55,6 +55,9 @@ docs/
 - Store all datetimes in UTC.
 - Convert to `Asia/Manila` for display and slot generation.
 - Slot interval is fixed at 30 minutes for MVP.
+- Customer-facing bookings are limited to the active booking window:
+  - before the last Monday of the current month, booking is open through the end of next month
+  - on or after the last Monday of the current month, booking is open through the end of the next two months
 - Availability is calculated from:
   - confirmed bookings
   - pending bookings within payment hold window
@@ -65,9 +68,23 @@ docs/
   - optimistic UI disabling based on fetched availability
   - server-side transactional overlap validation before creating payment intent/session
 
+## Cancellation Design
+
+- Cancellation eligibility is policy-driven.
+- Global cancellation can be enabled or disabled through app settings.
+- Facilities can override the global cancellation enabled/disabled state.
+- Global cancellation window defaults to 24 hours after booking creation.
+- Facilities can override the global cancellation window in hours.
+- Customer cancellation is allowed only when:
+  - booking status is `CONFIRMED`
+  - booking start time is still in the future
+  - cancellation policy permits it
+  - the request is within the configured cancellation window after booking creation
+
 ## Payment Design
 
-- Use PayMongo as the first provider.
+- Current local flow uses a mock payment provider so booking and operations can be tested before gateway selection.
+- PayMongo remains a candidate provider, but gateway selection is intentionally deferred.
 - Keep a payment gateway interface so provider-specific logic stays behind `src/server/payments`.
 - Booking state and payment state are separate.
 - Customer redirect alone never confirms the booking.
@@ -78,6 +95,18 @@ docs/
 - Email/password auth for customers and admins.
 - Single `User` table with a `role` field for MVP simplicity.
 - Admin pages are protected by role checks in server components and middleware later.
+- Customer registration captures a Philippine mobile number.
+- New customer accounts must verify a 6-digit OTP before sign-in.
+- OTP persistence is stored in `OtpRequest`.
+- Current OTP delivery is mocked and displayed in development until an SMS provider is selected.
+
+## Admin Operations Design
+
+- Admins can manage facilities, pricing, images, operating hours, blocked schedules, customers, reports, and booking calendar views.
+- Facility images can be provided as URLs or uploaded files.
+- Uploaded files are stored under `public/uploads/facilities` for local development.
+- Production deployments should move uploads to persistent object storage because serverless filesystem writes are not durable.
+- Admin-assisted walk-in bookings create or reuse customer records and create confirmed bookings through the same booking validation path.
 
 ## Reporting Design
 
@@ -94,8 +123,20 @@ docs/
 - `role`
 - `fullName`
 - `phone`
+- `phoneVerifiedAt`
 - `createdAt`
 - `updatedAt`
+
+### OtpRequest
+
+- `id`
+- `userId`
+- `phone`
+- `codeHash`
+- `attempts`
+- `expiresAt`
+- `verifiedAt`
+- `createdAt`
 
 ### Facility
 
@@ -108,6 +149,7 @@ docs/
 - `timezone`
 - `slotIntervalMinutes`
 - `cancellationEnabledOverride` (nullable)
+- `cancellationWindowHoursOverride` (nullable)
 - `createdAt`
 - `updatedAt`
 
@@ -193,6 +235,13 @@ docs/
 - `value`
 - `updatedAt`
 
+Relevant app settings:
+
+- `booking.paymentHoldMinutes`
+- `booking.cancellationEnabled`
+- `booking.cancellationWindowHours`
+- `payments.mockAutoConfirmEnabled`
+
 ## Tradeoffs
 
 - A single app and database keep MVP delivery fast and hosting costs low.
@@ -200,6 +249,8 @@ docs/
 - Pricing rules stay intentionally simple at launch: one main active rate per facility.
 - Booking uses direct `startAtUtc`/`endAtUtc` storage instead of a child `BookingSlot` table because fixed 30-minute intervals make range checks simpler.
 - Refund automation is intentionally out of scope for MVP even though payment states are future-ready.
+- OTP delivery is mocked to avoid committing to an SMS vendor before product/payment decisions are final.
+- Local image uploads are fast for development but must be replaced by object storage before production launch.
 
 ## Implementation Phases
 

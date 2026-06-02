@@ -17,18 +17,18 @@ export function SlotGrid({ slots }: SlotGridProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-stone-400">
-        <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-emerald-200">Available</span>
-        <span className="rounded-full bg-rose-400/15 px-3 py-1 text-rose-200">Booked</span>
-        <span className="rounded-full bg-amber-400/15 px-3 py-1 text-amber-100">Blocked</span>
+        <span className="rounded-full bg-emerald-400/25 px-3 py-1 text-emerald-200">Available</span>
+        <span className="rounded-full bg-rose-400/25 px-3 py-1 text-rose-200">Booked</span>
+        <span className="rounded-full bg-amber-400/25 px-3 py-1 text-amber-100">Blocked</span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {slots.map((slot) => {
           const toneClass =
             slot.reason === "AVAILABLE"
-              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+              ? "border-emerald-300/50 bg-emerald-500/20 text-emerald-100"
               : slot.reason === "BOOKED"
-                ? "border-rose-400/20 bg-rose-400/10 text-rose-100"
-                : "border-amber-400/20 bg-amber-400/10 text-amber-100";
+                ? "border-rose-300/50 bg-rose-500/20 text-rose-100"
+                : "border-amber-300/50 bg-amber-500/20 text-amber-100";
 
           return (
             <div key={slot.startMinutes} className={`rounded-2xl border px-4 py-3 text-sm ${toneClass}`}>

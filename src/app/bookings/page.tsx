@@ -6,7 +6,7 @@ import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
-import { canCustomerCancelBooking, resolveCancellationEnabled } from "@/server/bookings/policies";
+import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellationWindowHours } from "@/server/bookings/policies";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   }
 
   const now = new Date();
-  const [bookings, cancellationSetting] = await Promise.all([
+  const [bookings, cancellationSetting, cancellationWindowSetting] = await Promise.all([
     prisma.booking.findMany({
       where: {
         userId: session.user.id
@@ -52,7 +52,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
         facility: {
           select: {
             name: true,
-            cancellationEnabledOverride: true
+            cancellationEnabledOverride: true,
+            cancellationWindowHoursOverride: true
           }
         },
         payment: {
@@ -64,10 +65,14 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
     }),
     prisma.appSetting.findUnique({
       where: { key: "booking.cancellationEnabled" }
+    }),
+    prisma.appSetting.findUnique({
+      where: { key: "booking.cancellationWindowHours" }
     })
   ]);
 
   const globalCancellationEnabled = cancellationSetting?.value === true;
+  const globalCancellationWindowHours = typeof cancellationWindowSetting?.value === "number" ? cancellationWindowSetting.value : 24;
 
   const upcoming = bookings.filter((booking) => booking.endAtUtc >= now && booking.status !== BookingStatus.CANCELLED);
   const history = bookings.filter((booking) => booking.endAtUtc < now || booking.status === BookingStatus.CANCELLED || booking.status === BookingStatus.EXPIRED);
@@ -107,8 +112,13 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             isCancellable: canCustomerCancelBooking({
               bookingStatus: booking.status,
               startAtUtc: booking.startAtUtc,
+              createdAt: booking.createdAt,
               now,
-              cancellationEnabled: resolveCancellationEnabled(globalCancellationEnabled, booking.facility.cancellationEnabledOverride)
+              cancellationEnabled: resolveCancellationEnabled(globalCancellationEnabled, booking.facility.cancellationEnabledOverride),
+              cancellationWindowHours: resolveCancellationWindowHours(
+                globalCancellationWindowHours,
+                booking.facility.cancellationWindowHoursOverride
+              )
             })
           }))}
           title="Upcoming"

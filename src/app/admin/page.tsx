@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const session = await requireAdminSession();
-  const { stats: overviewStats, recentBookings, cancellationEnabled } = await getAdminOverviewData();
+  const { stats: overviewStats, recentBookings, cancellationEnabled, cancellationWindowHours } = await getAdminOverviewData();
 
   const stats = [
     { label: "Confirmed Bookings", value: String(overviewStats.confirmedCount), hint: "Recent confirmed records" },
@@ -62,6 +62,16 @@ export default async function AdminPage() {
             <label className="flex items-center gap-3 text-sm text-stone-300">
               <input defaultChecked={cancellationEnabled} name="enabled" type="checkbox" />
               Customer cancellation enabled globally
+            </label>
+            <label className="space-y-2 text-sm text-stone-300">
+              <span className="block">Cancellation window after booking</span>
+              <input
+                className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white"
+                defaultValue={cancellationWindowHours}
+                min={1}
+                name="cancellationWindowHours"
+                type="number"
+              />
             </label>
             <button className="rounded-full bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/15" type="submit">
               Save policy

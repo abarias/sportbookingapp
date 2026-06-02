@@ -69,11 +69,11 @@ export function AdminCalendarGrid(props: {
           const isSelected = day.dateKey === props.selectedDateKey;
 
           const tone = hasBlocked
-            ? "border-rose-400/30 bg-rose-400/10"
+            ? "border-rose-300/60 bg-rose-500/20"
             : hasFull
-              ? "border-amber-400/30 bg-amber-400/10"
+              ? "border-amber-300/60 bg-amber-500/20"
               : hasBookings
-                ? "border-emerald-400/30 bg-emerald-400/10"
+                ? "border-emerald-300/60 bg-emerald-500/20"
                 : "border-white/10 bg-stone-950/40";
 
           return (
@@ -173,11 +173,11 @@ export function AdminDayDetail(props: {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <StatusChip label={`${schedule.summary.bookedSlotCount} booked slots`} tone="bg-emerald-400/15 text-emerald-100" />
-                  <StatusChip label={`${schedule.summary.blockedSlotCount} blocked slots`} tone="bg-rose-400/15 text-rose-100" />
-                  <StatusChip label={`${schedule.summary.availableSlotCount} open slots`} tone="bg-sky-400/15 text-sky-100" />
-                  {schedule.summary.isFullyBooked ? <StatusChip label="Fully booked" tone="bg-amber-400/15 text-amber-100" /> : null}
-                  {schedule.summary.isFullyBlocked ? <StatusChip label="Fully blocked" tone="bg-rose-400/15 text-rose-100" /> : null}
+                  <StatusChip label={`${schedule.summary.bookedSlotCount} booked slots`} tone="bg-emerald-400/25 text-emerald-100" />
+                  <StatusChip label={`${schedule.summary.blockedSlotCount} blocked slots`} tone="bg-rose-400/25 text-rose-100" />
+                  <StatusChip label={`${schedule.summary.availableSlotCount} open slots`} tone="bg-sky-400/25 text-sky-100" />
+                  {schedule.summary.isFullyBooked ? <StatusChip label="Fully booked" tone="bg-amber-400/25 text-amber-100" /> : null}
+                  {schedule.summary.isFullyBlocked ? <StatusChip label="Fully blocked" tone="bg-rose-400/25 text-rose-100" /> : null}
                 </div>
               </div>
 
@@ -245,18 +245,18 @@ export function AdminDayDetail(props: {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <StatusChip label={`${selectedFacility.summary.availableSlotCount} available`} tone="bg-sky-400/15 text-sky-100" />
-                  <StatusChip label={`${selectedFacility.summary.bookedSlotCount} booked`} tone="bg-emerald-400/15 text-emerald-100" />
-                  <StatusChip label={`${selectedFacility.summary.blockedSlotCount} blocked`} tone="bg-rose-400/15 text-rose-100" />
+                  <StatusChip label={`${selectedFacility.summary.availableSlotCount} available`} tone="bg-sky-400/25 text-sky-100" />
+                  <StatusChip label={`${selectedFacility.summary.bookedSlotCount} booked`} tone="bg-emerald-400/25 text-emerald-100" />
+                  <StatusChip label={`${selectedFacility.summary.blockedSlotCount} blocked`} tone="bg-rose-400/25 text-rose-100" />
                 </div>
               </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
               <div className="mb-4 flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em]">
-                <span className="rounded-full bg-sky-400/15 px-3 py-1 text-sky-100">Available</span>
-                <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-emerald-100">Booked</span>
-                <span className="rounded-full bg-rose-400/15 px-3 py-1 text-rose-100">Blocked</span>
+                <span className="rounded-full bg-sky-400/25 px-3 py-1 text-sky-100">Available</span>
+                <span className="rounded-full bg-emerald-400/25 px-3 py-1 text-emerald-100">Booked</span>
+                <span className="rounded-full bg-rose-400/25 px-3 py-1 text-rose-100">Blocked</span>
               </div>
               {selectedFacility.slots.length === 0 ? (
                 <p className="text-sm text-stone-400">No operating slots on this date.</p>
@@ -265,10 +265,10 @@ export function AdminDayDetail(props: {
                   {selectedFacility.slots.map((slot) => {
                     const tone =
                       slot.reason === "AVAILABLE"
-                        ? "border-sky-400/20 bg-sky-400/10 text-sky-100"
+                        ? "border-sky-300/50 bg-sky-500/20 text-sky-100"
                         : slot.reason === "BOOKED"
-                          ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
-                          : "border-rose-400/20 bg-rose-400/10 text-rose-100";
+                          ? "border-emerald-300/50 bg-emerald-500/20 text-emerald-100"
+                          : "border-rose-300/50 bg-rose-500/20 text-rose-100";
 
                     return (
                       <div key={`${slot.startMinutes}-${slot.endMinutes}`} className={`rounded-xl border px-3 py-2 text-sm ${tone}`}>

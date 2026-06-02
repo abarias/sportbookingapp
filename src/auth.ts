@@ -35,6 +35,10 @@ const authConfig: NextAuthConfig = {
           return null;
         }
 
+        if (user.role === "CUSTOMER" && !user.phoneVerifiedAt) {
+          return null;
+        }
+
         const isValid = await verifyPassword(parsed.data.password, user.passwordHash);
 
         if (!isValid) {

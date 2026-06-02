@@ -75,6 +75,10 @@ export function FacilityForm({ facility }: FacilityFormProps) {
           {state.fieldErrors?.minimumMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.minimumMinutes}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200 md:col-span-2">
+          <span>Upload additional images</span>
+          <input accept="image/*" className="block w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-amber-300 file:px-4 file:py-2 file:text-sm file:font-medium file:text-stone-950" multiple name="imageFiles" type="file" />
+        </label>
+        <label className="space-y-2 text-sm text-stone-200 md:col-span-2">
           <span>Image URLs, one per line</span>
           <textarea
             className="min-h-28 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-white"
@@ -101,6 +105,18 @@ export function FacilityForm({ facility }: FacilityFormProps) {
             <option value="enabled">Enabled</option>
             <option value="disabled">Disabled</option>
           </select>
+        </label>
+        <label className="space-y-2 text-sm text-stone-200">
+          <span>Cancellation window override hours</span>
+          <input
+            className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white"
+            defaultValue={facility.cancellationWindowHoursOverride ?? ""}
+            min={1}
+            name="cancellationWindowHoursOverride"
+            placeholder="Inherit global"
+            type="number"
+          />
+          {state.fieldErrors?.cancellationWindowHoursOverride ? <p className="text-sm text-rose-300">{state.fieldErrors.cancellationWindowHoursOverride}</p> : null}
         </label>
       </div>
 

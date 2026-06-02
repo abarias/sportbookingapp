@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { BookingPanel } from "@/components/bookings/booking-panel";
 import { SlotGrid } from "@/components/bookings/slot-grid";
 import { getSession } from "@/lib/auth/session";
-import { formatDateLabel, getTodayDateKey, normalizeDateKey } from "@/lib/time/slots";
+import { formatDateLabel } from "@/lib/time/slots";
 import { formatCurrency } from "@/lib/formatting/currency";
+import { getBookingWindow, normalizeDateKeyWithinBookingWindow } from "@/server/bookings/booking-window";
 import { getFacilityDayAvailability } from "@/server/bookings/service";
 import { getFacilityBySlug, getFacilityTypeLabel } from "@/server/facilities/queries";
 
@@ -29,8 +30,8 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
     notFound();
   }
 
-  const dateKey = normalizeDateKey((await searchParams).date, facility.timezone);
-  const minDateKey = getTodayDateKey(facility.timezone);
+  const bookingWindow = getBookingWindow(facility.timezone);
+  const dateKey = normalizeDateKeyWithinBookingWindow((await searchParams).date, facility.timezone);
   const availability = await getFacilityDayAvailability(facility, dateKey);
   const primaryPrice = facility.pricingRules[0];
 
@@ -89,7 +90,8 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
                   className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-sm text-white"
                   defaultValue={dateKey}
                   id="date"
-                  min={minDateKey}
+                  min={bookingWindow.minDateKey}
+                  max={bookingWindow.maxDateKey}
                   name="date"
                   required
                   type="date"
@@ -102,7 +104,9 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
                 Check availability
               </button>
             </form>
-            <p className="mt-4 text-sm text-stone-400">Showing slots for {formatDateLabel(dateKey, facility.timezone)} in {facility.timezone}.</p>
+            <p className="mt-4 text-sm text-stone-400">
+              Showing slots for {formatDateLabel(dateKey, facility.timezone)} in {facility.timezone}. Bookings are open through {formatDateLabel(bookingWindow.maxDateKey, facility.timezone)}.
+            </p>
           </div>
 
           <BookingPanel

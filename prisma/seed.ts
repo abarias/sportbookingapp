@@ -77,6 +77,7 @@ async function upsertUser(params: {
   fullName: string;
   role: UserRole;
   phone?: string;
+  phoneVerifiedAt?: Date;
 }) {
   return prisma.user.upsert({
     where: { email: params.email },
@@ -84,6 +85,7 @@ async function upsertUser(params: {
       fullName: params.fullName,
       passwordHash: await bcrypt.hash(params.password, 10),
       phone: params.phone,
+      phoneVerifiedAt: params.phoneVerifiedAt,
       role: params.role
     },
     create: {
@@ -91,6 +93,7 @@ async function upsertUser(params: {
       fullName: params.fullName,
       passwordHash: await bcrypt.hash(params.password, 10),
       phone: params.phone,
+      phoneVerifiedAt: params.phoneVerifiedAt,
       role: params.role
     }
   });
@@ -107,6 +110,7 @@ async function main() {
     password: adminPassword,
     fullName: "MVP Admin",
     phone: "+639171234567",
+    phoneVerifiedAt: new Date(),
     role: UserRole.ADMIN
   });
 
@@ -115,6 +119,7 @@ async function main() {
     password: customerPassword,
     fullName: "Sample Player",
     phone: "+639181112222",
+    phoneVerifiedAt: new Date(),
     role: UserRole.CUSTOMER
   });
 
@@ -197,6 +202,12 @@ async function main() {
     where: { key: "booking.cancellationEnabled" },
     update: { value: true },
     create: { key: "booking.cancellationEnabled", value: true as Prisma.InputJsonValue }
+  });
+
+  await prisma.appSetting.upsert({
+    where: { key: "booking.cancellationWindowHours" },
+    update: { value: 24 },
+    create: { key: "booking.cancellationWindowHours", value: 24 as Prisma.InputJsonValue }
   });
 
   await prisma.appSetting.upsert({

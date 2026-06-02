@@ -11,8 +11,16 @@ export async function getCancellationSetting() {
   return setting?.value === true;
 }
 
+export async function getCancellationWindowHoursSetting() {
+  const setting = await prisma.appSetting.findUnique({
+    where: { key: "booking.cancellationWindowHours" }
+  });
+
+  return typeof setting?.value === "number" ? setting.value : 24;
+}
+
 export async function getAdminOverviewData() {
-  const [recentBookings, paidPayments, enabledFacilities, cancellationEnabled] = await Promise.all([
+  const [recentBookings, paidPayments, enabledFacilities, cancellationEnabled, cancellationWindowHours] = await Promise.all([
     prisma.booking.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,
@@ -28,7 +36,8 @@ export async function getAdminOverviewData() {
     prisma.facility.count({
       where: { isEnabled: true }
     }),
-    getCancellationSetting()
+    getCancellationSetting(),
+    getCancellationWindowHoursSetting()
   ]);
 
   const confirmedCount = recentBookings.filter((booking) => booking.status === BookingStatus.CONFIRMED).length;
@@ -47,7 +56,8 @@ export async function getAdminOverviewData() {
       enabledFacilities
     },
     recentBookings,
-    cancellationEnabled
+    cancellationEnabled,
+    cancellationWindowHours
   };
 }
 

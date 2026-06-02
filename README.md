@@ -4,17 +4,20 @@ MVP sports facility booking app for Philippine operators. The app supports custo
 
 ## Current Status
 
-Phase 6 is in place:
+Current MVP feature set:
 
 - Next.js App Router + TypeScript strict mode
 - Tailwind CSS UI scaffold
 - Prisma + PostgreSQL schema, migrations, and seed data
 - Credentials auth for customer and admin accounts
+- Customer mobile number capture and OTP verification during registration
 - Database-backed facility browsing and availability
 - Server-side booking creation with overlap checks
 - Mock payment flow that auto-confirms bookings
-- Customer booking history and cancellation flow
-- Admin overview, facility management, blocked schedules, customers, and reports
+- Customer booking history and policy-based cancellation flow
+- Admin overview, booking calendar, facility management, blocked schedules, walk-in booking, customers, and reports
+- Facility creation and editing with multiple image URLs or uploaded image files
+- Booking window rules limiting customers to the current/next month, with next-two-month visibility opening on the last Monday of the month
 - Basic automated coverage for availability, cancellation policy, and blocked schedule validation
 
 ## Tech Stack
@@ -83,6 +86,59 @@ rm -rf .next
 
 These can be overridden with seed env vars in `.env`.
 
+Seeded accounts are marked as mobile-verified. Newly registered customer accounts must complete the OTP verification step before sign-in.
+
+## Feature Notes
+
+### Facility Management
+
+Admins can manage existing facilities at `/admin/facilities` and create new facilities from the same page. Each facility supports:
+
+- name, slug, description, type, enabled state
+- per-hour pricing and minimum duration
+- 30-minute based slot interval rules
+- operating hours by day
+- global or per-facility cancellation policy overrides
+- multiple images through either image URLs or uploaded image files
+
+Uploaded images are stored locally in `public/uploads/facilities`. This is suitable for local development and lightweight demos. For production, move facility image storage to Cloudinary, Supabase Storage, S3, or another persistent object store because Vercel filesystem writes are not durable.
+
+### Customer Registration And OTP
+
+Customer registration captures:
+
+- full name
+- email
+- Philippine mobile number
+- password
+
+After account creation, the customer must verify a 6-digit OTP before they can sign in. The current implementation uses a development-visible mock OTP instead of sending SMS. This keeps the registration workflow testable while leaving the SMS provider decision open.
+
+Production SMS integration should replace the mock display with a provider such as Semaphore, Twilio, Vonage, or another Philippine-friendly SMS provider.
+
+### Walk-In Bookings
+
+Admins can create desk-assisted bookings at `/admin/walk-ins`. The form captures customer name, mobile number, optional email, facility, date, time, and duration. The system creates or reuses a customer record, marks the mobile number as verified because staff captured it in person, and creates a confirmed booking through the same server-side validation path as customer bookings.
+
+### Booking Window
+
+Customer-facing booking dates are limited by business policy:
+
+- before the last Monday of the current month: customers can book through the end of next month
+- on or after the last Monday of the current month: customers can book through the end of the next two months
+
+The browser date picker and server-side booking creation both enforce this rule.
+
+### Cancellation Policy
+
+Cancellation is controlled by both eligibility and timing:
+
+- cancellation must be enabled globally or enabled by a facility override
+- the booking must be future and confirmed
+- the request must happen within the configured cancellation window after booking creation
+
+The global cancellation window defaults to 24 hours and can be changed from the admin overview. Facilities can optionally override the cancellation window in hours.
+
 ## Environment Variables
 
 Defined in `.env.example`:
@@ -135,21 +191,28 @@ Production notes:
 - Keep `NEXTAUTH_SECRET` unique per environment.
 - Use a strong production database password.
 - Mock payment is still enabled in this MVP and should be disabled or replaced before launch.
+- Mock OTP is still enabled in this MVP and should be replaced with a real SMS provider before launch.
+- Local image uploads are stored on disk and should be moved to persistent object storage before launch.
 - Refund handling is still manual.
 
 ## Assumptions
 
 - Single branch/location only
 - Customers use email/password accounts
+- Customers must verify a Philippine mobile number during registration
 - Admins are internal staff only
 - Fixed 30-minute slot increments
 - Pricing is per facility without peak/off-peak tiers
 - Mock payment is temporary until a real gateway is chosen
-- Cancellation is allowed only for future confirmed bookings when policy permits it
+- Mock OTP is temporary until an SMS provider is chosen
+- Admin-assisted walk-in bookings create or reuse customer records
+- Cancellation is allowed only for future confirmed bookings when policy and cancellation window permit it
 
 ## Post-MVP Recommendations
 
 - Replace mock payments with verified PayMongo or another gateway
+- Replace mock OTP with real SMS delivery and rate limiting
+- Move uploaded facility images to persistent object storage
 - Add webhook-driven payment confirmation and expiry handling
 - Add refund tracking and staff workflows
 - Add booking filters, pagination, and richer reporting

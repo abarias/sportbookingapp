@@ -42,3 +42,6 @@ prisma/*.db-journal
 
 # typescript
 *.tsbuildinfo
+
+# local business docs
+docs/client-proposal-prompts.md
