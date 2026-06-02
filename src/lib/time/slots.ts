@@ -28,6 +28,15 @@ export function minutesToTimeLabel(totalMinutes: number) {
   return `${displayHour}:${minutes.toString().padStart(2, "0")} ${suffix}`;
 }
 
+export function minutesToTimeInputValue(totalMinutes: number) {
+  const hours = Math.floor(totalMinutes / 60)
+    .toString()
+    .padStart(2, "0");
+  const minutes = (totalMinutes % 60).toString().padStart(2, "0");
+
+  return `${hours}:${minutes}`;
+}
+
 export function buildUtcDateFromLocalMinutes(dateKey: string, totalMinutes: number, timezone: string) {
   const hours = Math.floor(totalMinutes / 60)
     .toString()

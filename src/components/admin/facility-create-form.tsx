@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { createFacilityAction, type FacilityActionState } from "@/features/admin/actions";
 import { Button } from "@/components/ui/button";
+import { minutesToTimeInputValue } from "@/lib/time/slots";
 
 const initialState: FacilityActionState = {};
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -103,11 +104,25 @@ export function FacilityCreateForm() {
               <div className="text-sm font-medium text-white">{label}</div>
               <label className="space-y-1 text-sm text-stone-300">
                 <span>Open</span>
-                <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={480} max={1440} min={0} name={`opensAtMinutes_${dayOfWeek}`} required type="number" />
+                <input
+                  className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white"
+                  defaultValue={minutesToTimeInputValue(480)}
+                  name={`opensAtMinutes_${dayOfWeek}`}
+                  required
+                  step={1800}
+                  type="time"
+                />
               </label>
               <label className="space-y-1 text-sm text-stone-300">
                 <span>Close</span>
-                <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={1320} max={1440} min={0} name={`closesAtMinutes_${dayOfWeek}`} required type="number" />
+                <input
+                  className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white"
+                  defaultValue={minutesToTimeInputValue(1320)}
+                  name={`closesAtMinutes_${dayOfWeek}`}
+                  required
+                  step={1800}
+                  type="time"
+                />
               </label>
               <label className="flex items-center gap-2 self-end text-sm text-stone-300">
                 <input name={`isClosed_${dayOfWeek}`} type="checkbox" />

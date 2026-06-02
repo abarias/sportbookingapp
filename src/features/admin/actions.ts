@@ -26,8 +26,13 @@ function parseNullableBoolean(value: string) {
 }
 
 function parseMinutes(value: FormDataEntryValue | null) {
-  const parsed = Number.parseInt(String(value ?? ""), 10);
-  return parsed;
+  const raw = String(value ?? "").trim();
+
+  if (/^\d{2}:\d{2}$/.test(raw)) {
+    return timeToMinutes(raw);
+  }
+
+  return Number.parseInt(raw, 10);
 }
 
 function parseAmountMinor(value: FormDataEntryValue | null) {
