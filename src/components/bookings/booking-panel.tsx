@@ -40,6 +40,7 @@ export function BookingPanel({
   isAuthenticated
 }: BookingPanelProps) {
   const [durationMinutes, setDurationMinutes] = useState(60);
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [state, action] = useActionState(createBookingAction, initialState);
 
   const startOptions = useMemo(() => {
@@ -76,6 +77,7 @@ export function BookingPanel({
       <input name="facilityId" type="hidden" value={facilityId} />
       <input name="facilitySlug" type="hidden" value={facilitySlug} />
       <input name="dateKey" type="hidden" value={dateKey} />
+      <input name="idempotencyKey" type="hidden" value={idempotencyKey} />
 
       <div className="space-y-2">
         <p className="text-sm uppercase tracking-[0.2em] text-stone-400">Create booking</p>

@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import { BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingBillingMode, type Facility } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
@@ -21,6 +23,7 @@ type BookingCreationInput = {
   dateKey: string;
   startMinutes: number;
   durationMinutes: number;
+  idempotencyKey?: string;
 };
 
 function getPaymentHoldMinutes(value: Prisma.JsonValue | null | undefined) {
@@ -39,6 +42,31 @@ function assertMockPaymentModeAllowed() {
   if (isStrictProductionEnvironment() && !isProductionMockPaymentAllowed()) {
     throw new Error("Mock payment mode is not allowed in production.");
   }
+}
+
+async function findReusableBooking(
+  tx: Prisma.TransactionClient,
+  input: BookingCreationInput,
+  includePayment = false
+) {
+  if (!input.idempotencyKey) {
+    return null;
+  }
+
+  const existingBooking = await tx.booking.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+    include: includePayment ? { payment: true } : undefined
+  });
+
+  if (!existingBooking) {
+    return null;
+  }
+
+  if (existingBooking.userId !== input.userId) {
+    throw new Error("Booking request could not be reused.");
+  }
+
+  return existingBooking;
 }
 
 function getBookingAmount(amountMinor: number, billingMode: PricingBillingMode, durationMinutes: number) {
@@ -181,6 +209,12 @@ export async function createPendingBooking(input: BookingCreationInput) {
 
   return prisma.$transaction(
     async (tx) => {
+      const existingBooking = await findReusableBooking(tx, input);
+
+      if (existingBooking) {
+        return existingBooking;
+      }
+
       const [facility, holdSetting] = await Promise.all([
         tx.facility.findUnique({
           where: { id: input.facilityId },
@@ -312,6 +346,7 @@ export async function createPendingBooking(input: BookingCreationInput) {
           slotCount: input.durationMinutes / facility.slotIntervalMinutes,
           amountMinor,
           currency: pricingRule.currency,
+          idempotencyKey: input.idempotencyKey,
           paymentHoldExpiresAt
         }
       });
@@ -327,8 +362,15 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
 
   const now = new Date();
 
-  return prisma.$transaction(
-    async (tx) => {
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        const existingBooking = await findReusableBooking(tx, input, true);
+
+        if (existingBooking) {
+          return existingBooking;
+        }
+
       const [facility, mockSetting] = await Promise.all([
         tx.facility.findUnique({
           where: { id: input.facilityId },
@@ -462,11 +504,12 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
           slotCount: input.durationMinutes / facility.slotIntervalMinutes,
           amountMinor,
           currency: pricingRule.currency,
+          idempotencyKey: input.idempotencyKey,
           paymentHoldExpiresAt: null,
           payment: {
             create: {
               provider: PaymentProvider.MOCK,
-              providerReference: `mock_${Date.now()}_${input.userId.slice(0, 6)}`,
+              providerReference: `mock_${input.idempotencyKey ?? crypto.randomUUID()}`,
               status: PaymentStatus.PAID,
               amountMinor,
               currency: pricingRule.currency,
@@ -478,11 +521,25 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
           payment: true
         }
       });
-    },
-    {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+      }
+    );
+  } catch (error) {
+    if (input.idempotencyKey && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const existingBooking = await prisma.booking.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+        include: { payment: true }
+      });
+
+      if (existingBooking?.userId === input.userId) {
+        return existingBooking;
+      }
     }
-  );
+
+    throw error;
+  }
 }
 
 export async function cancelBookingByCustomer(input: { bookingId: string; userId: string }) {

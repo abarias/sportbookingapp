@@ -186,6 +186,7 @@ model Booking {
   slotCount            Int
   amountMinor          Int
   currency             String        @default("PHP")
+  idempotencyKey       String?       @unique
   paymentHoldExpiresAt DateTime?
   cancellationReason   String?
   cancelledAt          DateTime?

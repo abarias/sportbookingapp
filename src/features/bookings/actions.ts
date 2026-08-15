@@ -22,6 +22,7 @@ const createBookingSchema = z.object({
   facilityId: z.string().min(1),
   facilitySlug: z.string().min(1),
   dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  idempotencyKey: z.string().uuid(),
   startMinutes: z
     .number()
     .int()
@@ -50,6 +51,7 @@ export async function createBookingAction(
       facilityId: String(formData.get("facilityId") ?? ""),
       facilitySlug: String(formData.get("facilitySlug") ?? ""),
       dateKey: String(formData.get("dateKey") ?? ""),
+      idempotencyKey: String(formData.get("idempotencyKey") ?? ""),
       startMinutes: Number.parseInt(String(formData.get("startMinutes") ?? ""), 10),
       durationMinutes: Number.parseInt(String(formData.get("durationMinutes") ?? ""), 10)
     });
@@ -70,6 +72,7 @@ export async function createBookingAction(
       userId: session.user.id,
       facilityId: parsed.data.facilityId,
       dateKey: parsed.data.dateKey,
+      idempotencyKey: parsed.data.idempotencyKey,
       startMinutes: parsed.data.startMinutes,
       durationMinutes: parsed.data.durationMinutes
     });
