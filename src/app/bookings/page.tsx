@@ -1,4 +1,4 @@
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus, PaymentStatus } from "@prisma/client";
 import Link from "next/link";
 
 import { BookingList } from "@/components/bookings/booking-list";
@@ -16,6 +16,40 @@ type BookingsPageProps = {
     mockPaid?: string;
   }>;
 };
+
+type CustomerBookingListRecord = Awaited<ReturnType<typeof prisma.booking.findMany>>[number] & {
+  payment: {
+    status: PaymentStatus;
+    reviewNote: string | null;
+  } | null;
+};
+
+function needsCustomerPaymentAction(booking: CustomerBookingListRecord) {
+  return (
+    booking.status === BookingStatus.HELD &&
+    (booking.payment?.status === PaymentStatus.AWAITING_PAYMENT || booking.payment?.status === PaymentStatus.ACTION_REQUIRED)
+  );
+}
+
+function belongsInHistory(booking: CustomerBookingListRecord, now: Date) {
+  return (
+    booking.endAtUtc < now ||
+    booking.status === BookingStatus.CANCELLED ||
+    booking.status === BookingStatus.EXPIRED ||
+    booking.payment?.status === PaymentStatus.REJECTED
+  );
+}
+
+function sortUpcomingBookings(left: CustomerBookingListRecord, right: CustomerBookingListRecord) {
+  const leftNeedsAction = needsCustomerPaymentAction(left);
+  const rightNeedsAction = needsCustomerPaymentAction(right);
+
+  if (leftNeedsAction !== rightNeedsAction) {
+    return leftNeedsAction ? -1 : 1;
+  }
+
+  return left.startAtUtc.getTime() - right.startAtUtc.getTime();
+}
 
 export default async function BookingsPage({ searchParams }: BookingsPageProps) {
   const session = await getSession();
@@ -75,8 +109,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   const globalCancellationEnabled = cancellationSetting?.value === true;
   const globalCancellationWindowHours = typeof cancellationWindowSetting?.value === "number" ? cancellationWindowSetting.value : 24;
 
-  const upcoming = bookings.filter((booking) => booking.endAtUtc >= now && booking.status !== BookingStatus.CANCELLED);
-  const history = bookings.filter((booking) => booking.endAtUtc < now || booking.status === BookingStatus.CANCELLED || booking.status === BookingStatus.EXPIRED);
+  const history = bookings.filter((booking) => belongsInHistory(booking, now));
+  const upcoming = bookings.filter((booking) => !belongsInHistory(booking, now)).sort(sortUpcomingBookings);
 
   return (
     <main className="space-y-8 pb-16">
