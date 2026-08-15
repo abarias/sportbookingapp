@@ -1,6 +1,7 @@
 import { BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingBillingMode, type Facility } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { getPaymentMode, isProductionMockPaymentAllowed, isStrictProductionEnvironment } from "@/lib/config/env";
 import { buildUtcDateFromLocalMinutes, getDayOfWeek, getLocalMinutesForDate } from "@/lib/time/slots";
 import { isDateWithinBookingWindow } from "@/server/bookings/booking-window";
 import { buildDaySlots, canFitDuration, rangesOverlapByMinute, rangesOverlap, type DaySlot, type MinuteInterval } from "@/server/bookings/core";
@@ -28,6 +29,16 @@ function getPaymentHoldMinutes(value: Prisma.JsonValue | null | undefined) {
   }
 
   return Number.parseInt(process.env.PAYMENT_HOLD_MINUTES ?? "15", 10);
+}
+
+function assertMockPaymentModeAllowed() {
+  if (getPaymentMode() !== "mock") {
+    throw new Error("Mock payment mode is disabled.");
+  }
+
+  if (isStrictProductionEnvironment() && !isProductionMockPaymentAllowed()) {
+    throw new Error("Mock payment mode is not allowed in production.");
+  }
 }
 
 function getBookingAmount(amountMinor: number, billingMode: PricingBillingMode, durationMinutes: number) {
@@ -312,6 +323,8 @@ export async function createPendingBooking(input: BookingCreationInput) {
 }
 
 export async function createConfirmedBookingWithMockPayment(input: BookingCreationInput) {
+  assertMockPaymentModeAllowed();
+
   const now = new Date();
 
   return prisma.$transaction(

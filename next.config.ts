@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+import { assertServerEnvironment } from "./src/lib/config/env";
+
+assertServerEnvironment();
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [

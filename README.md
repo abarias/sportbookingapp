@@ -84,9 +84,25 @@ rm -rf .next
 - Admin: `admin@sportbooking.local` / `Admin12345!`
 - Customer: `player@sportbooking.local` / `Player12345!`
 
-These can be overridden with seed env vars in `.env`.
+These local development defaults only work when `DATABASE_URL` points to a local database. For any remote database, set secure `SEED_*` credentials or use the production admin bootstrap flow.
 
 Seeded accounts are marked as mobile-verified. Newly registered customer accounts must complete the OTP verification step before sign-in.
+
+## Production Admin Bootstrap
+
+Do not run the development seed against production. The seed script refuses to run in strict production mode and refuses default credentials against remote databases.
+
+To create or rotate the first production admin account, set secure bootstrap variables locally or in a trusted shell:
+
+```bash
+ADMIN_BOOTSTRAP_EMAIL="owner@example.com" \
+ADMIN_BOOTSTRAP_PASSWORD="use-a-strong-unique-password" \
+ADMIN_BOOTSTRAP_FULL_NAME="Facility Owner" \
+ADMIN_BOOTSTRAP_PHONE="+639171234567" \
+npm run admin:bootstrap
+```
+
+The bootstrap script never prints the password. It marks the admin email as verified and marks the phone as verified only when a phone number is provided.
 
 ## Feature Notes
 
@@ -154,6 +170,9 @@ Defined in `.env.example`:
 - `PAYMONGO_WEBHOOK_SECRET`
 - `APP_TIMEZONE`
 - `PAYMENT_HOLD_MINUTES`
+- `PAYMENT_MODE`
+- `ALLOW_PRODUCTION_MOCK_PAYMENTS`
+- `AUTH_STRICT_ENV_VALIDATION`
 - `AUTH_REGISTRATION_WINDOW_MINUTES`
 - `AUTH_MAX_REGISTRATION_ATTEMPTS`
 - `AUTH_EMAIL_VERIFICATION_EXPIRY_MINUTES`
@@ -167,6 +186,10 @@ Defined in `.env.example`:
 - `SEED_ADMIN_PASSWORD`
 - `SEED_CUSTOMER_EMAIL`
 - `SEED_CUSTOMER_PASSWORD`
+- `ADMIN_BOOTSTRAP_EMAIL`
+- `ADMIN_BOOTSTRAP_PASSWORD`
+- `ADMIN_BOOTSTRAP_FULL_NAME`
+- `ADMIN_BOOTSTRAP_PHONE`
 
 ## Email Delivery
 
@@ -196,6 +219,18 @@ Defaults:
 
 Use the `AUTH_*` environment variables to adjust auth throttling and retention. For production, run this daily through Vercel Cron or an equivalent scheduled job.
 
+## Production Environment Validation
+
+The app validates critical server environment variables during startup and build.
+
+- Vercel production deployments run strict validation automatically through `VERCEL_ENV=production`.
+- Use `AUTH_STRICT_ENV_VALIDATION=true` to test production-style validation outside Vercel.
+- `PAYMENT_MODE=manual` is the safest production setting while real payment gateway work is deferred.
+- `PAYMENT_MODE=mock` is blocked in production unless `ALLOW_PRODUCTION_MOCK_PAYMENTS=true` is explicitly set for controlled demos.
+- `PAYMENT_MODE=gateway` requires PayMongo secret, public, and webhook keys.
+
+For the current demo deployment, use mock payments only if the client understands that bookings are auto-confirmed and no real collection happens.
+
 ## Project Structure
 
 ```text
@@ -221,7 +256,7 @@ Recommended MVP deployment:
 npx prisma migrate deploy
 ```
 
-4. Optionally seed an initial admin account from a secure environment.
+4. Create the initial production admin with `npm run admin:bootstrap` from a secure environment.
 5. Deploy the Next.js app to Vercel.
 
 Production notes:

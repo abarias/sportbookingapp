@@ -4,6 +4,10 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 const timezone = "Asia/Manila";
+const defaultAdminEmail = "admin@sportbooking.local";
+const defaultAdminPassword = "Admin12345!";
+const defaultCustomerEmail = "player@sportbooking.local";
+const defaultCustomerPassword = "Player12345!";
 const defaultOperatingHours = [
   { dayOfWeek: 0, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
   { dayOfWeek: 1, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
@@ -102,11 +106,51 @@ async function upsertUser(params: {
   });
 }
 
+function isLocalDatabaseUrl(value: string | undefined) {
+  return Boolean(value && /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(value));
+}
+
+function usesDefaultSeedCredentials(params: {
+  adminEmail: string;
+  adminPassword: string;
+  customerEmail: string;
+  customerPassword: string;
+}) {
+  return (
+    params.adminEmail === defaultAdminEmail ||
+    params.adminPassword === defaultAdminPassword ||
+    params.customerEmail === defaultCustomerEmail ||
+    params.customerPassword === defaultCustomerPassword
+  );
+}
+
+function assertSeedTargetIsSafe(params: {
+  adminEmail: string;
+  adminPassword: string;
+  customerEmail: string;
+  customerPassword: string;
+}) {
+  const strictProduction = process.env.AUTH_STRICT_ENV_VALIDATION === "true" || process.env.VERCEL_ENV === "production";
+  const localDatabase = isLocalDatabaseUrl(process.env.DATABASE_URL);
+
+  if (strictProduction) {
+    throw new Error("Development seed is disabled in production. Use npm run admin:bootstrap for production admin setup.");
+  }
+
+  if (!localDatabase && usesDefaultSeedCredentials(params)) {
+    throw new Error(
+      "Development seed defaults can only be used with a local database. Set secure SEED_* credentials or use npm run admin:bootstrap."
+    );
+  }
+}
+
 async function main() {
-  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@sportbooking.local";
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "Admin12345!";
-  const customerEmail = process.env.SEED_CUSTOMER_EMAIL ?? "player@sportbooking.local";
-  const customerPassword = process.env.SEED_CUSTOMER_PASSWORD ?? "Player12345!";
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? defaultAdminEmail;
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? defaultAdminPassword;
+  const customerEmail = process.env.SEED_CUSTOMER_EMAIL ?? defaultCustomerEmail;
+  const customerPassword = process.env.SEED_CUSTOMER_PASSWORD ?? defaultCustomerPassword;
+
+  assertSeedTargetIsSafe({ adminEmail, adminPassword, customerEmail, customerPassword });
 
   const admin = await upsertUser({
     email: adminEmail,
@@ -327,8 +371,8 @@ async function main() {
   });
 
   console.log("Seed complete.");
-  console.log(`Admin login: ${adminEmail} / ${adminPassword}`);
-  console.log(`Customer login: ${customerEmail} / ${customerPassword}`);
+  console.log(`Seeded admin account: ${adminEmail}`);
+  console.log(`Seeded customer account: ${customerEmail}`);
 }
 
 main()
