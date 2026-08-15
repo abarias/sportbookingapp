@@ -117,6 +117,10 @@ export function validateServerEnvironment(env: EnvSource = process.env): Environ
     errors.push("EMAIL_FROM must be configured with a verified sender address.");
   }
 
+  if (isPlaceholder(env.CRON_SECRET) || (env.CRON_SECRET?.length ?? 0) < 32) {
+    errors.push("CRON_SECRET must be a strong non-placeholder value with at least 32 characters.");
+  }
+
   const paymentMode = env.PAYMENT_MODE;
 
   if (paymentMode !== "manual" && paymentMode !== "gateway" && paymentMode !== "mock") {

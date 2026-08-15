@@ -173,6 +173,7 @@ Defined in `.env.example`:
 - `PAYMENT_MODE`
 - `ALLOW_PRODUCTION_MOCK_PAYMENTS`
 - `AUTH_STRICT_ENV_VALIDATION`
+- `CRON_SECRET`
 - `AUTH_REGISTRATION_WINDOW_MINUTES`
 - `AUTH_MAX_REGISTRATION_ATTEMPTS`
 - `AUTH_EMAIL_VERIFICATION_EXPIRY_MINUTES`
@@ -230,6 +231,15 @@ The app validates critical server environment variables during startup and build
 - `PAYMENT_MODE=gateway` requires PayMongo secret, public, and webhook keys.
 
 For the current demo deployment, use mock payments only if the client understands that bookings are auto-confirmed and no real collection happens.
+
+## Scheduled Maintenance
+
+Pending unpaid bookings are expired by `GET /api/cron/expire-bookings`.
+
+- Vercel runs this route every 15 minutes from `vercel.json`.
+- Production requests require `Authorization: Bearer <CRON_SECRET>`.
+- Set a strong `CRON_SECRET` in Vercel before deploying this route.
+- Local development may call the route without `CRON_SECRET` unless strict env validation is enabled.
 
 ## Project Structure
 

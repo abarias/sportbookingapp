@@ -12,6 +12,7 @@ function buildValidProductionEnv(overrides: TestEnv = {}): TestEnv {
     NEXTAUTH_SECRET: "a-production-secret-with-at-least-32-chars",
     RESEND_API_KEY: "re_123456789",
     EMAIL_FROM: "Sport Booking <bookings@example.com>",
+    CRON_SECRET: "a-production-cron-secret-at-least-32-chars",
     PAYMENT_MODE: "manual",
     PAYMENT_HOLD_MINUTES: "15",
     ...overrides
@@ -58,6 +59,7 @@ describe("server environment validation", () => {
         NEXTAUTH_SECRET: "dev-only-secret",
         RESEND_API_KEY: "",
         EMAIL_FROM: "",
+        CRON_SECRET: "",
         PAYMENT_MODE: "invalid"
       })
     );
@@ -71,6 +73,7 @@ describe("server environment validation", () => {
         "NEXTAUTH_SECRET must be a strong non-placeholder value with at least 32 characters.",
         "RESEND_API_KEY must be configured for production email verification.",
         "EMAIL_FROM must be configured with a verified sender address.",
+        "CRON_SECRET must be a strong non-placeholder value with at least 32 characters.",
         "PAYMENT_MODE must be one of: manual, gateway, mock."
       ])
     );
