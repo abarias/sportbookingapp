@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 type AdminNavProps = {
-  current: "overview" | "calendar" | "walk-ins" | "facilities" | "customers" | "reports";
+  current: "overview" | "calendar" | "walk-ins" | "facilities" | "payments" | "customers" | "reports";
 };
 
 const items = [
@@ -9,6 +9,7 @@ const items = [
   { key: "calendar", href: "/admin/calendar", label: "Calendar" },
   { key: "walk-ins", href: "/admin/walk-ins", label: "Walk-ins" },
   { key: "facilities", href: "/admin/facilities", label: "Facilities" },
+  { key: "payments", href: "/admin/payments", label: "Payments" },
   { key: "customers", href: "/admin/customers", label: "Customers" },
   { key: "reports", href: "/admin/reports", label: "Reports" }
 ] as const;

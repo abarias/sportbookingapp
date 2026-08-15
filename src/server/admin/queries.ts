@@ -31,7 +31,7 @@ export async function getAdminOverviewData() {
       }
     }),
     prisma.payment.findMany({
-      where: { status: PaymentStatus.PAID }
+      where: { status: { in: [PaymentStatus.PAID, PaymentStatus.VERIFIED] } }
     }),
     prisma.facility.count({
       where: { isEnabled: true }
@@ -41,7 +41,9 @@ export async function getAdminOverviewData() {
   ]);
 
   const confirmedCount = recentBookings.filter((booking) => booking.status === BookingStatus.CONFIRMED).length;
-  const pendingCount = recentBookings.filter((booking) => booking.status === BookingStatus.PENDING_PAYMENT).length;
+  const pendingCount = recentBookings.filter((booking) =>
+    booking.status === BookingStatus.PENDING_PAYMENT || booking.status === BookingStatus.HELD
+  ).length;
   const cancelledCount = recentBookings.filter((booking) =>
     booking.status === BookingStatus.CANCELLED || booking.status === BookingStatus.EXPIRED
   ).length;
@@ -59,6 +61,58 @@ export async function getAdminOverviewData() {
     cancellationEnabled,
     cancellationWindowHours
   };
+}
+
+type AdminPaymentQueueOptions = {
+  page: number;
+  pageSize: number;
+};
+
+export async function getAdminPaymentQueueData({ page, pageSize }: AdminPaymentQueueOptions) {
+  const where = {
+    status: {
+      in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED]
+    }
+  };
+
+  const [payments, totalCount, submittedCount, actionRequiredCount, duplicateCount] = await prisma.$transaction([
+    prisma.payment.findMany({
+      where,
+      orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        booking: {
+          include: {
+            facility: { select: { name: true, timezone: true } },
+            user: { select: { fullName: true, email: true, phone: true } }
+          }
+        },
+        verifiedBy: { select: { fullName: true, email: true } }
+      }
+    }),
+    prisma.payment.count({ where }),
+    prisma.payment.count({ where: { ...where, status: PaymentStatus.SUBMITTED } }),
+    prisma.payment.count({ where: { ...where, status: PaymentStatus.ACTION_REQUIRED } }),
+    prisma.payment.count({ where: { ...where, duplicateReference: true } })
+  ]);
+
+  return { payments, totalCount, submittedCount, actionRequiredCount, duplicateCount };
+}
+
+export async function getAdminPaymentDetailData(paymentId: string) {
+  return prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: {
+      booking: {
+        include: {
+          facility: { select: { name: true, timezone: true } },
+          user: { select: { fullName: true, email: true, phone: true } }
+        }
+      },
+      verifiedBy: { select: { fullName: true, email: true } }
+    }
+  });
 }
 
 export async function getAdminFacilitiesData() {

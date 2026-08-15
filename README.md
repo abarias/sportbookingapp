@@ -13,7 +13,7 @@ Current MVP feature set:
 - Customer mobile number capture and OTP verification during registration
 - Database-backed facility browsing and availability
 - Server-side booking creation with overlap checks
-- Mock payment flow that auto-confirms bookings
+- Manual payment hold flow with customer proof upload and admin verification
 - Customer booking history and policy-based cancellation flow
 - Admin overview, booking calendar, facility management, blocked schedules, walk-in booking, customers, and reports
 - Facility creation and editing with multiple image URLs or uploaded image files
@@ -145,6 +145,20 @@ Customer-facing booking dates are limited by business policy:
 
 The browser date picker and server-side booking creation both enforce this rule.
 
+### Booking And Payment Lifecycle
+
+Customer bookings now separate reservation state from payment state:
+
+- Selecting a date/time does not create a reservation hold.
+- Clicking `Reserve & Pay` creates a server-validated `HELD` booking and an `AWAITING_PAYMENT` manual payment record.
+- The default hold window is 15 minutes through `PAYMENT_HOLD_MINUTES` or the `booking.paymentHoldMinutes` setting.
+- Submitted payment proof changes payment status to `SUBMITTED` and stops the payment hold countdown, but does not confirm the booking.
+- Admin verification changes payment status to `VERIFIED` and booking status to `CONFIRMED`.
+- Admin rejection changes payment status to `REJECTED` and releases the held slot.
+- Admin `Action Required` keeps the booking held while the customer resubmits clearer proof.
+
+Current manual payment proof uploads are stored under `public/uploads/payment-proofs` for MVP/demo use. Move this to durable private object storage before production.
+
 ### Cancellation Policy
 
 Cancellation is controlled by both eligibility and timing:
@@ -273,7 +287,8 @@ Production notes:
 
 - Keep `NEXTAUTH_SECRET` unique per environment.
 - Use a strong production database password.
-- Mock payment is still enabled in this MVP and should be disabled or replaced before launch.
+- Customer payment confirmation now requires admin verification of submitted proof.
+- Local payment proof uploads are stored on disk and should be moved to persistent private object storage before launch.
 - Mock OTP is still enabled in this MVP and should be replaced with a real SMS provider before launch.
 - Local image uploads are stored on disk and should be moved to persistent object storage before launch.
 - Refund handling is still manual.

@@ -1,5 +1,6 @@
 import { PaymentStatus } from "@prisma/client";
 import { BookingStatus } from "@prisma/client";
+import Link from "next/link";
 
 import { CancelBookingButton } from "@/components/bookings/cancel-booking-button";
 import { formatCurrency } from "@/lib/formatting/currency";
@@ -17,6 +18,7 @@ type BookingListItem = {
   endAtUtc: Date;
   timezone: string;
   paymentHoldExpiresAt: Date | null;
+  paymentReviewNote: string | null;
   isCancellable: boolean;
 };
 
@@ -27,6 +29,7 @@ type BookingListProps = {
 };
 
 const statusTone: Record<BookingStatus, string> = {
+  HELD: "bg-amber-400/15 text-amber-100",
   PENDING_PAYMENT: "bg-amber-400/15 text-amber-100",
   CONFIRMED: "bg-emerald-400/15 text-emerald-100",
   CANCELLED: "bg-stone-600/30 text-stone-200",
@@ -34,11 +37,37 @@ const statusTone: Record<BookingStatus, string> = {
 };
 
 const paymentTone: Record<PaymentStatus, string> = {
+  AWAITING_PAYMENT: "bg-amber-400/15 text-amber-100",
+  SUBMITTED: "bg-sky-400/15 text-sky-100",
+  VERIFIED: "bg-emerald-400/15 text-emerald-100",
+  REJECTED: "bg-rose-400/15 text-rose-100",
+  ACTION_REQUIRED: "bg-orange-400/15 text-orange-100",
   PENDING: "bg-amber-400/15 text-amber-100",
   PAID: "bg-emerald-400/15 text-emerald-100",
   FAILED: "bg-rose-400/15 text-rose-100",
   EXPIRED: "bg-stone-600/30 text-stone-200",
   REFUNDED: "bg-sky-400/15 text-sky-100"
+};
+
+const bookingLabels: Record<BookingStatus, string> = {
+  HELD: "Reserved",
+  PENDING_PAYMENT: "Reserved",
+  CONFIRMED: "Booking Confirmed",
+  CANCELLED: "Cancelled",
+  EXPIRED: "Reservation Expired"
+};
+
+const paymentLabels: Record<PaymentStatus, string> = {
+  AWAITING_PAYMENT: "Awaiting Payment",
+  SUBMITTED: "Payment Submitted - For Verification",
+  VERIFIED: "Payment Verified",
+  REJECTED: "Payment Rejected",
+  ACTION_REQUIRED: "Payment Needs Attention",
+  PENDING: "Pending",
+  PAID: "Paid",
+  FAILED: "Failed",
+  EXPIRED: "Expired",
+  REFUNDED: "Refunded"
 };
 
 export function BookingList({ title, items, emptyMessage }: BookingListProps) {
@@ -56,12 +85,26 @@ export function BookingList({ title, items, emptyMessage }: BookingListProps) {
                 <p className="text-sm text-stone-400">{formatCurrency(item.amountMinor, item.currency)}</p>
                 {item.paymentStatus ? (
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em] ${paymentTone[item.paymentStatus]}`}>
-                    Payment {item.paymentStatus}
+                    {paymentLabels[item.paymentStatus]}
                   </span>
                 ) : null}
-                {item.status === BookingStatus.PENDING_PAYMENT && item.paymentHoldExpiresAt ? (
+                {(item.status === BookingStatus.PENDING_PAYMENT || item.status === BookingStatus.HELD) && item.paymentHoldExpiresAt ? (
                   <p className="text-sm text-amber-200">
                     Payment hold expires at {formatInTimeZone(item.paymentHoldExpiresAt, item.timezone, "h:mm a")}
+                  </p>
+                ) : null}
+                {item.status === BookingStatus.HELD &&
+                item.paymentStatus &&
+                (item.paymentStatus === PaymentStatus.AWAITING_PAYMENT ||
+                  item.paymentStatus === PaymentStatus.ACTION_REQUIRED ||
+                  item.paymentStatus === PaymentStatus.SUBMITTED) ? (
+                  <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href={`/bookings/${item.id}/payment`}>
+                    View payment instructions
+                  </Link>
+                ) : null}
+                {item.paymentReviewNote ? (
+                  <p className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm leading-6 text-amber-100">
+                    Staff message: {item.paymentReviewNote}
                   </p>
                 ) : null}
                 {item.isCancellable ? (
@@ -71,7 +114,7 @@ export function BookingList({ title, items, emptyMessage }: BookingListProps) {
                 ) : null}
               </div>
               <span className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.18em] ${statusTone[item.status]}`}>
-                {item.status.replaceAll("_", " ")}
+                {bookingLabels[item.status]}
               </span>
             </div>
           </article>

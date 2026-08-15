@@ -46,3 +46,6 @@ prisma/*.db-journal
 # local business docs
 docs/client-proposal-prompts.md
 .vercel
+
+# local runtime uploads
+public/uploads/

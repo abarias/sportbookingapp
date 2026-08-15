@@ -11,7 +11,8 @@ import { adminWalkInBookingSchema, blockedScheduleSchema, facilityCreateSchema, 
 import { hashPassword } from "@/lib/auth/password";
 import { requireAdminSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
-import { createConfirmedBookingWithMockPayment } from "@/server/bookings/service";
+import { createAdminConfirmedBooking } from "@/server/bookings/service";
+import { rejectSubmittedPayment, requestPaymentAction, verifySubmittedPayment } from "@/server/payments/service";
 
 function parseBoolean(value: FormDataEntryValue | null) {
   return value === "on" || value === "true";
@@ -127,8 +128,18 @@ export type WalkInBookingActionState = {
   fieldErrors?: Partial<Record<"fullName" | "email" | "phone" | "facilityId" | "dateKey" | "startTime" | "durationMinutes", string>>;
 };
 
+export type PaymentReviewActionState = {
+  success?: string;
+  error?: string;
+};
+
 const deleteBlockScheduleSchema = z.object({
   blockId: z.string().min(1, "Blocked schedule is required.")
+});
+
+const paymentReviewSchema = z.object({
+  paymentId: z.string().min(1),
+  reviewNote: z.string().trim().max(500).optional()
 });
 
 export async function updateCancellationSettingAction(formData: FormData) {
@@ -528,7 +539,7 @@ export async function createWalkInBookingAction(
   });
 
   try {
-    await createConfirmedBookingWithMockPayment({
+    await createAdminConfirmedBooking({
       userId: user.id,
       facilityId: parsed.data.facilityId,
       dateKey: parsed.data.dateKey,
@@ -550,4 +561,105 @@ export async function createWalkInBookingAction(
   return {
     success: "Walk-in booking created and confirmed."
   };
+}
+
+export async function verifyPaymentAction(
+  _prevState: PaymentReviewActionState,
+  formData: FormData
+): Promise<PaymentReviewActionState> {
+  try {
+    const session = await requireAdminSession();
+    const parsed = paymentReviewSchema.safeParse({
+      paymentId: String(formData.get("paymentId") ?? ""),
+      reviewNote: String(formData.get("reviewNote") ?? "")
+    });
+
+    if (!parsed.success) {
+      return { error: "Payment could not be verified." };
+    }
+
+    await verifySubmittedPayment({
+      paymentId: parsed.data.paymentId,
+      adminUserId: session.user.id,
+      reviewNote: parsed.data.reviewNote
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/payments");
+    revalidatePath("/admin/calendar");
+    revalidatePath("/admin/reports");
+    revalidatePath("/bookings");
+
+    return { success: "Payment verified and booking confirmed." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Payment could not be verified." };
+  }
+}
+
+export async function rejectPaymentAction(
+  _prevState: PaymentReviewActionState,
+  formData: FormData
+): Promise<PaymentReviewActionState> {
+  try {
+    const session = await requireAdminSession();
+    const parsed = paymentReviewSchema.extend({
+      reviewNote: z.string().trim().min(3, "Add a rejection reason.").max(500)
+    }).safeParse({
+      paymentId: String(formData.get("paymentId") ?? ""),
+      reviewNote: String(formData.get("reviewNote") ?? "")
+    });
+
+    if (!parsed.success) {
+      return { error: "Add a rejection reason before rejecting payment." };
+    }
+
+    await rejectSubmittedPayment({
+      paymentId: parsed.data.paymentId,
+      adminUserId: session.user.id,
+      reviewNote: parsed.data.reviewNote
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/payments");
+    revalidatePath("/admin/calendar");
+    revalidatePath("/admin/reports");
+    revalidatePath("/bookings");
+
+    return { success: "Payment rejected. The reservation is no longer blocking inventory." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Payment could not be rejected." };
+  }
+}
+
+export async function requestPaymentActionRequiredAction(
+  _prevState: PaymentReviewActionState,
+  formData: FormData
+): Promise<PaymentReviewActionState> {
+  try {
+    const session = await requireAdminSession();
+    const parsed = paymentReviewSchema.extend({
+      reviewNote: z.string().trim().min(3, "Add instructions for the customer.").max(500)
+    }).safeParse({
+      paymentId: String(formData.get("paymentId") ?? ""),
+      reviewNote: String(formData.get("reviewNote") ?? "")
+    });
+
+    if (!parsed.success) {
+      return { error: "Add instructions before requesting more proof." };
+    }
+
+    await requestPaymentAction({
+      paymentId: parsed.data.paymentId,
+      adminUserId: session.user.id,
+      reviewNote: parsed.data.reviewNote
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/payments");
+    revalidatePath("/bookings");
+
+    return { success: "Marked as needing customer action." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Payment could not be updated." };
+  }
 }

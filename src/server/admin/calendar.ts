@@ -1,4 +1,4 @@
-import { BookingStatus, type Facility, type FacilityOperatingHour } from "@prisma/client";
+import { BookingStatus, PaymentStatus, type Facility, type FacilityOperatingHour } from "@prisma/client";
 import { addDays, subDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
@@ -261,9 +261,27 @@ export async function getAdminCalendarData(params: {
     }),
     prisma.booking.findMany({
       where: {
-        status: {
-          in: [BookingStatus.CONFIRMED, BookingStatus.PENDING_PAYMENT]
-        },
+        OR: [
+          { status: BookingStatus.CONFIRMED },
+          {
+            status: BookingStatus.HELD,
+            OR: [
+              {
+                paymentHoldExpiresAt: { gt: new Date() },
+                payment: { status: PaymentStatus.AWAITING_PAYMENT }
+              },
+              {
+                payment: {
+                  status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED] }
+                }
+              }
+            ]
+          },
+          {
+            status: BookingStatus.PENDING_PAYMENT,
+            paymentHoldExpiresAt: { gt: new Date() }
+          }
+        ],
         startAtUtc: {
           lt: gridEndExclusiveUtc
         },

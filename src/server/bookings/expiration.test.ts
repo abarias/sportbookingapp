@@ -40,18 +40,11 @@ describe("expirePendingBookings", () => {
 
     expect(mocks.tx.booking.findMany).toHaveBeenNthCalledWith(1, {
       where: {
-        status: BookingStatus.PENDING_PAYMENT,
+        status: BookingStatus.HELD,
         paymentHoldExpiresAt: { lte: now },
-        OR: [
-          { payment: null },
-          {
-            payment: {
-              status: {
-                in: [PaymentStatus.PENDING, PaymentStatus.FAILED, PaymentStatus.EXPIRED]
-              }
-            }
-          }
-        ]
+        payment: {
+          status: PaymentStatus.AWAITING_PAYMENT
+        }
       },
       orderBy: { paymentHoldExpiresAt: "asc" },
       take: 50,
@@ -60,7 +53,7 @@ describe("expirePendingBookings", () => {
     expect(mocks.tx.booking.updateMany).toHaveBeenCalledWith({
       where: {
         id: { in: ["booking-1", "booking-2"] },
-        status: BookingStatus.PENDING_PAYMENT,
+        status: BookingStatus.HELD,
         paymentHoldExpiresAt: { lte: now }
       },
       data: {
@@ -70,7 +63,7 @@ describe("expirePendingBookings", () => {
     expect(mocks.tx.payment.updateMany).toHaveBeenCalledWith({
       where: {
         bookingId: { in: ["booking-1", "booking-2"] },
-        status: PaymentStatus.PENDING
+        status: PaymentStatus.AWAITING_PAYMENT
       },
       data: {
         status: PaymentStatus.EXPIRED

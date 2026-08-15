@@ -44,6 +44,78 @@ function assertMockPaymentModeAllowed() {
   }
 }
 
+function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
+  return {
+    OR: [
+      { status: BookingStatus.CONFIRMED },
+      {
+        status: BookingStatus.HELD,
+        OR: [
+          {
+            paymentHoldExpiresAt: { gt: now },
+            payment: { status: PaymentStatus.AWAITING_PAYMENT }
+          },
+          {
+            payment: {
+              status: {
+                in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED]
+              }
+            }
+          }
+        ]
+      },
+      {
+        status: BookingStatus.PENDING_PAYMENT,
+        paymentHoldExpiresAt: { gt: now }
+      }
+    ]
+  };
+}
+
+function createBookingReference() {
+  return `PG-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+async function expireStaleAwaitingPaymentHolds(tx: Prisma.TransactionClient, now: Date) {
+  const expiredBookings = await tx.booking.findMany({
+    where: {
+      status: BookingStatus.HELD,
+      paymentHoldExpiresAt: { lte: now },
+      payment: { status: PaymentStatus.AWAITING_PAYMENT }
+    },
+    select: { id: true }
+  });
+  const expiredIds = expiredBookings.map((booking) => booking.id);
+
+  if (expiredIds.length === 0) {
+    return;
+  }
+
+  await tx.booking.updateMany({
+    where: { id: { in: expiredIds } },
+    data: { status: BookingStatus.EXPIRED }
+  });
+
+  await tx.payment.updateMany({
+    where: {
+      bookingId: { in: expiredIds },
+      status: PaymentStatus.AWAITING_PAYMENT
+    },
+    data: { status: PaymentStatus.EXPIRED }
+  });
+}
+
+async function assertBookingUserExists(tx: Prisma.TransactionClient, userId: string) {
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: { id: true }
+  });
+
+  if (!user) {
+    throw new Error("Your session no longer matches the active database. Please sign out and sign in again.");
+  }
+}
+
 async function findReusableBooking(
   tx: Prisma.TransactionClient,
   input: BookingCreationInput,
@@ -126,15 +198,7 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
     prisma.booking.findMany({
       where: {
         facilityId: facility.id,
-        OR: [
-          { status: BookingStatus.CONFIRMED },
-          {
-            status: BookingStatus.PENDING_PAYMENT,
-            paymentHoldExpiresAt: {
-              gt: now
-            }
-          }
-        ],
+        ...activeBookingWhere(now),
         startAtUtc: {
           lt: dayEndUtc
         },
@@ -204,16 +268,20 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
   };
 }
 
-export async function createPendingBooking(input: BookingCreationInput) {
+export async function createBookingHold(input: BookingCreationInput) {
   const now = new Date();
 
-  return prisma.$transaction(
-    async (tx) => {
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
       const existingBooking = await findReusableBooking(tx, input);
 
       if (existingBooking) {
         return existingBooking;
       }
+
+      await expireStaleAwaitingPaymentHolds(tx, now);
+      await assertBookingUserExists(tx, input.userId);
 
       const [facility, holdSetting] = await Promise.all([
         tx.facility.findUnique({
@@ -235,6 +303,8 @@ export async function createPendingBooking(input: BookingCreationInput) {
       if (!facility || !facility.isEnabled) {
         throw new Error("Facility is not available.");
       }
+
+      await expireStaleAwaitingPaymentHolds(tx, now);
 
       const pricingRule = facility.pricingRules[0];
 
@@ -276,15 +346,7 @@ export async function createPendingBooking(input: BookingCreationInput) {
         tx.booking.findMany({
           where: {
             facilityId: facility.id,
-            OR: [
-              { status: BookingStatus.CONFIRMED },
-              {
-                status: BookingStatus.PENDING_PAYMENT,
-                paymentHoldExpiresAt: {
-                  gt: now
-                }
-              }
-            ],
+            ...activeBookingWhere(now),
             startAtUtc: {
               lt: endAtUtc
             },
@@ -339,7 +401,7 @@ export async function createPendingBooking(input: BookingCreationInput) {
         data: {
           userId: input.userId,
           facilityId: facility.id,
-          status: BookingStatus.PENDING_PAYMENT,
+          status: BookingStatus.HELD,
           startAtUtc,
           endAtUtc,
           timezone: facility.timezone,
@@ -347,14 +409,42 @@ export async function createPendingBooking(input: BookingCreationInput) {
           amountMinor,
           currency: pricingRule.currency,
           idempotencyKey: input.idempotencyKey,
-          paymentHoldExpiresAt
+          paymentHoldExpiresAt,
+          payment: {
+            create: {
+              provider: PaymentProvider.MANUAL,
+              providerReference: createBookingReference(),
+              method: "manual_gcash",
+              status: PaymentStatus.AWAITING_PAYMENT,
+              amountMinor,
+              currency: pricingRule.currency,
+              expiresAt: paymentHoldExpiresAt
+            }
+          }
+        },
+        include: {
+          payment: true
         }
       });
-    },
-    {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+      }
+    );
+  } catch (error) {
+    if (input.idempotencyKey && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const existingBooking = await prisma.booking.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+        include: { payment: true }
+      });
+
+      if (existingBooking?.userId === input.userId) {
+        return existingBooking;
+      }
     }
-  );
+
+    throw error;
+  }
 }
 
 export async function createConfirmedBookingWithMockPayment(input: BookingCreationInput) {
@@ -370,6 +460,9 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         if (existingBooking) {
           return existingBooking;
         }
+
+        await expireStaleAwaitingPaymentHolds(tx, now);
+        await assertBookingUserExists(tx, input.userId);
 
       const [facility, mockSetting] = await Promise.all([
         tx.facility.findUnique({
@@ -395,6 +488,9 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
       if (!facility || !facility.isEnabled) {
         throw new Error("Facility is not available.");
       }
+
+      await expireStaleAwaitingPaymentHolds(tx, now);
+      await assertBookingUserExists(tx, input.userId);
 
       const pricingRule = facility.pricingRules[0];
 
@@ -436,15 +532,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         tx.booking.findMany({
           where: {
             facilityId: facility.id,
-            OR: [
-              { status: BookingStatus.CONFIRMED },
-              {
-                status: BookingStatus.PENDING_PAYMENT,
-                paymentHoldExpiresAt: {
-                  gt: now
-                }
-              }
-            ],
+            ...activeBookingWhere(now),
             startAtUtc: {
               lt: endAtUtc
             },
@@ -540,6 +628,148 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
 
     throw error;
   }
+}
+
+export async function createAdminConfirmedBooking(input: BookingCreationInput) {
+  const now = new Date();
+
+  return prisma.$transaction(
+    async (tx) => {
+      const [facility] = await Promise.all([
+        tx.facility.findUnique({
+          where: { id: input.facilityId },
+          include: {
+            operatingHours: true,
+            pricingRules: {
+              where: { isActive: true },
+              orderBy: { createdAt: "desc" },
+              take: 1
+            }
+          }
+        })
+      ]);
+
+      if (!facility || !facility.isEnabled) {
+        throw new Error("Facility is not available.");
+      }
+
+      const pricingRule = facility.pricingRules[0];
+
+      if (!pricingRule) {
+        throw new Error("Facility pricing is not configured.");
+      }
+
+      if (input.durationMinutes < pricingRule.minimumMinutes || input.durationMinutes % facility.slotIntervalMinutes !== 0) {
+        throw new Error("Duration is not allowed for this facility.");
+      }
+
+      const openingRange = getDailyOpeningRange(facility, input.dateKey);
+
+      if (!openingRange) {
+        throw new Error("Facility is closed on the selected date.");
+      }
+
+      if (!isDateWithinBookingWindow(input.dateKey, facility.timezone, now)) {
+        throw new Error("Bookings are only available within the current booking window.");
+      }
+
+      const bookingRange = {
+        startMinutes: input.startMinutes,
+        endMinutes: input.startMinutes + input.durationMinutes
+      };
+
+      if (!rangesOverlapByMinute(bookingRange, openingRange) || bookingRange.endMinutes > openingRange.endMinutes) {
+        throw new Error("Selected time is outside operating hours.");
+      }
+
+      const startAtUtc = buildUtcDateFromLocalMinutes(input.dateKey, input.startMinutes, facility.timezone);
+      const endAtUtc = buildUtcDateFromLocalMinutes(input.dateKey, input.startMinutes + input.durationMinutes, facility.timezone);
+
+      if (startAtUtc <= now) {
+        throw new Error("You can only book future time slots.");
+      }
+
+      const [conflictingBookings, blockedSchedules] = await Promise.all([
+        tx.booking.findMany({
+          where: {
+            facilityId: facility.id,
+            ...activeBookingWhere(now),
+            startAtUtc: { lt: endAtUtc },
+            endAtUtc: { gt: startAtUtc }
+          },
+          select: { startAtUtc: true, endAtUtc: true }
+        }),
+        tx.blockedSchedule.findMany({
+          where: {
+            facilityId: facility.id,
+            startAtUtc: { lt: endAtUtc },
+            endAtUtc: { gt: startAtUtc }
+          },
+          select: { startAtUtc: true, endAtUtc: true }
+        })
+      ]);
+
+      const busyIntervals = [
+        ...conflictingBookings.map((booking) => ({
+          startMinutes: getLocalMinutesForDate(booking.startAtUtc, input.dateKey, facility.timezone),
+          endMinutes: getLocalMinutesForDate(booking.endAtUtc, input.dateKey, facility.timezone),
+          reason: "BOOKED" as const
+        })),
+        ...blockedSchedules.map((block) => ({
+          startMinutes: getLocalMinutesForDate(block.startAtUtc, input.dateKey, facility.timezone),
+          endMinutes: getLocalMinutesForDate(block.endAtUtc, input.dateKey, facility.timezone),
+          reason: "BLOCKED" as const
+        }))
+      ];
+
+      const slots = buildDaySlots({
+        openingRange,
+        slotIntervalMinutes: facility.slotIntervalMinutes,
+        busyIntervals
+      });
+
+      if (!canFitDuration(slots, input.startMinutes, input.durationMinutes, facility.slotIntervalMinutes)) {
+        throw new Error("Selected time is no longer available.");
+      }
+
+      const amountMinor = getBookingAmount(pricingRule.amountMinor, pricingRule.billingMode, input.durationMinutes);
+
+      return tx.booking.create({
+        data: {
+          userId: input.userId,
+          facilityId: facility.id,
+          status: BookingStatus.CONFIRMED,
+          startAtUtc,
+          endAtUtc,
+          timezone: facility.timezone,
+          slotCount: input.durationMinutes / facility.slotIntervalMinutes,
+          amountMinor,
+          currency: pricingRule.currency,
+          paymentHoldExpiresAt: null,
+          payment: {
+            create: {
+              provider: PaymentProvider.MANUAL,
+              providerReference: createBookingReference(),
+              method: "walk_in",
+              status: PaymentStatus.VERIFIED,
+              amountMinor,
+              amountPaidMinor: amountMinor,
+              currency: pricingRule.currency,
+              paidAt: now,
+              submittedAt: now,
+              verifiedAt: now
+            }
+          }
+        },
+        include: {
+          payment: true
+        }
+      });
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+    }
+  );
 }
 
 export async function cancelBookingByCustomer(input: { bookingId: string; userId: string }) {

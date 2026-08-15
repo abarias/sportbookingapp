@@ -21,6 +21,7 @@ enum FacilityType {
 }
 
 enum BookingStatus {
+  HELD
   PENDING_PAYMENT
   CONFIRMED
   CANCELLED
@@ -28,11 +29,17 @@ enum BookingStatus {
 }
 
 enum PaymentProvider {
+  MANUAL
   MOCK
   PAYMONGO
 }
 
 enum PaymentStatus {
+  AWAITING_PAYMENT
+  SUBMITTED
+  VERIFIED
+  REJECTED
+  ACTION_REQUIRED
   PENDING
   PAID
   FAILED
@@ -56,6 +63,7 @@ model User {
   role                    UserRole                 @default(CUSTOMER)
   bookings                Booking[]
   createdBlocks           BlockedSchedule[]        @relation("BlockedScheduleCreator")
+  verifiedPayments        Payment[]                @relation("PaymentVerifier")
   otpRequests             OtpRequest[]
   emailVerificationTokens EmailVerificationToken[]
   registrationAttempts    RegistrationAttempt[]
@@ -206,18 +214,32 @@ model Payment {
   bookingId         String          @unique
   provider          PaymentProvider
   providerReference String?         @unique
+  method            String?
+  externalReference String?
+  normalizedExternalReference String?
+  amountPaidMinor   Int?
+  proofImageUrl     String?
   checkoutUrl       String?
   status            PaymentStatus
   amountMinor       Int
   currency          String          @default("PHP")
   paidAt            DateTime?
+  submittedAt       DateTime?
+  verifiedAt        DateTime?
+  verifiedByUserId  String?
+  rejectedAt        DateTime?
+  actionRequiredAt  DateTime?
   expiresAt         DateTime?
+  reviewNote        String?
+  duplicateReference Boolean        @default(false)
   rawPayload        Json?
   booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  verifiedBy        User?           @relation("PaymentVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
   @@index([status, expiresAt])
+  @@index([normalizedExternalReference, status])
 }
 
 model BlockedSchedule {

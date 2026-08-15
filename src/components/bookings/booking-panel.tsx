@@ -26,7 +26,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
 
   return (
     <Button className="w-full" disabled={disabled || pending} type="submit">
-      {pending ? "Confirming..." : "Reserve and confirm"}
+      {pending ? "Creating hold..." : "Reserve & Pay"}
     </Button>
   );
 }
@@ -82,7 +82,7 @@ export function BookingPanel({
       <div className="space-y-2">
         <p className="text-sm uppercase tracking-[0.2em] text-stone-400">Create booking</p>
         <p className="text-sm text-stone-300">{availableCount} open half-hour slots remain on this date.</p>
-        <p className="text-xs text-amber-200">Reservations are confirmed as soon as checkout is completed successfully.</p>
+        <p className="text-xs text-amber-200">Click Reserve & Pay to hold this slot while you submit payment proof.</p>
       </div>
 
       <div className="space-y-2">
@@ -143,7 +143,7 @@ export function BookingPanel({
 
       <SubmitButton disabled={startOptions.length === 0 || startMinutes === null} />
 
-      <p className="text-xs leading-6 text-stone-400">Choose your time carefully before continuing to confirmation.</p>
+      <p className="text-xs leading-6 text-stone-400">Selecting a time does not hold the slot until you click Reserve & Pay.</p>
     </form>
   );
 }

@@ -58,7 +58,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
         },
         payment: {
           select: {
-            status: true
+            status: true,
+            reviewNote: true
           }
         }
       }
@@ -109,6 +110,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             endAtUtc: booking.endAtUtc,
             timezone: booking.timezone,
             paymentHoldExpiresAt: booking.paymentHoldExpiresAt,
+            paymentReviewNote: booking.payment?.reviewNote ?? null,
             isCancellable: canCustomerCancelBooking({
               bookingStatus: booking.status,
               startAtUtc: booking.startAtUtc,
@@ -136,6 +138,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             endAtUtc: booking.endAtUtc,
             timezone: booking.timezone,
             paymentHoldExpiresAt: booking.paymentHoldExpiresAt,
+            paymentReviewNote: booking.payment?.reviewNote ?? null,
             isCancellable: false
           }))}
           title="History"

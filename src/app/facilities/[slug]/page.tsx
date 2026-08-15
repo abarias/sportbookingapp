@@ -76,7 +76,7 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
             <ul className="mt-6 space-y-3 text-sm text-stone-300">
               <li>30-minute minimum increments</li>
               <li>Availability accounts for confirmed bookings, valid pending bookings, and blocked schedules</li>
-              <li>Reservations are confirmed as soon as payment is completed successfully</li>
+              <li>Customer reservations are confirmed only after staff verifies payment</li>
             </ul>
           </aside>
 

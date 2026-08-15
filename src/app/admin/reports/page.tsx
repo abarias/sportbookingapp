@@ -15,7 +15,7 @@ export default async function AdminReportsPage() {
 
   const confirmedBookings = bookings.filter((booking) => booking.status === "CONFIRMED");
   const paidRevenueMinor = bookings
-    .filter((booking) => booking.payment?.status === "PAID")
+    .filter((booking) => booking.payment?.status === "PAID" || booking.payment?.status === "VERIFIED")
     .reduce((sum, booking) => sum + booking.amountMinor, 0);
 
   const bookingsByDay = new Map<string, number>();
@@ -58,7 +58,7 @@ export default async function AdminReportsPage() {
         <DashboardStat label="Reporting Window" value="30 days" hint={`Since ${formatInTimeZone(reportStart, "Asia/Manila", "MMM d")}`} />
         <DashboardStat label="Bookings" value={String(bookings.length)} hint="All booking states" />
         <DashboardStat label="Confirmed" value={String(confirmedBookings.length)} hint="Reserved inventory" />
-        <DashboardStat label="Paid Revenue" value={formatCurrency(paidRevenueMinor, "PHP")} hint="PAID payments only" />
+        <DashboardStat label="Paid Revenue" value={formatCurrency(paidRevenueMinor, "PHP")} hint="Verified and paid payments" />
       </div>
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6">

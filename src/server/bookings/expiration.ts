@@ -20,18 +20,11 @@ export async function expirePendingBookings(options: ExpirePendingBookingsOption
   return prisma.$transaction(async (tx) => {
     const expiredCandidates = await tx.booking.findMany({
       where: {
-        status: BookingStatus.PENDING_PAYMENT,
+        status: BookingStatus.HELD,
         paymentHoldExpiresAt: { lte: now },
-        OR: [
-          { payment: null },
-          {
-            payment: {
-              status: {
-                in: [PaymentStatus.PENDING, PaymentStatus.FAILED, PaymentStatus.EXPIRED]
-              }
-            }
-          }
-        ]
+        payment: {
+          status: PaymentStatus.AWAITING_PAYMENT
+        }
       },
       orderBy: { paymentHoldExpiresAt: "asc" },
       take: batchSize,
@@ -50,7 +43,7 @@ export async function expirePendingBookings(options: ExpirePendingBookingsOption
     await tx.booking.updateMany({
       where: {
         id: { in: candidateIds },
-        status: BookingStatus.PENDING_PAYMENT,
+        status: BookingStatus.HELD,
         paymentHoldExpiresAt: { lte: now }
       },
       data: {
@@ -78,7 +71,7 @@ export async function expirePendingBookings(options: ExpirePendingBookingsOption
     const expiredPayments = await tx.payment.updateMany({
       where: {
         bookingId: { in: expiredBookingIds },
-        status: PaymentStatus.PENDING
+        status: PaymentStatus.AWAITING_PAYMENT
       },
       data: {
         status: PaymentStatus.EXPIRED
