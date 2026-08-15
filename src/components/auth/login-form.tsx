@@ -55,7 +55,7 @@ export function LoginForm({ callbackUrl = "/facilities", registered = false }: L
     setIsSubmitting(false);
 
     if (!result || result.error) {
-      setErrorMessage("Incorrect email or password.");
+      setErrorMessage("Incorrect email or password, or the account has not been verified yet.");
       return;
     }
 
@@ -66,7 +66,7 @@ export function LoginForm({ callbackUrl = "/facilities", registered = false }: L
     <form className="space-y-5" onSubmit={handleSubmit}>
       {registered ? (
         <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
-          Account created. Sign in to continue.
+          Email verified. Sign in to continue.
         </div>
       ) : null}
 
@@ -109,6 +109,12 @@ export function LoginForm({ callbackUrl = "/facilities", registered = false }: L
         Need an account?{" "}
         <Link href="/register" className="text-amber-300 hover:text-amber-200">
           Create one
+        </Link>
+      </p>
+      <p className="text-sm text-stone-400">
+        Need to verify your email?{" "}
+        <Link href="/verify-email" className="text-amber-300 hover:text-amber-200">
+          Get a new code
         </Link>
       </p>
     </form>

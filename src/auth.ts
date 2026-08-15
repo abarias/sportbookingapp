@@ -35,7 +35,7 @@ const authConfig: NextAuthConfig = {
           return null;
         }
 
-        if (user.role === "CUSTOMER" && !user.phoneVerifiedAt) {
+        if (user.role === "CUSTOMER" && !user.emailVerifiedAt) {
           return null;
         }
 

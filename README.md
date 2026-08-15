@@ -147,16 +147,54 @@ Defined in `.env.example`:
 - `DIRECT_URL`
 - `NEXTAUTH_URL`
 - `NEXTAUTH_SECRET`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
 - `PAYMONGO_SECRET_KEY`
 - `PAYMONGO_PUBLIC_KEY`
 - `PAYMONGO_WEBHOOK_SECRET`
 - `APP_TIMEZONE`
 - `PAYMENT_HOLD_MINUTES`
+- `AUTH_REGISTRATION_WINDOW_MINUTES`
+- `AUTH_MAX_REGISTRATION_ATTEMPTS`
+- `AUTH_EMAIL_VERIFICATION_EXPIRY_MINUTES`
+- `AUTH_MAX_EMAIL_VERIFICATION_ATTEMPTS`
+- `AUTH_RESEND_VERIFICATION_WINDOW_MINUTES`
+- `AUTH_MAX_RESEND_VERIFICATION_ATTEMPTS`
+- `AUTH_VERIFICATION_TOKEN_RETENTION_DAYS`
+- `AUTH_REGISTRATION_ATTEMPT_RETENTION_DAYS`
 - `NEXT_PUBLIC_APP_NAME`
 - `SEED_ADMIN_EMAIL`
 - `SEED_ADMIN_PASSWORD`
 - `SEED_CUSTOMER_EMAIL`
 - `SEED_CUSTOMER_PASSWORD`
+
+## Email Delivery
+
+Customer email verification uses the internal email adapter in `src/lib/notifications/email.ts`.
+
+- Set `RESEND_API_KEY` and `EMAIL_FROM` to send real verification emails through Resend.
+- Verify the sender domain in Resend before production use.
+- If Resend is not configured outside production, the app logs the verification code to the dev server console and shows it in the development UI.
+- In production, missing email configuration throws an error so registration does not silently create accounts that cannot be verified.
+
+## Auth Maintenance
+
+Email verification tokens and registration abuse-tracking attempts should be cleaned up routinely:
+
+```bash
+npm run auth:cleanup
+```
+
+Defaults:
+
+- registrations are limited to 5 attempts per email/IP every 15 minutes
+- email verification codes expire after 15 minutes
+- verification codes allow 5 failed attempts
+- verification resend is limited to 3 attempts per email/IP every 10 minutes
+- expired verification tokens are retained for 7 days after expiry
+- registration attempts are retained for 90 days
+
+Use the `AUTH_*` environment variables to adjust auth throttling and retention. For production, run this daily through Vercel Cron or an equivalent scheduled job.
 
 ## Project Structure
 

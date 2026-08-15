@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -45,58 +46,91 @@ enum PricingBillingMode {
 }
 
 model User {
-  id                 String            @id @default(cuid())
-  email              String            @unique
-  passwordHash       String
-  fullName           String
-  phone              String?
-  phoneVerifiedAt    DateTime?
-  role               UserRole          @default(CUSTOMER)
-  bookings           Booking[]
-  createdBlocks      BlockedSchedule[] @relation("BlockedScheduleCreator")
-  otpRequests        OtpRequest[]
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  id                      String                   @id @default(cuid())
+  email                   String                   @unique
+  passwordHash            String
+  fullName                String
+  phone                   String?
+  emailVerifiedAt         DateTime?
+  phoneVerifiedAt         DateTime?
+  role                    UserRole                 @default(CUSTOMER)
+  bookings                Booking[]
+  createdBlocks           BlockedSchedule[]        @relation("BlockedScheduleCreator")
+  otpRequests             OtpRequest[]
+  emailVerificationTokens EmailVerificationToken[]
+  registrationAttempts    RegistrationAttempt[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
 
   @@index([role])
   @@index([phone])
+  @@index([emailVerifiedAt])
 }
 
 model Facility {
-  id                           String                  @id @default(cuid())
-  name                         String
-  slug                         String                  @unique
-  description                  String
-  type                         FacilityType
-  timezone                     String                  @default("Asia/Manila")
-  isEnabled                    Boolean                 @default(true)
-  slotIntervalMinutes          Int                     @default(30)
-  cancellationEnabledOverride  Boolean?
+  id                              String                  @id @default(cuid())
+  name                            String
+  slug                            String                  @unique
+  description                     String
+  type                            FacilityType
+  timezone                        String                  @default("Asia/Manila")
+  isEnabled                       Boolean                 @default(true)
+  slotIntervalMinutes             Int                     @default(30)
+  cancellationEnabledOverride     Boolean?
   cancellationWindowHoursOverride Int?
-  images                       FacilityImage[]
-  operatingHours               FacilityOperatingHour[]
-  pricingRules                 PricingRule[]
-  bookings                     Booking[]
-  blockedSchedules             BlockedSchedule[]
-  createdAt                    DateTime                @default(now())
-  updatedAt                    DateTime                @updatedAt
+  images                          FacilityImage[]
+  operatingHours                  FacilityOperatingHour[]
+  pricingRules                    PricingRule[]
+  bookings                        Booking[]
+  blockedSchedules                BlockedSchedule[]
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
 
   @@index([type, isEnabled])
 }
 
 model OtpRequest {
-  id          String    @id @default(cuid())
-  userId      String
-  phone       String
-  codeHash    String
-  attempts    Int       @default(0)
-  expiresAt   DateTime
-  verifiedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  userId     String
+  phone      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@index([phone])
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  email      String
+  tokenHash  String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([email])
+}
+
+model RegistrationAttempt {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String?
+  ipHash    String?
+  outcome   String
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([outcome, createdAt])
 }
 
 model FacilityImage {
@@ -112,31 +146,31 @@ model FacilityImage {
 }
 
 model FacilityOperatingHour {
-  id               String   @id @default(cuid())
-  facilityId       String
-  dayOfWeek        Int
-  opensAtMinutes   Int
-  closesAtMinutes  Int
-  isClosed         Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  facility         Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  facilityId      String
+  dayOfWeek       Int
+  opensAtMinutes  Int
+  closesAtMinutes Int
+  isClosed        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  facility        Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
 
   @@unique([facilityId, dayOfWeek])
   @@index([facilityId])
 }
 
 model PricingRule {
-  id              String             @id @default(cuid())
-  facilityId      String
-  currency        String             @default("PHP")
-  amountMinor     Int
-  billingMode     PricingBillingMode @default(PER_HOUR)
-  minimumMinutes  Int                @default(30)
-  isActive        Boolean            @default(true)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  facility        Facility           @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  id             String             @id @default(cuid())
+  facilityId     String
+  currency       String             @default("PHP")
+  amountMinor    Int
+  billingMode    PricingBillingMode @default(PER_HOUR)
+  minimumMinutes Int                @default(30)
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  facility       Facility           @relation(fields: [facilityId], references: [id], onDelete: Cascade)
 
   @@index([facilityId, isActive])
 }

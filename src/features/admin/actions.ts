@@ -513,12 +513,14 @@ export async function createWalkInBookingAction(
     update: {
       fullName: parsed.data.fullName,
       phone: parsed.data.phone,
+      emailVerifiedAt: new Date(),
       phoneVerifiedAt: new Date()
     },
     create: {
       email: email.toLowerCase(),
       fullName: parsed.data.fullName,
       phone: parsed.data.phone,
+      emailVerifiedAt: new Date(),
       phoneVerifiedAt: new Date(),
       passwordHash: await hashPassword(crypto.randomUUID()),
       role: "CUSTOMER"

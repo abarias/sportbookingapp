@@ -77,6 +77,7 @@ async function upsertUser(params: {
   fullName: string;
   role: UserRole;
   phone?: string;
+  emailVerifiedAt?: Date;
   phoneVerifiedAt?: Date;
 }) {
   return prisma.user.upsert({
@@ -85,6 +86,7 @@ async function upsertUser(params: {
       fullName: params.fullName,
       passwordHash: await bcrypt.hash(params.password, 10),
       phone: params.phone,
+      emailVerifiedAt: params.emailVerifiedAt,
       phoneVerifiedAt: params.phoneVerifiedAt,
       role: params.role
     },
@@ -93,6 +95,7 @@ async function upsertUser(params: {
       fullName: params.fullName,
       passwordHash: await bcrypt.hash(params.password, 10),
       phone: params.phone,
+      emailVerifiedAt: params.emailVerifiedAt,
       phoneVerifiedAt: params.phoneVerifiedAt,
       role: params.role
     }
@@ -110,6 +113,7 @@ async function main() {
     password: adminPassword,
     fullName: "MVP Admin",
     phone: "+639171234567",
+    emailVerifiedAt: new Date(),
     phoneVerifiedAt: new Date(),
     role: UserRole.ADMIN
   });
@@ -119,6 +123,7 @@ async function main() {
     password: customerPassword,
     fullName: "Sample Player",
     phone: "+639181112222",
+    emailVerifiedAt: new Date(),
     phoneVerifiedAt: new Date(),
     role: UserRole.CUSTOMER
   });
