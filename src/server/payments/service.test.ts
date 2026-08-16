@@ -41,6 +41,8 @@ beforeEach(() => {
 });
 
 describe("manual payment service", () => {
+  const futureHoldExpiresAt = () => new Date(Date.now() + 15 * 60 * 1000);
+
   it("normalizes external payment references", () => {
     expect(normalizePaymentReference(" gcash-123 456 ")).toBe("GCASH123456");
   });
@@ -50,7 +52,7 @@ describe("manual payment service", () => {
       id: "booking-1",
       userId: "user-1",
       status: BookingStatus.HELD,
-      paymentHoldExpiresAt: new Date("2026-08-16T01:00:00.000Z"),
+      paymentHoldExpiresAt: futureHoldExpiresAt(),
       payment: { status: PaymentStatus.AWAITING_PAYMENT }
     });
     mocks.tx.payment.findFirst.mockResolvedValue(null);
@@ -85,7 +87,7 @@ describe("manual payment service", () => {
       id: "booking-1",
       userId: "user-1",
       status: BookingStatus.HELD,
-      paymentHoldExpiresAt: new Date("2026-08-16T01:00:00.000Z"),
+      paymentHoldExpiresAt: futureHoldExpiresAt(),
       payment: { status: PaymentStatus.AWAITING_PAYMENT }
     });
     mocks.tx.payment.findFirst.mockResolvedValue({ id: "other-payment" });

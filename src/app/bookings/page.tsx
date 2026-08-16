@@ -6,6 +6,7 @@ import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { expirePendingBookings } from "@/server/bookings/expiration";
 import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellationWindowHours } from "@/server/bookings/policies";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,10 @@ function sortUpcomingBookings(left: CustomerBookingListRecord, right: CustomerBo
   return left.startAtUtc.getTime() - right.startAtUtc.getTime();
 }
 
+function sortHistoryBookings(left: CustomerBookingListRecord, right: CustomerBookingListRecord) {
+  return right.startAtUtc.getTime() - left.startAtUtc.getTime();
+}
+
 export default async function BookingsPage({ searchParams }: BookingsPageProps) {
   const session = await getSession();
   const params = await searchParams;
@@ -74,6 +79,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   }
 
   const now = new Date();
+  await expirePendingBookings({ now });
   const [bookings, cancellationSetting, cancellationWindowSetting] = await Promise.all([
     prisma.booking.findMany({
       where: {
@@ -109,7 +115,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   const globalCancellationEnabled = cancellationSetting?.value === true;
   const globalCancellationWindowHours = typeof cancellationWindowSetting?.value === "number" ? cancellationWindowSetting.value : 24;
 
-  const history = bookings.filter((booking) => belongsInHistory(booking, now));
+  const history = bookings.filter((booking) => belongsInHistory(booking, now)).sort(sortHistoryBookings);
   const upcoming = bookings.filter((booking) => !belongsInHistory(booking, now)).sort(sortUpcomingBookings);
 
   return (

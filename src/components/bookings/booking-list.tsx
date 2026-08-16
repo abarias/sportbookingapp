@@ -88,6 +88,11 @@ export function BookingList({ title, items, emptyMessage }: BookingListProps) {
                     {paymentLabels[item.paymentStatus]}
                   </span>
                 ) : null}
+                {item.paymentHoldExpiresAt && item.status === BookingStatus.EXPIRED ? (
+                  <p className="text-sm text-rose-200">
+                    Payment hold expired at {formatInTimeZone(item.paymentHoldExpiresAt, item.timezone, "MMM d, yyyy h:mm a")}
+                  </p>
+                ) : null}
                 {(item.status === BookingStatus.PENDING_PAYMENT || item.status === BookingStatus.HELD) && item.paymentHoldExpiresAt ? (
                   <p className="text-sm text-amber-200">
                     Payment hold expires at {formatInTimeZone(item.paymentHoldExpiresAt, item.timezone, "h:mm a")}

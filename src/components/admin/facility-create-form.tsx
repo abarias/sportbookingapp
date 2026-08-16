@@ -65,7 +65,7 @@ export function FacilityCreateForm() {
         </label>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Minimum minutes</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={30} max={480} min={30} name="minimumMinutes" required step={30} type="number" />
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={60} max={480} min={60} name="minimumMinutes" required step={60} type="number" />
           {state.fieldErrors?.minimumMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.minimumMinutes}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">

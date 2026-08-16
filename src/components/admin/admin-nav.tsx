@@ -16,7 +16,7 @@ const items = [
 
 export function AdminNav({ current }: AdminNavProps) {
   return (
-    <nav className="flex flex-wrap gap-3">
+    <nav className="hidden flex-wrap gap-3 md:flex">
       {items.map((item) => (
         <Link
           key={item.key}

@@ -22,16 +22,9 @@ export function SessionNav({ session }: SessionNavProps) {
     );
   }
 
-  const showAdminLink = session.user.role === "ADMIN";
-
   return (
     <div className="flex items-center gap-3">
       <span className="hidden text-stone-400 md:inline">{session.user.name}</span>
-      {showAdminLink ? (
-        <Link href="/admin" className="hover:text-white">
-          Admin
-        </Link>
-      ) : null}
       <form
         action={async () => {
           "use server";

@@ -37,13 +37,13 @@ const createBookingSchema = z.object({
     .int()
     .min(0, "Choose a valid start time.")
     .max(1410, "Choose a valid start time.")
-    .refine((value) => value % 30 === 0, "Start time must align with 30-minute slots."),
+    .refine((value) => value % 30 === 0, "Start time must align with the facility schedule."),
   durationMinutes: z
     .number()
     .int()
-    .min(30, "Duration must be at least 30 minutes.")
+    .min(60, "Duration must be at least 1 hour.")
     .max(240, "Duration is too long.")
-    .refine((value) => value % 30 === 0, "Duration must be in 30-minute increments.")
+    .refine((value) => value % 60 === 0, "Duration must be in hourly increments.")
 });
 
 const cancelBookingSchema = z.object({

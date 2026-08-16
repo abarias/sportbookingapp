@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { auth } from "@/auth";
+import { DesktopAdminMenu } from "@/components/layout/desktop-admin-menu";
+import { MobileNavMenu } from "@/components/layout/mobile-nav-menu";
 import { SessionNav } from "@/components/layout/session-nav";
 import { siteConfig } from "@/lib/config/site";
 
@@ -13,8 +15,19 @@ const navItems = [
   { href: "/bookings", label: "My Bookings" }
 ] as const;
 
+const adminItems = [
+  { href: "/admin", label: "Overview" },
+  { href: "/admin/calendar", label: "Calendar" },
+  { href: "/admin/walk-ins", label: "Walk-ins" },
+  { href: "/admin/facilities", label: "Facilities" },
+  { href: "/admin/payments", label: "Payments" },
+  { href: "/admin/customers", label: "Customers" },
+  { href: "/admin/reports", label: "Reports" }
+] as const;
+
 export async function AppShell({ children }: AppShellProps) {
   const session = await auth();
+  const showAdminItems = session?.user?.role === "ADMIN";
 
   return (
     <div className="min-h-screen">
@@ -23,14 +36,23 @@ export async function AppShell({ children }: AppShellProps) {
           <Link href="/" className="text-lg font-semibold tracking-tight text-white">
             {siteConfig.name}
           </Link>
-          <nav className="flex items-center gap-4 text-sm text-stone-300">
+          <nav className="hidden items-center gap-4 text-sm text-stone-300 md:flex">
             {navItems.map((item) => (
               <Link key={item.href} href={item.href} className="hover:text-white">
                 {item.label}
               </Link>
             ))}
+            {showAdminItems ? (
+              <DesktopAdminMenu items={adminItems} />
+            ) : null}
             <SessionNav session={session} />
           </nav>
+          <MobileNavMenu
+            adminItems={adminItems}
+            navItems={navItems}
+            sessionControls={<SessionNav session={session} />}
+            showAdminItems={showAdminItems}
+          />
         </div>
       </header>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>

@@ -60,7 +60,10 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
 
   const now = new Date();
   const isAwaitingPayment = booking.payment.status === PaymentStatus.AWAITING_PAYMENT;
-  const isExpiredHold = isAwaitingPayment && booking.paymentHoldExpiresAt && booking.paymentHoldExpiresAt <= now;
+  const isExpiredHold =
+    booking.paymentHoldExpiresAt &&
+    booking.paymentHoldExpiresAt <= now &&
+    (isAwaitingPayment || booking.payment.status === PaymentStatus.EXPIRED);
   const canSubmitProof =
     (booking.payment.status === PaymentStatus.AWAITING_PAYMENT || booking.payment.status === PaymentStatus.ACTION_REQUIRED) && !isExpiredHold;
 
@@ -97,7 +100,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
           ) : null}
           {isExpiredHold ? (
             <p className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-100">
-              This unpaid reservation hold has expired. Please create a new booking.
+              This unpaid reservation hold has expired. Please create a new booking. If payment has already been made, please contact MMG Stellar support.
             </p>
           ) : null}
           {booking.payment.reviewNote ? (
@@ -108,8 +111,8 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
           ) : null}
           <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4 text-sm leading-7 text-stone-300">
             <p className="font-medium text-white">Payment instructions</p>
-            <p>GCash: 0917 000 0000 - Sport Booking PH</p>
-            <p>Bank transfer: BPI 0000-0000-00 - Sport Booking PH</p>
+            <p>GCash: 0917 000 0000 - MMG Stellar</p>
+            <p>Bank transfer: BPI 0000-0000-00 - MMG Stellar</p>
             <p>Include booking reference {booking.payment.providerReference} in the transfer remarks when possible.</p>
           </div>
         </div>

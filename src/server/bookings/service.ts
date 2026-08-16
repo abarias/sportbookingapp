@@ -26,6 +26,20 @@ type BookingCreationInput = {
   idempotencyKey?: string;
 };
 
+const BOOKING_INCREMENT_MINUTES = 60;
+
+function assertAllowedBookingDuration(durationMinutes: number, pricingMinimumMinutes: number, slotIntervalMinutes: number) {
+  const minimumMinutes = Math.max(pricingMinimumMinutes, BOOKING_INCREMENT_MINUTES);
+
+  if (
+    durationMinutes < minimumMinutes ||
+    durationMinutes % BOOKING_INCREMENT_MINUTES !== 0 ||
+    durationMinutes % slotIntervalMinutes !== 0
+  ) {
+    throw new Error("Bookings must be at least 1 hour and use hourly increments.");
+  }
+}
+
 function getPaymentHoldMinutes(value: Prisma.JsonValue | null | undefined) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -312,9 +326,7 @@ export async function createBookingHold(input: BookingCreationInput) {
         throw new Error("Facility pricing is not configured.");
       }
 
-      if (input.durationMinutes < pricingRule.minimumMinutes || input.durationMinutes % facility.slotIntervalMinutes !== 0) {
-        throw new Error("Duration is not allowed for this facility.");
-      }
+      assertAllowedBookingDuration(input.durationMinutes, pricingRule.minimumMinutes, facility.slotIntervalMinutes);
 
       const openingRange = getDailyOpeningRange(facility, input.dateKey);
 
@@ -498,9 +510,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         throw new Error("Facility pricing is not configured.");
       }
 
-      if (input.durationMinutes < pricingRule.minimumMinutes || input.durationMinutes % facility.slotIntervalMinutes !== 0) {
-        throw new Error("Duration is not allowed for this facility.");
-      }
+      assertAllowedBookingDuration(input.durationMinutes, pricingRule.minimumMinutes, facility.slotIntervalMinutes);
 
       const openingRange = getDailyOpeningRange(facility, input.dateKey);
 
@@ -659,9 +669,7 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
         throw new Error("Facility pricing is not configured.");
       }
 
-      if (input.durationMinutes < pricingRule.minimumMinutes || input.durationMinutes % facility.slotIntervalMinutes !== 0) {
-        throw new Error("Duration is not allowed for this facility.");
-      }
+      assertAllowedBookingDuration(input.durationMinutes, pricingRule.minimumMinutes, facility.slotIntervalMinutes);
 
       const openingRange = getDailyOpeningRange(facility, input.dateKey);
 

@@ -44,7 +44,7 @@ export async function submitManualPaymentProof(input: {
       booking.paymentHoldExpiresAt &&
       booking.paymentHoldExpiresAt <= now
     ) {
-      throw new Error("This reservation hold has expired. Please create a new booking.");
+      throw new Error("This reservation hold has expired. Please create a new booking. If payment has already been made, please contact MMG Stellar support.");
     }
 
     if (booking.payment.status !== PaymentStatus.AWAITING_PAYMENT && booking.payment.status !== PaymentStatus.ACTION_REQUIRED) {

@@ -34,9 +34,9 @@ export const facilityUpdateSchema = z.object({
   minimumMinutes: z
     .number()
     .int()
-    .min(30, "Minimum duration must be at least 30 minutes.")
+    .min(60, "Minimum duration must be at least 1 hour.")
     .max(480, "Minimum duration is too large.")
-    .refine((value) => value % 30 === 0, "Minimum duration must be in 30-minute increments."),
+    .refine((value) => value % 60 === 0, "Minimum duration must be in hourly increments."),
   imageUrls: z.array(z.string().url("Each image must be a valid URL.")).min(1, "Add at least one image URL."),
   cancellationEnabledOverride: z.enum(["inherit", "enabled", "disabled"]),
   operatingHours: z.array(operatingHourSchema).length(7)
@@ -85,9 +85,9 @@ export const adminWalkInBookingSchema = z.object({
   durationMinutes: z
     .number()
     .int()
-    .min(30, "Duration must be at least 30 minutes.")
+    .min(60, "Duration must be at least 1 hour.")
     .max(240, "Duration is too long.")
-    .refine((value) => value % 30 === 0, "Duration must be in 30-minute increments.")
+    .refine((value) => value % 60 === 0, "Duration must be in hourly increments.")
 });
 
 export type FacilityUpdateInput = z.infer<typeof facilityUpdateSchema>;

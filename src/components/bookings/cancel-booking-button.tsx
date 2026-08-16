@@ -25,7 +25,15 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
   const [state, action] = useActionState(cancelBookingAction, initialState);
 
   return (
-    <form action={action} className="space-y-2">
+    <form
+      action={action}
+      className="space-y-2"
+      onSubmit={(event) => {
+        if (!window.confirm("Cancel this booking? Any refund handling will be coordinated by staff.")) {
+          event.preventDefault();
+        }
+      }}
+    >
       <input name="bookingId" type="hidden" value={bookingId} />
       <SubmitButton />
       {state.error ? <p className="text-xs text-rose-300">{state.error}</p> : null}

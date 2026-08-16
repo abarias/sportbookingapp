@@ -112,7 +112,7 @@ Admins can manage existing facilities at `/admin/facilities` and create new faci
 
 - name, slug, description, type, enabled state
 - per-hour pricing and minimum duration
-- 30-minute based slot interval rules
+- Hourly customer booking increments with 30-minute internal slot resolution
 - operating hours by day
 - global or per-facility cancellation policy overrides
 - multiple images through either image URLs or uploaded image files
@@ -299,7 +299,7 @@ Production notes:
 - Customers use email/password accounts
 - Customers must verify a Philippine mobile number during registration
 - Admins are internal staff only
-- Fixed 30-minute slot increments
+- Fixed hourly customer booking increments
 - Pricing is per facility without peak/off-peak tiers
 - Mock payment is temporary until a real gateway is chosen
 - Mock OTP is temporary until an SMS provider is chosen

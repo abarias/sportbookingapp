@@ -64,7 +64,7 @@ export function WalkInBookingForm({ facilities, maxDateKey, minDateKey }: { faci
         </label>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Duration minutes</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={60} max={240} min={30} name="durationMinutes" required step={30} type="number" />
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={60} max={240} min={60} name="durationMinutes" required step={60} type="number" />
           {state.fieldErrors?.durationMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.durationMinutes}</p> : null}
         </label>
       </div>

@@ -16,7 +16,14 @@ export function FacilityCard({ facility }: FacilityCardProps) {
     <article className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/5">
       {coverImage ? (
         <div className="relative aspect-[4/3]">
-          <Image src={coverImage.url} alt={coverImage.alt} fill className="object-cover" sizes="(max-width: 768px) 100vw, 25vw" />
+          <Image
+            src={coverImage.url}
+            alt={coverImage.alt}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 25vw"
+            unoptimized={coverImage.url.startsWith("/facility_photos/")}
+          />
         </div>
       ) : (
         <div className="flex aspect-[4/3] items-center justify-center bg-stone-900/80 text-sm text-stone-400">No image</div>

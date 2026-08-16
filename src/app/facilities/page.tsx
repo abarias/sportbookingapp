@@ -12,7 +12,7 @@ export default async function FacilitiesPage() {
       <SectionHeading
         eyebrow="Browse"
         title="Available facilities"
-        description="Browse live facility inventory from PostgreSQL and drill into date-based availability for each court."
+        description="Browse our basketball, pickleball, and badminton facilities and drill into date-based availability for each court."
       />
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {facilities.map((facility) => (

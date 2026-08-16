@@ -18,6 +18,26 @@ const defaultOperatingHours = [
   { dayOfWeek: 6, opensAtMinutes: 8 * 60, closesAtMinutes: 23 * 60, isClosed: false }
 ];
 
+const centerCourtImages = [
+  "/facility_photos/whole_court-1.jpg",
+  "/facility_photos/whole_court-2.jpg",
+  "/facility_photos/whole_court-3.jpg",
+  "/facility_photos/whole_court-4.jpg",
+  "/facility_photos/whole_court-5.jpg"
+];
+
+const halfCourtImages = [
+  "/facility_photos/3x3-1.jpg",
+  "/facility_photos/3x3-2.jpg",
+  "/facility_photos/3x3-3.jpg",
+  "/facility_photos/3x3-4.jpg"
+];
+
+const racketCourtImages = [
+  "/facility_photos/badminton-1.jpg",
+  "/facility_photos/badminton-2.jpg"
+];
+
 const facilities = [
   {
     slug: "center-court",
@@ -25,7 +45,7 @@ const facilities = [
     description: "Full indoor basketball court for leagues, scrimmages, and private rentals.",
     type: FacilityType.BASKETBALL_WHOLE,
     priceMinor: 250000,
-    imageUrl: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1200&q=80",
+    imageUrls: centerCourtImages,
     imageAlt: "Indoor basketball court"
   },
   {
@@ -34,7 +54,7 @@ const facilities = [
     description: "Half-court setup optimized for 3x3 play, drills, and youth training sessions.",
     type: FacilityType.BASKETBALL_HALF,
     priceMinor: 120000,
-    imageUrl: "https://images.unsplash.com/photo-1518063319789-7217e6706b04?auto=format&fit=crop&w=1200&q=80",
+    imageUrls: halfCourtImages,
     imageAlt: "Half basketball court"
   },
   {
@@ -43,7 +63,7 @@ const facilities = [
     description: "Second half-court for overflow play, private coaching, and tournament rotations.",
     type: FacilityType.BASKETBALL_HALF,
     priceMinor: 120000,
-    imageUrl: "https://images.unsplash.com/photo-1519861531473-9200262188bf?auto=format&fit=crop&w=1200&q=80",
+    imageUrls: halfCourtImages,
     imageAlt: "Basketball half court with players"
   },
   {
@@ -52,8 +72,8 @@ const facilities = [
     description: "Dedicated pickleball court with competition markings and evening lighting.",
     type: FacilityType.PICKLEBALL,
     priceMinor: 90000,
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Outdoor_pickleball_courts.jpg",
-    imageAlt: "Outdoor pickleball courts"
+    imageUrls: racketCourtImages,
+    imageAlt: "Indoor racket court"
   },
   {
     slug: "badminton-court-1",
@@ -61,7 +81,7 @@ const facilities = [
     description: "Indoor badminton lane with rubberized flooring and spectator-side clearance.",
     type: FacilityType.BADMINTON,
     priceMinor: 70000,
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/BOSE_Badminton_Court.jpg",
+    imageUrls: racketCourtImages,
     imageAlt: "Indoor badminton court"
   },
   {
@@ -70,7 +90,7 @@ const facilities = [
     description: "Second badminton court for doubles play, classes, and casual bookings.",
     type: FacilityType.BADMINTON,
     priceMinor: 70000,
-    imageUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/Badminton_courts.jpg",
+    imageUrls: racketCourtImages,
     imageAlt: "Badminton courts"
   }
 ] as const;
@@ -185,7 +205,11 @@ async function main() {
           slotIntervalMinutes: 30,
           images: {
             deleteMany: {},
-            create: [{ url: facility.imageUrl, altText: facility.imageAlt, sortOrder: 0 }]
+            create: facility.imageUrls.map((url, index) => ({
+              url,
+              altText: `${facility.imageAlt} ${index + 1}`,
+              sortOrder: index
+            }))
           },
           operatingHours: {
             deleteMany: {},
@@ -198,7 +222,7 @@ async function main() {
                 currency: "PHP",
                 amountMinor: facility.priceMinor,
                 billingMode: PricingBillingMode.PER_HOUR,
-                minimumMinutes: 30,
+                minimumMinutes: 60,
                 isActive: true
               }
             ]
@@ -213,7 +237,11 @@ async function main() {
           isEnabled: true,
           slotIntervalMinutes: 30,
           images: {
-            create: [{ url: facility.imageUrl, altText: facility.imageAlt, sortOrder: 0 }]
+            create: facility.imageUrls.map((url, index) => ({
+              url,
+              altText: `${facility.imageAlt} ${index + 1}`,
+              sortOrder: index
+            }))
           },
           operatingHours: {
             create: defaultOperatingHours
@@ -224,7 +252,7 @@ async function main() {
                 currency: "PHP",
                 amountMinor: facility.priceMinor,
                 billingMode: PricingBillingMode.PER_HOUR,
-                minimumMinutes: 30,
+                minimumMinutes: 60,
                 isActive: true
               }
             ]

@@ -16,22 +16,19 @@ export default async function HomePage() {
       <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),linear-gradient(135deg,#0c0a09_0%,#1c1917_45%,#292524_100%)] px-6 py-14 shadow-2xl shadow-amber-500/10 sm:px-10">
         <div className="grid gap-10 lg:grid-cols-[1.3fr_0.9fr] lg:items-end">
           <div className="space-y-6">
-            <p className="text-sm uppercase tracking-[0.3em] text-amber-300">Sports Facility Booking</p>
+            <p className="text-sm uppercase tracking-[0.3em] text-amber-300">MMG Stellar Facilities</p>
             <div className="space-y-4">
               <h1 className="max-w-3xl font-serif text-4xl leading-tight text-white sm:text-5xl lg:text-6xl">
                 Book courts in minutes with clear availability and fast confirmation.
               </h1>
               <p className="max-w-2xl text-base leading-7 text-stone-300 sm:text-lg">
-                Built for Philippine sports facilities with easy scheduling, 30-minute slots, and a straightforward
-                online booking experience for players and staff.
+                Check out our booking tool catered to our facilities with easy scheduling, hourly bookings, and a straightforward
+                online booking experience for the ballers, picklers, and shuttle chasers out there.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg">
                 <Link href="/facilities">Browse facilities</Link>
-              </Button>
-              <Button asChild size="lg" variant="secondary">
-                <Link href="/admin">Open admin preview</Link>
               </Button>
             </div>
           </div>

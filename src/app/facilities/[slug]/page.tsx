@@ -1,8 +1,8 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
+import { BookingDateSelector } from "@/components/bookings/booking-date-selector";
 import { BookingPanel } from "@/components/bookings/booking-panel";
-import { SlotGrid } from "@/components/bookings/slot-grid";
 import { getSession } from "@/lib/auth/session";
 import { formatDateLabel } from "@/lib/time/slots";
 import { formatCurrency } from "@/lib/formatting/currency";
@@ -39,73 +39,31 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
     notFound();
   }
 
+  const dateLabel = formatDateLabel(dateKey, facility.timezone);
+
   return (
-    <main className="space-y-10 pb-16">
-      <section className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="space-y-5">
-          <div className="flex snap-x gap-4 overflow-x-auto pb-2">
-            {facility.images.map((image, index) => (
-              <div key={image.id} className="relative min-w-full snap-start overflow-hidden rounded-[2rem] border border-white/10">
-                <Image
-                  src={image.url}
-                  alt={image.altText}
-                  width={1400}
-                  height={900}
-                  className="aspect-[16/10] w-full object-cover"
-                  priority={index === 0}
-                />
+    <main className="space-y-8 pb-16">
+      <section className="grid gap-6 lg:grid-cols-[1.28fr_0.72fr]">
+        <section className="space-y-5 lg:order-1">
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 sm:p-5">
+            <p className="text-xs uppercase tracking-[0.24em] text-amber-300">{getFacilityTypeLabel(facility.type)}</p>
+            <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h1 className="font-serif text-3xl text-white">{facility.name}</h1>
+                <p className="mt-1 text-sm text-stone-300">
+                  {formatCurrency(primaryPrice.amountMinor, "PHP")} {primaryPrice.billingMode === "PER_HOUR" ? "per hour" : "per booking block"} • 1-hour minimum
+                </p>
               </div>
-            ))}
+              <p className="rounded-full bg-amber-300/15 px-4 py-2 text-sm font-medium text-amber-100">
+                Select hourly slots below
+              </p>
+            </div>
           </div>
-          <div className="space-y-3">
-            <p className="text-sm uppercase tracking-[0.24em] text-amber-300">{getFacilityTypeLabel(facility.type)}</p>
-            <h1 className="font-serif text-4xl text-white">{facility.name}</h1>
-            <p className="max-w-3xl text-base leading-7 text-stone-300">{facility.description}</p>
-          </div>
-        </div>
 
-        <div className="space-y-5">
-          <aside className="rounded-[2rem] border border-white/10 bg-white/5 p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-stone-400">Pricing</p>
-            <p className="mt-4 text-3xl font-semibold text-white">
-              {formatCurrency(primaryPrice.amountMinor, "PHP")}
-            </p>
-            <p className="mt-2 text-sm text-stone-300">
-              {primaryPrice.billingMode === "PER_HOUR" ? "Per hour" : "Per booking block"} • Minimum {primaryPrice.minimumMinutes} minutes
-            </p>
-            <ul className="mt-6 space-y-3 text-sm text-stone-300">
-              <li>30-minute minimum increments</li>
-              <li>Availability accounts for confirmed bookings, valid pending bookings, and blocked schedules</li>
-              <li>Customer reservations are confirmed only after staff verifies payment</li>
-            </ul>
-          </aside>
-
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6">
-            <form className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex-1 space-y-2">
-                <label className="text-sm font-medium text-stone-200" htmlFor="date">
-                  Booking date
-                </label>
-                <input
-                  className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-sm text-white"
-                  defaultValue={dateKey}
-                  id="date"
-                  min={bookingWindow.minDateKey}
-                  max={bookingWindow.maxDateKey}
-                  name="date"
-                  required
-                  type="date"
-                />
-              </div>
-              <button
-                className="inline-flex h-11 items-center justify-center rounded-full bg-white/10 px-5 text-sm font-medium text-white transition hover:bg-white/15"
-                type="submit"
-              >
-                Check availability
-              </button>
-            </form>
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 sm:p-6">
+            <BookingDateSelector dateKey={dateKey} maxDateKey={bookingWindow.maxDateKey} minDateKey={bookingWindow.minDateKey} />
             <p className="mt-4 text-sm text-stone-400">
-              Showing slots for {formatDateLabel(dateKey, facility.timezone)} in {facility.timezone}. Bookings are open through {formatDateLabel(bookingWindow.maxDateKey, facility.timezone)}.
+              Showing hourly booking slots for {dateLabel} in {facility.timezone}. Bookings are open through {formatDateLabel(bookingWindow.maxDateKey, facility.timezone)}.
             </p>
           </div>
 
@@ -114,22 +72,81 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
             facilityId={facility.id}
             facilitySlug={facility.slug}
             isAuthenticated={Boolean(session?.user)}
+            dateLabel={dateLabel}
+            priceAmountMinor={primaryPrice.amountMinor}
+            priceBillingMode={primaryPrice.billingMode}
             slotIntervalMinutes={availability.slotIntervalMinutes}
             slots={availability.slots}
           />
-        </div>
-      </section>
+        </section>
 
-      <section className="space-y-5">
-        <div className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Availability</p>
-          <h2 className="font-serif text-3xl text-white">Live slot status</h2>
-          <p className="text-sm leading-7 text-stone-300">
-            Each card represents one 30-minute slot. Past times are automatically disabled, and only future valid start times can be reserved.
-          </p>
-          <p className="text-sm text-stone-400">Viewing slots for {formatDateLabel(dateKey, facility.timezone)}.</p>
-        </div>
-        <SlotGrid slots={availability.slots} />
+        <aside className="space-y-4 lg:order-2 lg:sticky lg:top-6 lg:self-start">
+          <details className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 lg:hidden">
+            <summary className="cursor-pointer list-none p-5 text-sm font-medium text-white">
+              View facility photos, pricing, and rules
+            </summary>
+            <div className="border-t border-white/10 p-4">
+              <div className="flex snap-x gap-3 overflow-x-auto pb-3">
+                {facility.images.map((image, index) => (
+                  <div key={image.id} className="relative min-w-[82%] snap-start overflow-hidden rounded-[1.35rem] border border-white/10 sm:min-w-[58%]">
+                    <Image
+                      src={image.url}
+                      alt={image.altText}
+                      width={900}
+                      height={620}
+                      className="aspect-[16/10] w-full object-cover"
+                      priority={index === 0}
+                      unoptimized={image.url.startsWith("/facility_photos/")}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm leading-6 text-stone-300">{facility.description}</p>
+            </div>
+          </details>
+
+          <div className="hidden overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 lg:block">
+            <div className="flex snap-x gap-3 overflow-x-auto p-3">
+              {facility.images.map((image, index) => (
+                <div key={image.id} className="relative min-w-full snap-start overflow-hidden rounded-[1.35rem] border border-white/10">
+                  <Image
+                    src={image.url}
+                    alt={image.altText}
+                    width={900}
+                    height={620}
+                    className="aspect-[16/10] w-full object-cover"
+                    priority={index === 0}
+                    unoptimized={image.url.startsWith("/facility_photos/")}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="space-y-3 border-t border-white/10 p-5">
+              <p className="text-xs uppercase tracking-[0.24em] text-amber-300">{getFacilityTypeLabel(facility.type)}</p>
+              <h2 className="font-serif text-2xl text-white">{facility.name}</h2>
+              <p className="max-h-36 overflow-hidden text-sm leading-6 text-stone-300">{facility.description}</p>
+            </div>
+          </div>
+
+          <div className="hidden gap-3 lg:grid">
+            <aside className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Pricing</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{formatCurrency(primaryPrice.amountMinor, "PHP")}</p>
+              <p className="mt-1 text-sm text-stone-300">
+                {primaryPrice.billingMode === "PER_HOUR" ? "Per hour" : "Per booking block"} • 1-hour minimum
+              </p>
+            </aside>
+
+            <aside className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 text-sm leading-6 text-stone-300">
+              <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Booking rules</p>
+              <ul className="mt-3 space-y-2">
+                <li>Hourly booking increments only</li>
+                <li>Slots are held after Reserve & Pay</li>
+                <li>Final confirmation requires staff payment verification</li>
+              </ul>
+            </aside>
+          </div>
+        </aside>
       </section>
     </main>
   );
