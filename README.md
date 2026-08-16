@@ -250,7 +250,7 @@ For the current demo deployment, use mock payments only if the client understand
 
 Pending unpaid bookings are expired by `GET /api/cron/expire-bookings`.
 
-- Vercel runs this route every 15 minutes from `vercel.json`.
+- Vercel Hobby runs this route once daily from `vercel.json`; Vercel Pro or an equivalent scheduler can run it more frequently.
 - Production requests require `Authorization: Bearer <CRON_SECRET>`.
 - Set a strong `CRON_SECRET` in Vercel before deploying this route.
 - Local development may call the route without `CRON_SECRET` unless strict env validation is enabled.
