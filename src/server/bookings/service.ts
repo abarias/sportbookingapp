@@ -24,6 +24,8 @@ type BookingCreationInput = {
   startMinutes: number;
   durationMinutes: number;
   idempotencyKey?: string;
+  paymentMethod?: "cash" | "manual_gcash" | "manual_bank_transfer" | "walk_in";
+  paymentReference?: string;
 };
 
 const BOOKING_INCREMENT_MINUTES = 60;
@@ -758,7 +760,8 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
             create: {
               provider: PaymentProvider.MANUAL,
               providerReference: createBookingReference(),
-              method: "walk_in",
+              method: input.paymentMethod ?? "walk_in",
+              externalReference: input.paymentReference?.trim() || null,
               status: PaymentStatus.VERIFIED,
               amountMinor,
               amountPaidMinor: amountMinor,
