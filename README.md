@@ -270,6 +270,8 @@ prisma/         Schema, migrations, and seed data
 
 ## Deployment
 
+See [Deployment Environments](docs/deployment-environments.md) for the current Development, QA, staging, production, branching, DNS, Vercel, and Supabase setup.
+
 Recommended MVP deployment:
 
 1. Create a hosted Postgres database on Neon or Supabase.
