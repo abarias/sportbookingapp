@@ -74,11 +74,10 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
             <p><span className="text-stone-500">Email:</span> {payment.booking.user.email}</p>
             <p><span className="text-stone-500">Phone:</span> {payment.booking.user.phone ?? "Not provided"}</p>
             <p><span className="text-stone-500">Expected:</span> {formatCurrency(payment.amountMinor, "PHP")}</p>
-            <p><span className="text-stone-500">Claimed:</span> {formatCurrency(payment.amountPaidMinor ?? 0, "PHP")}</p>
             <p><span className="text-stone-500">Method:</span> {payment.method?.replaceAll("_", " ") ?? "Not set"}</p>
             <p><span className="text-stone-500">Transfer ref:</span> {payment.externalReference ?? "Not set"}</p>
             <p>
-              <span className="text-stone-500">Submitted:</span>{" "}
+                <span className="text-stone-500">Proof uploaded:</span>{" "}
               {payment.submittedAt ? formatInTimeZone(payment.submittedAt, payment.booking.timezone, "MMM d, h:mm a") : "Not submitted"}
             </p>
           </div>

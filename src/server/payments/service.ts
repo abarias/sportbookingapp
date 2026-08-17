@@ -12,9 +12,7 @@ export async function submitManualPaymentProof(input: {
   bookingId: string;
   userId: string;
   method: ManualPaymentMethod;
-  amountPaidMinor: number;
   externalReference: string;
-  paidAt: Date;
   proofImageUrl: string;
 }) {
   const now = new Date();
@@ -68,9 +66,9 @@ export async function submitManualPaymentProof(input: {
         method: input.method,
         externalReference: input.externalReference.trim(),
         normalizedExternalReference: normalizedReference,
-        amountPaidMinor: input.amountPaidMinor,
+        amountPaidMinor: booking.amountMinor,
         proofImageUrl: input.proofImageUrl,
-        paidAt: input.paidAt,
+        paidAt: now,
         submittedAt: now,
         status: PaymentStatus.SUBMITTED,
         duplicateReference: Boolean(duplicatePayment),
