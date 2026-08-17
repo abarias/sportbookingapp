@@ -1,6 +1,8 @@
 import { BookingStatus, PaymentStatus } from "@prisma/client";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
+import { BookingHistoryPagination } from "@/components/bookings/booking-history-pagination";
 import { BookingList } from "@/components/bookings/booking-list";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,8 @@ type BookingsPageProps = {
   searchParams: Promise<{
     created?: string;
     mockPaid?: string;
+    historyPage?: string;
+    historyPageSize?: string;
   }>;
 };
 
@@ -32,15 +36,6 @@ function needsCustomerPaymentAction(booking: CustomerBookingListRecord) {
   );
 }
 
-function belongsInHistory(booking: CustomerBookingListRecord, now: Date) {
-  return (
-    booking.endAtUtc < now ||
-    booking.status === BookingStatus.CANCELLED ||
-    booking.status === BookingStatus.EXPIRED ||
-    booking.payment?.status === PaymentStatus.REJECTED
-  );
-}
-
 function sortUpcomingBookings(left: CustomerBookingListRecord, right: CustomerBookingListRecord) {
   const leftNeedsAction = needsCustomerPaymentAction(left);
   const rightNeedsAction = needsCustomerPaymentAction(right);
@@ -52,8 +47,20 @@ function sortUpcomingBookings(left: CustomerBookingListRecord, right: CustomerBo
   return left.startAtUtc.getTime() - right.startAtUtc.getTime();
 }
 
-function sortHistoryBookings(left: CustomerBookingListRecord, right: CustomerBookingListRecord) {
-  return right.startAtUtc.getTime() - left.startAtUtc.getTime();
+const HISTORY_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+function parsePositiveInteger(value: string | undefined, fallback: number) {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseHistoryPageSize(value: string | undefined) {
+  const parsed = parsePositiveInteger(value, HISTORY_PAGE_SIZE_OPTIONS[0]);
+  return HISTORY_PAGE_SIZE_OPTIONS.includes(parsed as (typeof HISTORY_PAGE_SIZE_OPTIONS)[number]) ? parsed : HISTORY_PAGE_SIZE_OPTIONS[0];
 }
 
 export default async function BookingsPage({ searchParams }: BookingsPageProps) {
@@ -80,43 +87,73 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
 
   const now = new Date();
   await expirePendingBookings({ now });
-  const [bookings, cancellationSetting, cancellationWindowSetting] = await Promise.all([
+  const historyPage = parsePositiveInteger(params.historyPage, 1);
+  const historyPageSize = parseHistoryPageSize(params.historyPageSize);
+  const historyWhere = {
+    userId: session.user.id,
+    OR: [
+      { endAtUtc: { lt: now } },
+      { status: BookingStatus.CANCELLED },
+      { status: BookingStatus.EXPIRED },
+      { payment: { is: { status: PaymentStatus.REJECTED } } }
+    ]
+  };
+  const bookingInclude = {
+    facility: {
+      select: {
+        name: true,
+        cancellationEnabledOverride: true,
+        cancellationWindowHoursOverride: true
+      }
+    },
+    payment: {
+      select: {
+        status: true,
+        reviewNote: true
+      }
+    }
+  } as const;
+
+  const [upcomingBookings, history, historyTotalCount, cancellationSetting, cancellationWindowSetting] = await Promise.all([
     prisma.booking.findMany({
       where: {
-        userId: session.user.id
+        userId: session.user.id,
+        endAtUtc: { gte: now },
+        status: { notIn: [BookingStatus.CANCELLED, BookingStatus.EXPIRED] },
+        payment: { isNot: { status: PaymentStatus.REJECTED } }
       },
       orderBy: {
         startAtUtc: "asc"
       },
-      include: {
-        facility: {
-          select: {
-            name: true,
-            cancellationEnabledOverride: true,
-            cancellationWindowHoursOverride: true
-          }
-        },
-        payment: {
-          select: {
-            status: true,
-            reviewNote: true
-          }
-        }
-      }
+      include: bookingInclude
+    }),
+    prisma.booking.findMany({
+      where: historyWhere,
+      orderBy: {
+        startAtUtc: "desc"
+      },
+      skip: (historyPage - 1) * historyPageSize,
+      take: historyPageSize,
+      include: bookingInclude
+    }),
+    prisma.booking.count({ where: historyWhere }),
+    prisma.appSetting.findUnique({
+      where: { key: "booking.cancellationWindowHours" }
     }),
     prisma.appSetting.findUnique({
       where: { key: "booking.cancellationEnabled" }
-    }),
-    prisma.appSetting.findUnique({
-      where: { key: "booking.cancellationWindowHours" }
     })
   ]);
 
   const globalCancellationEnabled = cancellationSetting?.value === true;
   const globalCancellationWindowHours = typeof cancellationWindowSetting?.value === "number" ? cancellationWindowSetting.value : 24;
 
-  const history = bookings.filter((booking) => belongsInHistory(booking, now)).sort(sortHistoryBookings);
-  const upcoming = bookings.filter((booking) => !belongsInHistory(booking, now)).sort(sortUpcomingBookings);
+  const upcoming = upcomingBookings.sort(sortUpcomingBookings);
+  const totalHistoryPages = Math.max(1, Math.ceil(historyTotalCount / historyPageSize));
+
+  if (historyPage > totalHistoryPages) {
+    redirect(`/bookings?historyPage=${totalHistoryPages}&historyPageSize=${historyPageSize}`);
+  }
 
   return (
     <main className="space-y-8 pb-16">
@@ -182,6 +219,11 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             isCancellable: false
           }))}
           title="History"
+          footer={
+            historyTotalCount > 0 ? (
+              <BookingHistoryPagination page={historyPage} pageSize={historyPageSize} totalCount={historyTotalCount} />
+            ) : null
+          }
         />
       </div>
     </main>

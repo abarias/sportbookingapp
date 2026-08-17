@@ -7,7 +7,8 @@ const facilityTypeLabels: Record<FacilityType, string> = {
   BASKETBALL_WHOLE: "Whole Basketball Court",
   BASKETBALL_HALF: "Half Basketball Court",
   PICKLEBALL: "Pickleball Court",
-  BADMINTON: "Badminton Court"
+  BADMINTON: "Badminton Court",
+  OTHER: "Other Facility"
 };
 
 export async function getFacilityCards(): Promise<FacilityCardViewModel[]> {

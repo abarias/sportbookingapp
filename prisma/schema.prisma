@@ -18,6 +18,7 @@ enum FacilityType {
   BASKETBALL_HALF
   PICKLEBALL
   BADMINTON
+  OTHER
 }
 
 enum BookingStatus {
