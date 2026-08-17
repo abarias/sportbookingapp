@@ -1,0 +1,1 @@
+ALTER TYPE "FacilityType" ADD VALUE 'OTHER';

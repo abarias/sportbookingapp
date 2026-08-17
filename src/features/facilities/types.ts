@@ -1,4 +1,4 @@
-export type FacilityType = "BASKETBALL_WHOLE" | "BASKETBALL_HALF" | "PICKLEBALL" | "BADMINTON";
+export type FacilityType = "BASKETBALL_WHOLE" | "BASKETBALL_HALF" | "PICKLEBALL" | "BADMINTON" | "OTHER";
 
 export type FacilityCardViewModel = {
   id: string;
