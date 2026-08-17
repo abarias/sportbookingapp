@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { blockedScheduleSchema } from "./schemas";
+import { adminWalkInBookingSchema, blockedScheduleSchema, walkInCustomerSchema } from "./schemas";
 
 describe("blockedScheduleSchema", () => {
   it("accepts a valid multi-day date-time block", () => {
@@ -29,5 +29,32 @@ describe("blockedScheduleSchema", () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("walk-in booking schemas", () => {
+  const customer = {
+    fullName: "Walk-in Player",
+    email: "player@example.com",
+    phone: "09171234567"
+  };
+
+  it("requires email and mobile number before allowing customer lookup", () => {
+    expect(walkInCustomerSchema.safeParse({ fullName: customer.fullName }).success).toBe(false);
+    expect(walkInCustomerSchema.safeParse(customer).success).toBe(true);
+  });
+
+  it("requires a payment reference for non-cash walk-in payments", () => {
+    const baseBooking = {
+      ...customer,
+      facilityId: "facility_123",
+      dateKey: "2026-08-20",
+      startTime: "10:00",
+      durationMinutes: 60
+    };
+
+    expect(adminWalkInBookingSchema.safeParse({ ...baseBooking, paymentMethod: "cash", paymentReference: "" }).success).toBe(true);
+    expect(adminWalkInBookingSchema.safeParse({ ...baseBooking, paymentMethod: "manual_gcash", paymentReference: "" }).success).toBe(false);
+    expect(adminWalkInBookingSchema.safeParse({ ...baseBooking, paymentMethod: "manual_gcash", paymentReference: "GCASH-1234" }).success).toBe(true);
   });
 });
