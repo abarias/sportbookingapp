@@ -86,7 +86,6 @@ export default async function AdminPaymentsPage({ searchParams }: AdminPaymentsP
     schedule: formatDateTimeRange(payment.booking.startAtUtc, payment.booking.endAtUtc, payment.booking.timezone),
     facilityName: payment.booking.facility.name,
     amountDue: formatCurrency(payment.amountMinor, "PHP"),
-    amountClaimed: payment.amountPaidMinor ? formatCurrency(payment.amountPaidMinor, "PHP") : null,
     bookingReference: payment.providerReference ?? `PAY-${payment.id.slice(0, 6).toUpperCase()}`,
     transferReference: payment.externalReference,
     paymentMethod: formatPaymentMethod(payment.method),

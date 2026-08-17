@@ -24,7 +24,7 @@ export type CancelBookingActionState = {
 export type PaymentProofActionState = {
   error?: string;
   success?: string;
-  fieldErrors?: Partial<Record<"method" | "amountPaid" | "externalReference" | "paidAt" | "proofImage", string>>;
+  fieldErrors?: Partial<Record<"method" | "externalReference" | "proofImage", string>>;
 };
 
 const createBookingSchema = z.object({
@@ -53,15 +53,8 @@ const cancelBookingSchema = z.object({
 const paymentProofSchema = z.object({
   bookingId: z.string().min(1),
   method: z.enum(["manual_gcash", "manual_bank_transfer"]),
-  amountPaidMinor: z.number().int().positive("Enter the amount paid."),
-  externalReference: z.string().trim().min(4, "Enter the transfer reference number.").max(120),
-  paidAt: z.coerce.date()
+  externalReference: z.string().trim().min(4, "Enter the transfer reference number.").max(120)
 });
-
-function parseAmountMinor(value: FormDataEntryValue | null) {
-  const amount = Number.parseFloat(String(value ?? ""));
-  return Math.round(amount * 100);
-}
 
 async function persistPaymentProofUpload(formData: FormData, bookingId: string) {
   const file = formData.get("proofImage");
@@ -153,9 +146,7 @@ export async function submitPaymentProofAction(
     const parsed = paymentProofSchema.safeParse({
       bookingId: String(formData.get("bookingId") ?? ""),
       method: String(formData.get("method") ?? ""),
-      amountPaidMinor: parseAmountMinor(formData.get("amountPaid")),
-      externalReference: String(formData.get("externalReference") ?? ""),
-      paidAt: String(formData.get("paidAt") ?? "")
+      externalReference: String(formData.get("externalReference") ?? "")
     });
 
     if (!parsed.success) {
@@ -165,9 +156,7 @@ export async function submitPaymentProofAction(
         error: "Please correct the payment proof details.",
         fieldErrors: {
           method: flattened.method?.[0],
-          amountPaid: flattened.amountPaidMinor?.[0],
-          externalReference: flattened.externalReference?.[0],
-          paidAt: flattened.paidAt?.[0]
+          externalReference: flattened.externalReference?.[0]
         }
       };
     }
@@ -178,9 +167,7 @@ export async function submitPaymentProofAction(
       bookingId: parsed.data.bookingId,
       userId: session.user.id,
       method: parsed.data.method,
-      amountPaidMinor: parsed.data.amountPaidMinor,
       externalReference: parsed.data.externalReference,
-      paidAt: parsed.data.paidAt,
       proofImageUrl
     });
 

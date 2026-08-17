@@ -15,7 +15,7 @@ function SubmitButton() {
   return <Button disabled={pending} type="submit">{pending ? "Submitting proof..." : "Submit proof for verification"}</Button>;
 }
 
-export function PaymentProofForm({ bookingId, amountDue }: { bookingId: string; amountDue: number }) {
+export function PaymentProofForm({ bookingId }: { bookingId: string }) {
   const [state, action] = useActionState(submitPaymentProofAction, initialState);
   const [fileError, setFileError] = useState<string | null>(null);
 
@@ -54,27 +54,9 @@ export function PaymentProofForm({ bookingId, amountDue }: { bookingId: string; 
           {state.fieldErrors?.method ? <p className="text-sm text-rose-300">{state.fieldErrors.method}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">
-          <span>Amount paid</span>
-          <input
-            className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white"
-            defaultValue={(amountDue / 100).toFixed(2)}
-            min="1"
-            name="amountPaid"
-            required
-            step="0.01"
-            type="number"
-          />
-          {state.fieldErrors?.amountPaid ? <p className="text-sm text-rose-300">{state.fieldErrors.amountPaid}</p> : null}
-        </label>
-        <label className="space-y-2 text-sm text-stone-200">
           <span>Transfer reference number</span>
           <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="externalReference" required />
           {state.fieldErrors?.externalReference ? <p className="text-sm text-rose-300">{state.fieldErrors.externalReference}</p> : null}
-        </label>
-        <label className="space-y-2 text-sm text-stone-200">
-          <span>Payment date and time</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="paidAt" required type="datetime-local" />
-          {state.fieldErrors?.paidAt ? <p className="text-sm text-rose-300">{state.fieldErrors.paidAt}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200 md:col-span-2">
           <span>Receipt screenshot or image</span>
