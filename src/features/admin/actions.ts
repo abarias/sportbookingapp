@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fromZonedTime } from "date-fns-tz";
 import { z } from "zod";
 import { FacilityType } from "@prisma/client";
 
-import { adminWalkInBookingSchema, blockedScheduleSchema, facilityCreateSchema, facilityUpdateSchema } from "@/features/admin/schemas";
+import { adminWalkInBookingSchema, blockedScheduleSchema, facilityCreateSchema, facilityUpdateSchema, walkInCustomerSchema } from "@/features/admin/schemas";
 import { hashPassword } from "@/lib/auth/password";
 import { requireAdminSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
@@ -125,7 +126,16 @@ export type DeleteBlockScheduleActionState = {
 export type WalkInBookingActionState = {
   success?: string;
   message?: string;
-  fieldErrors?: Partial<Record<"fullName" | "email" | "phone" | "facilityId" | "dateKey" | "startTime" | "durationMinutes", string>>;
+  customer?: {
+    fullName: string;
+    email: string;
+    phone: string;
+  };
+  existingCustomer?: {
+    email: string;
+    phone: string | null;
+  };
+  fieldErrors?: Partial<Record<"fullName" | "email" | "phone" | "facilityId" | "dateKey" | "startTime" | "durationMinutes" | "paymentMethod" | "paymentReference", string>>;
 };
 
 export type PaymentReviewActionState = {
@@ -485,6 +495,70 @@ export async function deleteBlockedScheduleAction(
   };
 }
 
+function getPhoneVariants(phone: string) {
+  const normalized = phone.replace(/[\s-]/g, "");
+
+  if (normalized.startsWith("+63")) {
+    return [normalized, `0${normalized.slice(3)}`];
+  }
+
+  if (normalized.startsWith("0")) {
+    return [normalized, `+63${normalized.slice(1)}`];
+  }
+
+  return [normalized];
+}
+
+function getWalkInCustomerValues(formData: FormData) {
+  return {
+    fullName: String(formData.get("fullName") ?? ""),
+    email: String(formData.get("email") ?? "").trim().toLowerCase(),
+    phone: String(formData.get("phone") ?? "").trim()
+  };
+}
+
+export async function checkWalkInCustomerAction(
+  _prevState: WalkInBookingActionState,
+  formData: FormData
+): Promise<WalkInBookingActionState> {
+  await requireAdminSession();
+
+  const parsed = walkInCustomerSchema.safeParse(getWalkInCustomerValues(formData));
+
+  if (!parsed.success) {
+    const flattened = parsed.error.flatten().fieldErrors;
+
+    return {
+      message: "Please enter the customer's name, email, and mobile number.",
+      fieldErrors: {
+        fullName: flattened.fullName?.[0],
+        email: flattened.email?.[0],
+        phone: flattened.phone?.[0]
+      }
+    };
+  }
+
+  const phoneVariants = getPhoneVariants(parsed.data.phone);
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: parsed.data.email }, { phone: { in: phoneVariants } }]
+    },
+    select: { email: true, phone: true }
+  });
+
+  if (existing) {
+    return {
+      message: "This customer already has an account. Ask them to sign in and complete the booking and payment from their own phone.",
+      existingCustomer: existing
+    };
+  }
+
+  return {
+    success: "Customer details are new. Continue with the walk-in booking.",
+    customer: parsed.data
+  };
+}
+
 export async function createWalkInBookingAction(
   _prevState: WalkInBookingActionState,
   formData: FormData
@@ -498,7 +572,9 @@ export async function createWalkInBookingAction(
     facilityId: String(formData.get("facilityId") ?? ""),
     dateKey: String(formData.get("dateKey") ?? ""),
     startTime: String(formData.get("startTime") ?? ""),
-    durationMinutes: Number.parseInt(String(formData.get("durationMinutes") ?? ""), 10)
+    durationMinutes: Number.parseInt(String(formData.get("durationMinutes") ?? ""), 10),
+    paymentMethod: String(formData.get("paymentMethod") ?? ""),
+    paymentReference: String(formData.get("paymentReference") ?? "")
   });
 
   if (!parsed.success) {
@@ -513,12 +589,29 @@ export async function createWalkInBookingAction(
         facilityId: flattened.facilityId?.[0],
         dateKey: flattened.dateKey?.[0],
         startTime: flattened.startTime?.[0],
-        durationMinutes: flattened.durationMinutes?.[0]
+        durationMinutes: flattened.durationMinutes?.[0],
+        paymentMethod: flattened.paymentMethod?.[0],
+        paymentReference: flattened.paymentReference?.[0]
       }
     };
   }
 
-  const email = parsed.data.email || `walkin-${parsed.data.phone.replace(/\D/g, "")}@sportbooking.local`;
+  const phoneVariants = getPhoneVariants(parsed.data.phone);
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: parsed.data.email }, { phone: { in: phoneVariants } }]
+    },
+    select: { email: true, phone: true }
+  });
+
+  if (existing) {
+    return {
+      message: "This customer already has an account. Ask them to sign in and complete the booking and payment from their own phone.",
+      existingCustomer: existing
+    };
+  }
+
+  const email = parsed.data.email;
   const user = await prisma.user.upsert({
     where: { email: email.toLowerCase() },
     update: {
@@ -544,7 +637,9 @@ export async function createWalkInBookingAction(
       facilityId: parsed.data.facilityId,
       dateKey: parsed.data.dateKey,
       startMinutes: timeToMinutes(parsed.data.startTime),
-      durationMinutes: parsed.data.durationMinutes
+      durationMinutes: parsed.data.durationMinutes,
+      paymentMethod: parsed.data.paymentMethod,
+      paymentReference: parsed.data.paymentReference
     });
   } catch (error) {
     return {
@@ -558,9 +653,7 @@ export async function createWalkInBookingAction(
   revalidatePath("/bookings");
   revalidatePath("/facilities");
 
-  return {
-    success: "Walk-in booking created and confirmed."
-  };
+  redirect(`/admin/walk-ins?date=${encodeURIComponent(parsed.data.dateKey)}`);
 }
 
 export async function verifyPaymentAction(

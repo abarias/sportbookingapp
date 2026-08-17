@@ -75,10 +75,13 @@ export const blockedScheduleSchema = z
     }
   });
 
-export const adminWalkInBookingSchema = z.object({
+export const walkInCustomerSchema = z.object({
   fullName: z.string().trim().min(2, "Customer name is required.").max(120),
-  email: z.string().trim().email("Enter a valid email.").max(255).optional().or(z.literal("")),
+  email: z.string().trim().email("Enter a valid email.").max(255),
   phone: z.string().trim().regex(/^(\+63|0)9\d{9}$/, "Enter a valid Philippine mobile number."),
+});
+
+export const adminWalkInBookingSchema = walkInCustomerSchema.extend({
   facilityId: z.string().min(1, "Facility is required."),
   dateKey: dateKeySchema,
   startTime: timeKeySchema,
@@ -87,10 +90,21 @@ export const adminWalkInBookingSchema = z.object({
     .int()
     .min(60, "Duration must be at least 1 hour.")
     .max(240, "Duration is too long.")
-    .refine((value) => value % 60 === 0, "Duration must be in hourly increments.")
+    .refine((value) => value % 60 === 0, "Duration must be in hourly increments."),
+  paymentMethod: z.enum(["cash", "manual_gcash", "manual_bank_transfer"]),
+  paymentReference: z.string().trim().max(120, "Reference is too long.").optional().or(z.literal(""))
+}).superRefine((data, ctx) => {
+  if (data.paymentMethod !== "cash" && !data.paymentReference) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Enter the payment transaction reference.",
+      path: ["paymentReference"]
+    });
+  }
 });
 
 export type FacilityUpdateInput = z.infer<typeof facilityUpdateSchema>;
 export type FacilityCreateInput = z.infer<typeof facilityCreateSchema>;
 export type BlockedScheduleInput = z.infer<typeof blockedScheduleSchema>;
+export type WalkInCustomerInput = z.infer<typeof walkInCustomerSchema>;
 export type AdminWalkInBookingInput = z.infer<typeof adminWalkInBookingSchema>;
