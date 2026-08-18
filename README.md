@@ -175,6 +175,10 @@ Defined in `.env.example`:
 
 - `DATABASE_URL`
 - `DIRECT_URL`
+- `SUPABASE_URL` — Supabase project URL used for private payment-proof storage
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only Supabase service-role key; never expose as `NEXT_PUBLIC_*`
+- `SUPABASE_PAYMENT_PROOFS_BUCKET` — private Storage bucket name, defaults to `payment-proofs`
+- `SUPABASE_FACILITY_IMAGES_BUCKET` — public Storage bucket name for facility photos, defaults to `facility-images`
 - `NEXTAUTH_URL`
 - `NEXTAUTH_SECRET`
 - `RESEND_API_KEY`
@@ -285,14 +289,30 @@ npx prisma migrate deploy
 4. Create the initial production admin with `npm run admin:bootstrap` from a secure environment.
 5. Deploy the Next.js app to Vercel.
 
+For payment-proof uploads, create a **private** Supabase Storage bucket named
+`payment-proofs`, and for facility uploads create a **public** bucket named
+`facility-images`, in each environment's Supabase project. Set the following
+server-only Vercel environment variables for Preview/Staging and Production,
+using the matching Supabase project in each environment:
+
+```text
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
+SUPABASE_PAYMENT_PROOFS_BUCKET=payment-proofs
+SUPABASE_FACILITY_IMAGES_BUCKET=facility-images
+```
+
+Never expose `SUPABASE_SERVICE_ROLE_KEY` as a `NEXT_PUBLIC_*` variable. Redeploy
+after adding or changing these variables. Local development can omit them and
+will store proofs under `public/uploads/payment-proofs` instead.
+
 Production notes:
 
 - Keep `NEXTAUTH_SECRET` unique per environment.
 - Use a strong production database password.
 - Customer payment confirmation now requires admin verification of submitted proof.
-- Local payment proof uploads are stored on disk and should be moved to persistent private object storage before launch.
+- Payment proof and facility image uploads use private Supabase Storage buckets on Vercel. Local development falls back to `public/uploads` when Supabase Storage variables are absent.
 - Mock OTP is still enabled in this MVP and should be replaced with a real SMS provider before launch.
-- Local image uploads are stored on disk and should be moved to persistent object storage before launch.
 - Refund handling is still manual.
 
 ## Assumptions
