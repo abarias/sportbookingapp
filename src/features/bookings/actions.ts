@@ -4,10 +4,9 @@ import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 
 import { requireUserSession } from "@/lib/auth/session";
+import { storePaymentProof } from "@/lib/storage/payment-proofs";
 import { cancelBookingByCustomer, createBookingHold } from "@/server/bookings/service";
 import { submitManualPaymentProof } from "@/server/payments/service";
 
@@ -71,16 +70,7 @@ async function persistPaymentProofUpload(formData: FormData, bookingId: string) 
     throw new Error("Payment proof must be an image file.");
   }
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "payment-proofs");
-  await mkdir(uploadDir, { recursive: true });
-
-  const extension = path.extname(file.name) || ".jpg";
-  const fileName = `${bookingId}-${Date.now()}${extension}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
-
-  await writeFile(path.join(uploadDir, fileName), bytes);
-
-  return `/uploads/payment-proofs/${fileName}`;
+  return storePaymentProof(file, bookingId);
 }
 
 export async function createBookingAction(

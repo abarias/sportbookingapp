@@ -2,8 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { fromZonedTime } from "date-fns-tz";
 import { z } from "zod";
 import { FacilityType } from "@prisma/client";
@@ -12,6 +10,7 @@ import { adminWalkInBookingSchema, blockedScheduleSchema, facilityCreateSchema, 
 import { hashPassword } from "@/lib/auth/password";
 import { requireAdminSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { storeFacilityImages } from "@/lib/storage/facility-images";
 import { createAdminConfirmedBooking } from "@/server/bookings/service";
 import { rejectSubmittedPayment, requestPaymentAction, verifySubmittedPayment } from "@/server/payments/service";
 
@@ -70,11 +69,7 @@ async function persistFacilityUploads(formData: FormData, slugSeed: string) {
     return [];
   }
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "facilities");
-  await mkdir(uploadDir, { recursive: true });
-
   const slug = slugify(slugSeed) || "facility";
-  const urls: string[] = [];
   const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
   if (files.length > 12) {
@@ -91,22 +86,7 @@ async function persistFacilityUploads(formData: FormData, slugSeed: string) {
     }
   }
 
-  for (const [index, file] of files.entries()) {
-    const extensionByType: Record<string, string> = {
-      "image/jpeg": ".jpg",
-      "image/png": ".png",
-      "image/webp": ".webp",
-      "image/gif": ".gif"
-    };
-    const extension = extensionByType[file.type];
-    const fileName = `${slug}-${Date.now()}-${index}${extension}`;
-    const bytes = Buffer.from(await file.arrayBuffer());
-
-    await writeFile(path.join(uploadDir, fileName), bytes);
-    urls.push(`/uploads/facilities/${fileName}`);
-  }
-
-  return urls;
+  return storeFacilityImages(files, slug);
 }
 
 function buildWeekdays(formData: FormData) {

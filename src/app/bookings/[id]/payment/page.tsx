@@ -9,6 +9,7 @@ import { SectionHeading } from "@/components/shared/section-heading";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formatCurrency } from "@/lib/formatting/currency";
+import { getPaymentProofUrl } from "@/lib/storage/payment-proofs";
 import { formatDateTimeRange } from "@/lib/time/slots";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,8 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
   if (!booking || !booking.payment) {
     notFound();
   }
+
+  const paymentProofUrl = await getPaymentProofUrl(booking.payment.proofImageUrl);
 
   const now = new Date();
   const isAwaitingPayment = booking.payment.status === PaymentStatus.AWAITING_PAYMENT;
@@ -116,7 +119,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
             <p>Bank transfer: BPI 0000-0000-00 - MMG Stellar</p>
             <p>Include booking reference {booking.payment.providerReference} in the transfer remarks when possible.</p>
           </div>
-          {booking.payment.proofImageUrl ? (
+          {paymentProofUrl ? (
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-medium text-white">Uploaded payment proof</p>
@@ -128,12 +131,12 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
               </div>
               <a
                 className="mt-3 block overflow-hidden rounded-xl border border-white/10"
-                href={booking.payment.proofImageUrl}
+                href={paymentProofUrl}
                 rel="noreferrer"
                 target="_blank"
               >
                 <Image
-                  src={booking.payment.proofImageUrl}
+                  src={paymentProofUrl}
                   alt="Uploaded payment receipt"
                   width={900}
                   height={600}

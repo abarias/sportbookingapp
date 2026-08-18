@@ -10,6 +10,7 @@ import { SectionHeading } from "@/components/shared/section-heading";
 import { requireAdminSession } from "@/lib/auth/session";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { formatDateTimeRange } from "@/lib/time/slots";
+import { getPaymentProofUrl } from "@/lib/storage/payment-proofs";
 import { getAdminPaymentDetailData } from "@/server/admin/queries";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,8 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
   if (!payment) {
     notFound();
   }
+
+  const paymentProofUrl = await getPaymentProofUrl(payment.proofImageUrl);
 
   return (
     <main className="space-y-8 pb-16">
@@ -94,9 +97,9 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
             </p>
           ) : null}
 
-          {payment.proofImageUrl ? (
-            <Link href={payment.proofImageUrl} target="_blank" className="block overflow-hidden rounded-2xl border border-white/10">
-              <Image src={payment.proofImageUrl} alt="Payment proof" width={900} height={600} className="max-h-[520px] w-full object-contain" />
+          {paymentProofUrl ? (
+            <Link href={paymentProofUrl} target="_blank" className="block overflow-hidden rounded-2xl border border-white/10">
+              <Image src={paymentProofUrl} alt="Payment proof" width={900} height={600} className="max-h-[520px] w-full object-contain" />
             </Link>
           ) : (
             <p className="rounded-2xl border border-white/10 bg-stone-950/40 p-4 text-sm text-stone-400">No proof image uploaded.</p>
