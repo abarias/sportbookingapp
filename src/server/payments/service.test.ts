@@ -52,6 +52,7 @@ describe("manual payment service", () => {
       id: "booking-1",
       userId: "user-1",
       status: BookingStatus.HELD,
+      amountMinor: 100000,
       paymentHoldExpiresAt: futureHoldExpiresAt(),
       payment: { status: PaymentStatus.AWAITING_PAYMENT }
     });
@@ -61,9 +62,7 @@ describe("manual payment service", () => {
       bookingId: "booking-1",
       userId: "user-1",
       method: "manual_gcash",
-      amountPaidMinor: 100000,
       externalReference: "abc-123",
-      paidAt: new Date("2026-08-16T00:10:00.000Z"),
       proofImageUrl: "/uploads/payment-proofs/proof.jpg"
     });
 
@@ -72,6 +71,7 @@ describe("manual payment service", () => {
       data: expect.objectContaining({
         status: PaymentStatus.SUBMITTED,
         normalizedExternalReference: "ABC123",
+        amountPaidMinor: 100000,
         duplicateReference: false,
         proofImageUrl: "/uploads/payment-proofs/proof.jpg"
       })
@@ -87,6 +87,7 @@ describe("manual payment service", () => {
       id: "booking-1",
       userId: "user-1",
       status: BookingStatus.HELD,
+      amountMinor: 100000,
       paymentHoldExpiresAt: futureHoldExpiresAt(),
       payment: { status: PaymentStatus.AWAITING_PAYMENT }
     });
@@ -96,9 +97,7 @@ describe("manual payment service", () => {
       bookingId: "booking-1",
       userId: "user-1",
       method: "manual_bank_transfer",
-      amountPaidMinor: 100000,
       externalReference: "duplicate-ref",
-      paidAt: new Date("2026-08-16T00:10:00.000Z"),
       proofImageUrl: "/uploads/payment-proofs/proof.jpg"
     });
 

@@ -75,13 +75,30 @@ async function persistFacilityUploads(formData: FormData, slugSeed: string) {
 
   const slug = slugify(slugSeed) || "facility";
   const urls: string[] = [];
+  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
-  for (const [index, file] of files.entries()) {
-    if (!file.type.startsWith("image/")) {
-      throw new Error("Only image uploads are supported.");
+  if (files.length > 12) {
+    throw new Error("Upload a maximum of 12 facility images at a time.");
+  }
+
+  for (const file of files) {
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("Each facility image must be 5MB or smaller.");
     }
 
-    const extension = path.extname(file.name) || ".jpg";
+    if (!allowedTypes.has(file.type)) {
+      throw new Error("Facility images must be JPG, PNG, WEBP, or GIF files.");
+    }
+  }
+
+  for (const [index, file] of files.entries()) {
+    const extensionByType: Record<string, string> = {
+      "image/jpeg": ".jpg",
+      "image/png": ".png",
+      "image/webp": ".webp",
+      "image/gif": ".gif"
+    };
+    const extension = extensionByType[file.type];
     const fileName = `${slug}-${Date.now()}-${index}${extension}`;
     const bytes = Buffer.from(await file.arrayBuffer());
 
@@ -109,7 +126,7 @@ function timeToMinutes(value: string) {
 export type FacilityActionState = {
   success?: string;
   message?: string;
-  fieldErrors?: Partial<Record<"name" | "slug" | "type" | "description" | "slotIntervalMinutes" | "amount" | "minimumMinutes" | "imageUrls" | "operatingHours" | "cancellationWindowHoursOverride", string>>;
+  fieldErrors?: Partial<Record<"name" | "slug" | "type" | "description" | "amount" | "imageUrls" | "operatingHours" | "cancellationWindowHoursOverride", string>>;
 };
 
 export type BlockScheduleActionState = {
@@ -198,7 +215,13 @@ export async function updateFacilityAction(
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
-  const uploadedUrls = await persistFacilityUploads(formData, String(formData.get("name") ?? facilityId));
+  let uploadedUrls: string[];
+
+  try {
+    uploadedUrls = await persistFacilityUploads(formData, String(formData.get("name") ?? facilityId));
+  } catch (error) {
+    return { message: error instanceof Error ? error.message : "Facility images could not be uploaded." };
+  }
   const weekdays = buildWeekdays(formData);
   const cancellationWindowHoursOverride = parseNullablePositiveInteger(formData.get("cancellationWindowHoursOverride"));
 
@@ -207,9 +230,7 @@ export async function updateFacilityAction(
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? ""),
     isEnabled: parseBoolean(formData.get("isEnabled")),
-    slotIntervalMinutes: parseMinutes(formData.get("slotIntervalMinutes")),
     amountMinor: parseAmountMinor(formData.get("amount")),
-    minimumMinutes: parseMinutes(formData.get("minimumMinutes")),
     imageUrls: [...imageUrls, ...uploadedUrls],
     cancellationEnabledOverride: String(formData.get("cancellationEnabledOverride") ?? "inherit"),
     operatingHours: weekdays
@@ -224,9 +245,7 @@ export async function updateFacilityAction(
       fieldErrors: {
         name: flattened?.name?.[0],
         description: flattened?.description?.[0],
-        slotIntervalMinutes: flattened?.slotIntervalMinutes?.[0],
         amount: flattened?.amountMinor?.[0],
-        minimumMinutes: flattened?.minimumMinutes?.[0],
         imageUrls: flattened?.imageUrls?.[0],
         operatingHours: operatingHourIssue?.message,
         cancellationWindowHoursOverride:
@@ -244,7 +263,6 @@ export async function updateFacilityAction(
         name: parsed.data.name,
         description: parsed.data.description,
         isEnabled: parsed.data.isEnabled,
-        slotIntervalMinutes: parsed.data.slotIntervalMinutes,
         cancellationEnabledOverride: parseNullableBoolean(parsed.data.cancellationEnabledOverride),
         cancellationWindowHoursOverride,
         images: {
@@ -268,7 +286,7 @@ export async function updateFacilityAction(
     });
 
     const nextPrice = parsed.data.amountMinor;
-    const nextMinimumMinutes = parsed.data.minimumMinutes;
+    const nextMinimumMinutes = 60;
 
     if (!activePricing || activePricing.amountMinor !== nextPrice || activePricing.minimumMinutes !== nextMinimumMinutes) {
       await tx.pricingRule.updateMany({
@@ -308,7 +326,13 @@ export async function createFacilityAction(
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
-  const uploadedUrls = await persistFacilityUploads(formData, String(formData.get("slug") || formData.get("name") || "facility"));
+  let uploadedUrls: string[];
+
+  try {
+    uploadedUrls = await persistFacilityUploads(formData, String(formData.get("slug") || formData.get("name") || "facility"));
+  } catch (error) {
+    return { message: error instanceof Error ? error.message : "Facility images could not be uploaded." };
+  }
   const weekdays = buildWeekdays(formData);
   const cancellationWindowHoursOverride = parseNullablePositiveInteger(formData.get("cancellationWindowHoursOverride"));
 
@@ -318,9 +342,7 @@ export async function createFacilityAction(
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? ""),
     isEnabled: parseBoolean(formData.get("isEnabled")),
-    slotIntervalMinutes: parseMinutes(formData.get("slotIntervalMinutes")),
     amountMinor: parseAmountMinor(formData.get("amount")),
-    minimumMinutes: parseMinutes(formData.get("minimumMinutes")),
     imageUrls: [...imageUrls, ...uploadedUrls],
     cancellationEnabledOverride: String(formData.get("cancellationEnabledOverride") ?? "inherit"),
     operatingHours: weekdays
@@ -337,9 +359,7 @@ export async function createFacilityAction(
         type: flattened?.type?.[0],
         name: flattened?.name?.[0],
         description: flattened?.description?.[0],
-        slotIntervalMinutes: flattened?.slotIntervalMinutes?.[0],
         amount: flattened?.amountMinor?.[0],
-        minimumMinutes: flattened?.minimumMinutes?.[0],
         imageUrls: flattened?.imageUrls?.[0],
         operatingHours: operatingHourIssue?.message,
         cancellationWindowHoursOverride:
@@ -362,7 +382,7 @@ export async function createFacilityAction(
     };
   }
 
-  await prisma.facility.create({
+  const createdFacility = await prisma.facility.create({
     data: {
       slug: parsed.data.slug,
       name: parsed.data.name,
@@ -370,7 +390,7 @@ export async function createFacilityAction(
       type: parsed.data.type as FacilityType,
       timezone: process.env.APP_TIMEZONE ?? "Asia/Manila",
       isEnabled: parsed.data.isEnabled,
-      slotIntervalMinutes: parsed.data.slotIntervalMinutes,
+      slotIntervalMinutes: 30,
       cancellationEnabledOverride: parseNullableBoolean(parsed.data.cancellationEnabledOverride),
       cancellationWindowHoursOverride,
       images: {
@@ -386,7 +406,7 @@ export async function createFacilityAction(
           currency: "PHP",
           amountMinor: parsed.data.amountMinor,
           billingMode: "PER_HOUR",
-          minimumMinutes: parsed.data.minimumMinutes,
+          minimumMinutes: 60,
           isActive: true
         }
       }
@@ -397,7 +417,7 @@ export async function createFacilityAction(
   revalidatePath("/admin/facilities");
   revalidatePath("/facilities");
 
-  return { success: "Facility created." };
+  redirect(`/admin/facilities?facilityId=${encodeURIComponent(createdFacility.id)}`);
 }
 
 export async function createBlockedScheduleAction(

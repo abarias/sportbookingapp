@@ -1,6 +1,7 @@
 import { PaymentStatus } from "@prisma/client";
 import { BookingStatus } from "@prisma/client";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { CancelBookingButton } from "@/components/bookings/cancel-booking-button";
 import { formatCurrency } from "@/lib/formatting/currency";
@@ -26,6 +27,7 @@ type BookingListProps = {
   title: string;
   items: BookingListItem[];
   emptyMessage: string;
+  footer?: ReactNode;
 };
 
 const statusTone: Record<BookingStatus, string> = {
@@ -70,7 +72,7 @@ const paymentLabels: Record<PaymentStatus, string> = {
   REFUNDED: "Refunded"
 };
 
-export function BookingList({ title, items, emptyMessage }: BookingListProps) {
+export function BookingList({ title, items, emptyMessage, footer }: BookingListProps) {
   return (
     <section className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
       <h2 className="text-lg font-semibold text-white">{title}</h2>
@@ -125,6 +127,7 @@ export function BookingList({ title, items, emptyMessage }: BookingListProps) {
           </article>
         ))}
       </div>
+      {footer}
     </section>
   );
 }

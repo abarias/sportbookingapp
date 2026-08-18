@@ -131,8 +131,11 @@ export async function getAdminFacilitiesData() {
       }
     }),
     prisma.blockedSchedule.findMany({
+      where: {
+        endAtUtc: { gte: new Date() }
+      },
       orderBy: { startAtUtc: "asc" },
-      take: 20,
+      take: 100,
       include: {
         facility: { select: { name: true, timezone: true } },
         createdBy: { select: { fullName: true } }

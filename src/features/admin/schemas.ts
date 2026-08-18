@@ -2,6 +2,10 @@ import { z } from "zod";
 
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date.");
 const timeKeySchema = z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid time.");
+const facilityImageUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => value.startsWith("/") || /^https?:\/\//i.test(value), "Use a local image path or an HTTP(S) image URL.");
 
 const operatingHourSchema = z
   .object({
@@ -24,20 +28,8 @@ export const facilityUpdateSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters.").max(120),
   description: z.string().trim().min(10, "Description must be at least 10 characters.").max(1000),
   isEnabled: z.boolean(),
-  slotIntervalMinutes: z
-    .number()
-    .int()
-    .min(30, "Slot interval must be at least 30 minutes.")
-    .max(240, "Slot interval is too large.")
-    .refine((value) => value % 30 === 0, "Slot interval must be in 30-minute increments."),
   amountMinor: z.number().int().min(0, "Price must be zero or greater."),
-  minimumMinutes: z
-    .number()
-    .int()
-    .min(60, "Minimum duration must be at least 1 hour.")
-    .max(480, "Minimum duration is too large.")
-    .refine((value) => value % 60 === 0, "Minimum duration must be in hourly increments."),
-  imageUrls: z.array(z.string().url("Each image must be a valid URL.")).min(1, "Add at least one image URL."),
+  imageUrls: z.array(facilityImageUrlSchema).min(1, "Add at least one image URL."),
   cancellationEnabledOverride: z.enum(["inherit", "enabled", "disabled"]),
   operatingHours: z.array(operatingHourSchema).length(7)
 });
@@ -49,7 +41,7 @@ export const facilityCreateSchema = facilityUpdateSchema.omit({ facilityId: true
     .min(2, "Slug must be at least 2 characters.")
     .max(120)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens only."),
-  type: z.enum(["BASKETBALL_WHOLE", "BASKETBALL_HALF", "PICKLEBALL", "BADMINTON"])
+  type: z.enum(["BASKETBALL_WHOLE", "BASKETBALL_HALF", "PICKLEBALL", "BADMINTON", "OTHER"])
 });
 
 export const blockedScheduleSchema = z
