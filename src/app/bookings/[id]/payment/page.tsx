@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { PaymentStatus } from "@prisma/client";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -115,10 +116,37 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
             <p>Bank transfer: BPI 0000-0000-00 - MMG Stellar</p>
             <p>Include booking reference {booking.payment.providerReference} in the transfer remarks when possible.</p>
           </div>
+          {booking.payment.proofImageUrl ? (
+            <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium text-white">Uploaded payment proof</p>
+                {booking.payment.submittedAt ? (
+                  <p className="text-xs text-stone-400">
+                    Uploaded {formatInTimeZone(booking.payment.submittedAt, booking.timezone, "MMM d, h:mm a")}
+                  </p>
+                ) : null}
+              </div>
+              <a
+                className="mt-3 block overflow-hidden rounded-xl border border-white/10"
+                href={booking.payment.proofImageUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <Image
+                  src={booking.payment.proofImageUrl}
+                  alt="Uploaded payment receipt"
+                  width={900}
+                  height={600}
+                  className="max-h-[520px] w-full object-contain"
+                />
+              </a>
+              <p className="mt-2 text-xs text-stone-400">Click the image to view it at full size.</p>
+            </div>
+          ) : null}
         </div>
 
         {canSubmitProof ? (
-          <PaymentProofForm amountDue={booking.amountMinor} bookingId={booking.id} />
+          <PaymentProofForm bookingId={booking.id} />
         ) : (
           <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-stone-300">
             <h2 className="text-lg font-semibold text-white">Payment status</h2>

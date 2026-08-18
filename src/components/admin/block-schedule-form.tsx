@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 
 type BlockScheduleFormProps = {
   facilities: Facility[];
+  facilityId?: string;
 };
 
 const initialState: BlockScheduleActionState = {};
@@ -20,7 +21,7 @@ function SubmitButton() {
   return <Button disabled={pending} type="submit">{pending ? "Saving block..." : "Add block"}</Button>;
 }
 
-export function BlockScheduleForm({ facilities }: BlockScheduleFormProps) {
+export function BlockScheduleForm({ facilities, facilityId }: BlockScheduleFormProps) {
   const [state, action] = useActionState(createBlockedScheduleAction, initialState);
 
   return (
@@ -30,16 +31,18 @@ export function BlockScheduleForm({ facilities }: BlockScheduleFormProps) {
         Blocks support both date range and time range, so you can block a few hours or multiple days as needed.
       </p>
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2 text-sm text-stone-200">
-          <span>Facility</span>
-          <select className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="facilityId" required>
-            {facilities.map((facility) => (
-              <option key={facility.id} value={facility.id}>
-                {facility.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {facilityId ? <input name="facilityId" type="hidden" value={facilityId} /> : (
+          <label className="space-y-2 text-sm text-stone-200">
+            <span>Facility</span>
+            <select className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="facilityId" required>
+              {facilities.map((facility) => (
+                <option key={facility.id} value={facility.id}>
+                  {facility.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="space-y-2 text-sm text-stone-200">
           <span>Title</span>
           <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue="Maintenance block" maxLength={120} name="title" required />
