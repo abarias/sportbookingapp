@@ -20,6 +20,7 @@ const adminItems = [
   { href: "/admin/calendar", label: "Calendar" },
   { href: "/admin/walk-ins", label: "Walk-ins" },
   { href: "/admin/facilities", label: "Facilities" },
+  { href: "/admin/pricing", label: "Pricing" },
   { href: "/admin/payments", label: "Payments" },
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/reports", label: "Reports" }

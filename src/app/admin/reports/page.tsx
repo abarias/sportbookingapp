@@ -58,7 +58,7 @@ export default async function AdminReportsPage() {
         <DashboardStat label="Reporting Window" value="30 days" hint={`Since ${formatInTimeZone(reportStart, "Asia/Manila", "MMM d")}`} />
         <DashboardStat label="Bookings" value={String(bookings.length)} hint="All booking states" />
         <DashboardStat label="Confirmed" value={String(confirmedBookings.length)} hint="Reserved inventory" />
-        <DashboardStat label="Paid Revenue" value={formatCurrency(paidRevenueMinor, "PHP")} hint="Verified and paid payments" />
+        <DashboardStat label="Paid Base Revenue" value={formatCurrency(paidRevenueMinor, "PHP")} hint="VAT-exclusive verified and paid amounts" />
       </div>
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6">

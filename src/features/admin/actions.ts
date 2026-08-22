@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { addDays } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
 import { z } from "zod";
 import { FacilityType } from "@prisma/client";
@@ -103,6 +104,14 @@ function timeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
+function buildBlockedScheduleDate(dateKey: string, time: string, timezone: string) {
+  if (time === "24:00") {
+    return addDays(fromZonedTime(`${dateKey}T00:00:00`, timezone), 1);
+  }
+
+  return fromZonedTime(`${dateKey}T${time}:00`, timezone);
+}
+
 export type FacilityActionState = {
   success?: string;
   message?: string;
@@ -188,7 +197,7 @@ export async function updateFacilityAction(
   _prevState: FacilityActionState,
   formData: FormData
 ): Promise<FacilityActionState> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const facilityId = String(formData.get("facilityId") ?? "");
   const imageUrls = String(formData.get("imageUrls") ?? "")
@@ -261,7 +270,7 @@ export async function updateFacilityAction(
     });
 
     const activePricing = await tx.pricingRule.findFirst({
-      where: { facilityId: parsed.data.facilityId, isActive: true },
+      where: { facilityId: parsed.data.facilityId, isActive: true, dayType: "DEFAULT" },
       orderBy: { createdAt: "desc" }
     });
 
@@ -270,18 +279,23 @@ export async function updateFacilityAction(
 
     if (!activePricing || activePricing.amountMinor !== nextPrice || activePricing.minimumMinutes !== nextMinimumMinutes) {
       await tx.pricingRule.updateMany({
-        where: { facilityId: parsed.data.facilityId, isActive: true },
+        where: { facilityId: parsed.data.facilityId, isActive: true, dayType: "DEFAULT" },
         data: { isActive: false }
       });
 
       await tx.pricingRule.create({
         data: {
           facilityId: parsed.data.facilityId,
+          name: "Default rate",
+          customerLabel: "Standard base rate",
+          dayType: "DEFAULT",
           currency: "PHP",
           amountMinor: nextPrice,
           billingMode: "PER_HOUR",
           minimumMinutes: nextMinimumMinutes,
-          isActive: true
+          isActive: true,
+          createdByUserId: session.user.id,
+          updatedByUserId: session.user.id
         }
       });
     }
@@ -300,7 +314,7 @@ export async function createFacilityAction(
   _prevState: FacilityActionState,
   formData: FormData
 ): Promise<FacilityActionState> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const imageUrls = String(formData.get("imageUrls") ?? "")
     .split("\n")
@@ -383,11 +397,16 @@ export async function createFacilityAction(
       operatingHours: { create: parsed.data.operatingHours },
       pricingRules: {
         create: {
+          name: "Default rate",
+          customerLabel: "Standard base rate",
+          dayType: "DEFAULT",
           currency: "PHP",
           amountMinor: parsed.data.amountMinor,
           billingMode: "PER_HOUR",
           minimumMinutes: 60,
-          isActive: true
+          isActive: true,
+          createdByUserId: session.user.id,
+          updatedByUserId: session.user.id
         }
       }
     }
@@ -413,7 +432,8 @@ export async function createBlockedScheduleAction(
     startDate: String(formData.get("startDate") ?? ""),
     endDate: String(formData.get("endDate") ?? ""),
     startTime: String(formData.get("startTime") ?? ""),
-    endTime: String(formData.get("endTime") ?? "")
+    endTime: String(formData.get("endTime") ?? ""),
+    allDay: parseBoolean(formData.get("allDay"))
   });
 
   if (!parsed.success) {
@@ -443,8 +463,8 @@ export async function createBlockedScheduleAction(
     };
   }
 
-  const startAtUtc = fromZonedTime(`${parsed.data.startDate}T${parsed.data.startTime}:00`, facility.timezone);
-  const endAtUtc = fromZonedTime(`${parsed.data.endDate}T${parsed.data.endTime}:00`, facility.timezone);
+  const startAtUtc = buildBlockedScheduleDate(parsed.data.startDate, parsed.data.allDay ? "00:00" : parsed.data.startTime, facility.timezone);
+  const endAtUtc = buildBlockedScheduleDate(parsed.data.endDate, parsed.data.allDay ? "24:00" : parsed.data.endTime, facility.timezone);
 
   await prisma.blockedSchedule.create({
     data: {

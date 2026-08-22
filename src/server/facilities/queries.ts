@@ -20,7 +20,7 @@ export async function getFacilityCards(): Promise<FacilityCardViewModel[]> {
         orderBy: { sortOrder: "asc" }
       },
       pricingRules: {
-        where: { isActive: true },
+        where: { isActive: true, dayType: "DEFAULT" },
         orderBy: { createdAt: "desc" },
         take: 1
       }
@@ -54,7 +54,7 @@ export async function getFacilityBySlug(slug: string) {
       },
       pricingRules: {
         where: { isActive: true },
-        orderBy: { createdAt: "desc" }
+        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }]
       },
       operatingHours: {
         orderBy: { dayOfWeek: "asc" }

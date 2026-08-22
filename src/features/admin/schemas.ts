@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date.");
 const timeKeySchema = z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid time.");
+const blockedTimeKeySchema = z.string().regex(/^(?:[01]\d|2[0-4]):00$/, "Use an hourly time value.");
 const facilityImageUrlSchema = z
   .string()
   .trim()
@@ -28,7 +29,7 @@ export const facilityUpdateSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters.").max(120),
   description: z.string().trim().min(10, "Description must be at least 10 characters.").max(1000),
   isEnabled: z.boolean(),
-  amountMinor: z.number().int().min(0, "Price must be zero or greater."),
+  amountMinor: z.number().int().positive("Default price must be greater than zero."),
   imageUrls: z.array(facilityImageUrlSchema).min(1, "Add at least one image URL."),
   cancellationEnabledOverride: z.enum(["inherit", "enabled", "disabled"]),
   operatingHours: z.array(operatingHourSchema).length(7)
@@ -51,14 +52,15 @@ export const blockedScheduleSchema = z
     reason: z.string().trim().max(300).optional(),
     startDate: dateKeySchema,
     endDate: dateKeySchema,
-    startTime: timeKeySchema,
-    endTime: timeKeySchema
+    startTime: blockedTimeKeySchema,
+    endTime: blockedTimeKeySchema,
+    allDay: z.boolean()
   })
   .superRefine((value, ctx) => {
     const start = `${value.startDate}T${value.startTime}`;
     const end = `${value.endDate}T${value.endTime}`;
 
-    if (start >= end) {
+    if (!value.allDay && start >= end) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "End date and time must be after the start date and time.",

@@ -84,7 +84,7 @@ export function BookingList({ title, items, emptyMessage, footer }: BookingListP
               <div className="space-y-2">
                 <p className="text-base font-semibold text-white">{item.facilityName}</p>
                 <p className="text-sm text-stone-300">{formatDateTimeRange(item.startAtUtc, item.endAtUtc, item.timezone)}</p>
-                <p className="text-sm text-stone-400">{formatCurrency(item.amountMinor, item.currency)}</p>
+                <p className="text-sm text-stone-400">Base amount: {formatCurrency(item.amountMinor, item.currency)} <span className="text-stone-500">(VAT exclusive)</span></p>
                 {item.paymentStatus ? (
                   <span className={`inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em] ${paymentTone[item.paymentStatus]}`}>
                     {paymentLabels[item.paymentStatus]}

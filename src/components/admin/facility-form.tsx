@@ -8,7 +8,7 @@ import type { Facility, FacilityImage, FacilityOperatingHour, PricingRule } from
 import { updateFacilityAction, type FacilityActionState } from "@/features/admin/actions";
 import { Button } from "@/components/ui/button";
 import { FacilityImageManager } from "@/components/admin/facility-image-manager";
-import { minutesToTimeInputValue } from "@/lib/time/slots";
+import { minutesToTimeLabel } from "@/lib/time/slots";
 
 type FacilityWithAdminFields = Facility & {
   images: FacilityImage[];
@@ -18,6 +18,8 @@ type FacilityWithAdminFields = Facility & {
 };
 
 const dayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const openingTimeOptions = Array.from({ length: 24 }, (_, index) => index * 60);
+const closingTimeOptions = Array.from({ length: 24 }, (_, index) => (index + 1) * 60);
 const initialState: FacilityActionState = {};
 
 function SubmitButton() {
@@ -69,12 +71,21 @@ export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }
         </div>
         <label className="block max-w-sm space-y-2 text-sm text-stone-200">
           <span>Price per hour (PHP)</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={((activePricing?.amountMinor ?? 0) / 100).toFixed(2)} min="0" name="amount" required step="0.01" type="number" />
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={((activePricing?.amountMinor ?? 0) / 100).toFixed(2)} min="0.01" name="amount" required step="0.01" type="number" />
+          <span className="mt-1 block text-xs text-stone-500">Fallback base rate per hour, exclusive of VAT. Schedule overrides are managed under Pricing.</span>
           {state.fieldErrors?.amount ? <p className="text-sm text-rose-300">{state.fieldErrors.amount}</p> : null}
         </label>
       </section>
 
+      <div className="flex justify-end">
+        <SubmitButton />
+      </div>
+
       <FacilityImageManager key={`${facility.id}-${facility.updatedAt.toISOString()}`} facilityName={facility.name} initialImageUrls={facility.images.map((image) => image.url)} />
+
+      <div className="flex justify-end">
+        <SubmitButton />
+      </div>
 
       <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
         <div>
@@ -90,11 +101,15 @@ export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }
                 <div className="text-sm font-medium text-white">{label}</div>
                 <label className="space-y-1 text-sm text-stone-300">
                   <span>Open</span>
-                  <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={minutesToTimeInputValue(hour?.opensAtMinutes ?? 480)} name={`opensAtMinutes_${dayOfWeek}`} required step={1800} type="time" />
+                  <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.opensAtMinutes ?? 480} name={`opensAtMinutes_${dayOfWeek}`} required>
+                    {openingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}</option>)}
+                  </select>
                 </label>
                 <label className="space-y-1 text-sm text-stone-300">
                   <span>Close</span>
-                  <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={minutesToTimeInputValue(hour?.closesAtMinutes ?? 1320)} name={`closesAtMinutes_${dayOfWeek}`} required step={1800} type="time" />
+                  <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.closesAtMinutes ?? 1320} name={`closesAtMinutes_${dayOfWeek}`} required>
+                    {closingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}{minutes === 1440 ? " (midnight)" : ""}</option>)}
+                  </select>
                 </label>
                 <label className="flex items-center gap-2 text-sm text-stone-300">
                   <input defaultChecked={hour?.isClosed ?? false} name={`isClosed_${dayOfWeek}`} type="checkbox" />
@@ -132,7 +147,7 @@ export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }
       {state.fieldErrors?.operatingHours ? <p className="text-sm text-rose-300">{state.fieldErrors.operatingHours}</p> : null}
       {state.message ? <p className="text-sm text-rose-300">{state.message}</p> : null}
       {state.success ? <p className="text-sm text-emerald-300">{state.success}</p> : null}
-      <div className="flex justify-end">
+      <div className="flex justify-end border-t border-white/10 pt-5">
         <SubmitButton />
       </div>
     </form>

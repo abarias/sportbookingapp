@@ -20,6 +20,10 @@ export function normalizeDateKey(value: string | undefined, timezone: string) {
 }
 
 export function minutesToTimeLabel(totalMinutes: number) {
+  if (totalMinutes === 1440) {
+    return "12:00 AM";
+  }
+
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   const suffix = hours >= 12 ? "PM" : "AM";
@@ -48,7 +52,7 @@ export function buildUtcDateFromLocalMinutes(dateKey: string, totalMinutes: numb
 
 export function buildLocalDayUtcRange(dateKey: string, timezone: string) {
   const startUtc = fromZonedTime(`${dateKey}T00:00:00`, timezone);
-  const nextDateKey = formatInTimeZone(addDays(startUtc, 2), timezone, "yyyy-MM-dd");
+  const nextDateKey = formatInTimeZone(addDays(startUtc, 1), timezone, "yyyy-MM-dd");
   const endUtc = fromZonedTime(`${nextDateKey}T00:00:00`, timezone);
 
   return { startUtc, endUtc };
@@ -75,9 +79,10 @@ export function formatDateLabel(dateKey: string, timezone: string) {
 }
 
 export function formatDateTimeRange(startAtUtc: Date, endAtUtc: Date, timezone: string) {
-  const datePart = formatInTimeZone(startAtUtc, timezone, "EEE, MMM d");
+  const startDatePart = formatInTimeZone(startAtUtc, timezone, "EEE, MMM d, yyyy");
+  const endDatePart = formatInTimeZone(endAtUtc, timezone, "EEE, MMM d, yyyy");
   const startPart = formatInTimeZone(startAtUtc, timezone, "h:mm a");
   const endPart = formatInTimeZone(endAtUtc, timezone, "h:mm a");
 
-  return `${datePart} • ${startPart} - ${endPart}`;
+  return `${startDatePart} ${startPart} - ${endDatePart} ${endPart}`;
 }

@@ -11,7 +11,8 @@ describe("blockedScheduleSchema", () => {
       startDate: "2026-04-20",
       endDate: "2026-04-21",
       startTime: "08:00",
-      endTime: "18:00"
+      endTime: "18:00",
+      allDay: false
     });
 
     expect(parsed.success).toBe(true);
@@ -25,10 +26,26 @@ describe("blockedScheduleSchema", () => {
       startDate: "2026-04-21",
       endDate: "2026-04-20",
       startTime: "18:00",
-      endTime: "08:00"
+      endTime: "08:00",
+      allDay: false
     });
 
     expect(parsed.success).toBe(false);
+  });
+
+  it("accepts an all-day block with a same-day end date", () => {
+    const parsed = blockedScheduleSchema.safeParse({
+      facilityId: "facility_123",
+      title: "Holiday closure",
+      reason: "Facility unavailable",
+      startDate: "2026-04-20",
+      endDate: "2026-04-20",
+      startTime: "00:00",
+      endTime: "24:00",
+      allDay: true
+    });
+
+    expect(parsed.success).toBe(true);
   });
 });
 

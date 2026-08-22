@@ -11,6 +11,8 @@ import { requireAdminSession } from "@/lib/auth/session";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { formatDateTimeRange } from "@/lib/time/slots";
 import { getPaymentProofUrl } from "@/lib/storage/payment-proofs";
+import { parsePriceSnapshot } from "@/server/pricing/snapshot";
+import { minutesToTimeLabel } from "@/lib/time/slots";
 import { getAdminPaymentDetailData } from "@/server/admin/queries";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +46,7 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
   }
 
   const paymentProofUrl = await getPaymentProofUrl(payment.proofImageUrl);
+  const priceSnapshot = parsePriceSnapshot(payment.booking.priceSnapshot);
 
   return (
     <main className="space-y-8 pb-16">
@@ -71,12 +74,13 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
               {payment.providerReference}
             </span>
           </div>
+          {priceSnapshot?.segments.length ? <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-stone-500">Recorded base price breakdown</p><div className="mt-3 space-y-2">{priceSnapshot.segments.map((segment) => <div key={`${segment.startMinutes}-${segment.ruleId}`} className="flex justify-between gap-4 text-sm text-stone-300"><span>{minutesToTimeLabel(segment.startMinutes)}-{minutesToTimeLabel(segment.endMinutes)} · {segment.rateLabel}</span><span className="text-white">{formatCurrency(segment.amountMinor, "PHP")}</span></div>)}</div></div> : null}
 
           <div className="grid gap-3 text-sm text-stone-300 md:grid-cols-2">
             <p><span className="text-stone-500">Customer:</span> {payment.booking.user.fullName}</p>
             <p><span className="text-stone-500">Email:</span> {payment.booking.user.email}</p>
             <p><span className="text-stone-500">Phone:</span> {payment.booking.user.phone ?? "Not provided"}</p>
-            <p><span className="text-stone-500">Expected:</span> {formatCurrency(payment.amountMinor, "PHP")}</p>
+            <p><span className="text-stone-500">Expected base amount (VAT exclusive):</span> {formatCurrency(payment.amountMinor, "PHP")}</p>
             <p><span className="text-stone-500">Method:</span> {payment.method?.replaceAll("_", " ") ?? "Not set"}</p>
             <p><span className="text-stone-500">Transfer ref:</span> {payment.externalReference ?? "Not set"}</p>
             <p>

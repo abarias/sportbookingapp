@@ -17,6 +17,8 @@ Current MVP feature set:
 - Customer booking history and policy-based cancellation flow
 - Admin overview, booking calendar, facility management, blocked schedules, walk-in booking, customers, and reports
 - Facility creation and editing with multiple image URLs or uploaded image files
+- Rule-based facility pricing by weekday, weekend, selected day, holiday, time range, and effective date
+- Generated public VAT-exclusive rate cards and immutable booking price snapshots
 - Booking window rules limiting customers to the current/next month, with next-two-month visibility opening on the last Monday of the month
 - Basic automated coverage for availability, cancellation policy, and blocked schedule validation
 
@@ -314,6 +316,12 @@ Production notes:
 - Payment proof and facility image uploads use private Supabase Storage buckets on Vercel. Local development falls back to `public/uploads` when Supabase Storage variables are absent.
 - Mock OTP is still enabled in this MVP and should be replaced with a real SMS provider before launch.
 - Refund handling is still manual.
+
+### Dynamic pricing deployment
+
+Apply `20260822090000_add_dynamic_pricing` before deploying this feature. The migration preserves existing booking totals and converts existing facility prices into default fallback rules. It does not recalculate historical bookings.
+
+Administrators manage schedule overrides and the manual holiday calendar under `/admin/pricing`. Pricing precedence is: configured holiday, selected day of week, weekend, weekday, then facility default. All displayed and calculated amounts are base prices exclusive of VAT.
 
 ## Assumptions
 

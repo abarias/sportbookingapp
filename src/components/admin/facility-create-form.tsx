@@ -86,8 +86,9 @@ export function FacilityCreateForm() {
           {state.fieldErrors?.description ? <p className="text-sm text-rose-300">{state.fieldErrors.description}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">
-          <span>Price (PHP per hour)</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" min="0" name="amount" onChange={(event) => setAmount(event.target.value)} required step="0.01" type="number" value={amount} />
+          <span>Default base rate (PHP per hour)</span>
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" min="0.01" name="amount" onChange={(event) => setAmount(event.target.value)} required step="0.01" type="number" value={amount} />
+          <span className="block text-xs text-stone-500">VAT exclusive. Add weekday, weekend, and holiday overrides after creating the facility.</span>
           {state.fieldErrors?.amount ? <p className="text-sm text-rose-300">{state.fieldErrors.amount}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">

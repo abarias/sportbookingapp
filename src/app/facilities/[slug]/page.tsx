@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 
 import { BookingDateSelector } from "@/components/bookings/booking-date-selector";
 import { BookingPanel } from "@/components/bookings/booking-panel";
+import { RateCard } from "@/components/pricing/rate-card";
 import { getSession } from "@/lib/auth/session";
 import { formatDateLabel } from "@/lib/time/slots";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { getBookingWindow, normalizeDateKeyWithinBookingWindow } from "@/server/bookings/booking-window";
 import { getFacilityDayAvailability } from "@/server/bookings/service";
 import { getFacilityBySlug, getFacilityTypeLabel } from "@/server/facilities/queries";
+import { getFacilityPricingView } from "@/server/pricing/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +35,8 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
   const bookingWindow = getBookingWindow(facility.timezone);
   const dateKey = normalizeDateKeyWithinBookingWindow((await searchParams).date, facility.timezone);
   const availability = await getFacilityDayAvailability(facility, dateKey);
-  const primaryPrice = facility.pricingRules[0];
-
-  if (!primaryPrice) {
-    notFound();
-  }
+  const pricingView = await getFacilityPricingView(facility, dateKey);
+  const primaryPrice = facility.pricingRules.find((rule) => rule.dayType === "DEFAULT");
 
   const dateLabel = formatDateLabel(dateKey, facility.timezone);
 
@@ -51,7 +50,7 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
               <div>
                 <h1 className="font-serif text-3xl text-white">{facility.name}</h1>
                 <p className="mt-1 text-sm text-stone-300">
-                  {formatCurrency(primaryPrice.amountMinor, "PHP")} {primaryPrice.billingMode === "PER_HOUR" ? "per hour" : "per booking block"} • 1-hour minimum
+                  {primaryPrice ? `Base rates from ${formatCurrency(primaryPrice.amountMinor, "PHP")} per hour · VAT exclusive · 1-hour minimum` : "Pricing is temporarily unavailable"}
                 </p>
               </div>
               <p className="rounded-full bg-amber-300/15 px-4 py-2 text-sm font-medium text-amber-100">
@@ -73,11 +72,12 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
             facilitySlug={facility.slug}
             isAuthenticated={Boolean(session?.user)}
             dateLabel={dateLabel}
-            priceAmountMinor={primaryPrice.amountMinor}
-            priceBillingMode={primaryPrice.billingMode}
+            priceQuotes={pricingView.quotes}
             slotIntervalMinutes={availability.slotIntervalMinutes}
             slots={availability.slots}
           />
+          {pricingView.pricingError ? <p className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-200">Online pricing is temporarily unavailable: {pricingView.pricingError}</p> : null}
+          <RateCard rows={pricingView.rateCard} />
         </section>
 
         <aside className="space-y-4 lg:order-2 lg:sticky lg:top-6 lg:self-start">
@@ -131,9 +131,9 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
           <div className="hidden gap-3 lg:grid">
             <aside className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
               <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Pricing</p>
-              <p className="mt-3 text-2xl font-semibold text-white">{formatCurrency(primaryPrice.amountMinor, "PHP")}</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{primaryPrice ? `From ${formatCurrency(primaryPrice.amountMinor, "PHP")}` : "Unavailable"}</p>
               <p className="mt-1 text-sm text-stone-300">
-                {primaryPrice.billingMode === "PER_HOUR" ? "Per hour" : "Per booking block"} • 1-hour minimum
+                Base rate per hour • VAT exclusive • 1-hour minimum
               </p>
             </aside>
 
