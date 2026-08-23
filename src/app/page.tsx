@@ -40,7 +40,7 @@ export default async function HomePage() {
                 <h2 className="mt-2 text-xl font-semibold text-white">{facility.name}</h2>
                 <p className="mt-3 text-sm text-stone-300">{facility.description}</p>
                 <p className="mt-4 text-sm text-amber-300">
-                  Starts at {formatCurrency(facility.price.amountMinor, facility.price.currency)}
+                  Base rates from {formatCurrency(facility.price.amountMinor, facility.price.currency)} per hour, VAT exclusive
                 </p>
               </div>
             ))}

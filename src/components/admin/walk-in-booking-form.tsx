@@ -13,13 +13,13 @@ import {
 import { formatCurrency } from "@/lib/formatting/currency";
 import { minutesToTimeLabel } from "@/lib/time/slots";
 import type { DaySlot } from "@/server/bookings/core";
+import type { PriceCalculation } from "@/server/pricing/types";
 
 type FacilityOption = {
   id: string;
   name: string;
   timezone: string;
-  priceAmountMinor: number;
-  priceBillingMode: "PER_HOUR" | "PER_BLOCK";
+  priceQuotes: PriceCalculation[];
   slotIntervalMinutes: number;
   slots: DaySlot[];
 };
@@ -88,12 +88,6 @@ function formatTimeInput(minutes: number) {
   return `${hours}:${remainingMinutes}`;
 }
 
-function getBookingAmount(facility: FacilityOption, durationMinutes: number) {
-  return facility.priceBillingMode === "PER_BLOCK"
-    ? facility.priceAmountMinor
-    : Math.round((facility.priceAmountMinor * durationMinutes) / 60);
-}
-
 function getBlockTone(block: HourBlock, selected: boolean) {
   if (selected) {
     return "border-amber-200 bg-amber-300 text-stone-950";
@@ -133,8 +127,9 @@ export function WalkInBookingForm({ facilities, dateKey, dateLabel }: WalkInBook
     [hourBlocks, selectionEnd, selectionStart]
   );
   const durationMinutes = selectedBlocks.length * 60;
-  const amountMinor = selectedFacility ? getBookingAmount(selectedFacility, durationMinutes) : 0;
-  const canSubmitBooking = Boolean(customer && selectedFacility && selectedBlocks.length > 0 && selectionStart !== null && paymentMethod && (paymentMethod === "cash" || paymentReference.trim()));
+  const selectedQuotes = selectedBlocks.map((block) => selectedFacility?.priceQuotes.find((quote) => quote.segments[0]?.startMinutes === block.startMinutes)).filter((quote): quote is PriceCalculation => Boolean(quote));
+  const amountMinor = selectedQuotes.reduce((sum, quote) => sum + quote.amountMinor, 0);
+  const canSubmitBooking = Boolean(customer && selectedFacility && selectedBlocks.length > 0 && selectedQuotes.length === selectedBlocks.length && selectionStart !== null && paymentMethod && (paymentMethod === "cash" || paymentReference.trim()));
 
   function selectFacility(facilityId: string) {
     setSelectedFacilityId(facilityId);
@@ -257,7 +252,7 @@ export function WalkInBookingForm({ facilities, dateKey, dateLabel }: WalkInBook
               type="button"
             >
               <p className="font-semibold">{facility.name}</p>
-              <p className="mt-1 text-sm opacity-75">{formatCurrency(facility.priceAmountMinor, "PHP")} per hour</p>
+              <p className="mt-1 text-sm opacity-75">Base rates vary by selected schedule</p>
             </button>
           ))}
         </div>
@@ -272,13 +267,16 @@ export function WalkInBookingForm({ facilities, dateKey, dateLabel }: WalkInBook
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {hourBlocks.map((block) => {
               const selected = selectedBlocks.some((candidate) => candidate.startMinutes === block.startMinutes);
-              const label = block.reason === "AVAILABLE" ? "Available" : block.reason === "BOOKED" ? "Booked" : "Blocked";
+              const quote = selectedFacility?.priceQuotes.find((item) => item.segments[0]?.startMinutes === block.startMinutes);
+              const isBookable = block.isAvailable && Boolean(quote);
+              const displayBlock = isBookable ? block : block.isAvailable ? { ...block, isAvailable: false, reason: "BLOCKED" as const } : block;
+              const label = block.isAvailable && !quote ? "Pricing unavailable" : block.reason === "AVAILABLE" ? "Available" : block.reason === "BOOKED" ? "Booked" : "Blocked";
 
               return (
                 <button
                   key={block.startMinutes}
-                  className={`rounded-2xl border px-4 py-4 text-left transition ${getBlockTone(block, selected)}`}
-                  disabled={!block.isAvailable}
+                  className={`rounded-2xl border px-4 py-4 text-left transition ${getBlockTone(displayBlock, selected)}`}
+                  disabled={!isBookable}
                   onClick={() => selectBlock(block)}
                   type="button"
                 >
@@ -295,7 +293,7 @@ export function WalkInBookingForm({ facilities, dateKey, dateLabel }: WalkInBook
         action={createBooking}
         className="space-y-5 border-t border-white/10 pt-5"
         onSubmit={(event) => {
-          if (!canSubmitBooking || !window.confirm(`Create a confirmed walk-in booking for ${dateLabel} for ${formatCurrency(amountMinor, "PHP")}?`)) {
+          if (!canSubmitBooking || !window.confirm(`Create a confirmed walk-in booking for ${dateLabel} at a VAT-exclusive base price of ${formatCurrency(amountMinor, "PHP")}?`)) {
             event.preventDefault();
           }
         }}
@@ -330,7 +328,7 @@ export function WalkInBookingForm({ facilities, dateKey, dateLabel }: WalkInBook
             <p className="text-stone-400">Selected booking</p>
             <p className="mt-1 font-semibold text-white">{selectedBlocks.length > 0 && selectionStart !== null ? `${minutesToTimeLabel(selectionStart)} - ${minutesToTimeLabel(selectionStart + durationMinutes)}` : "Select an available slot"}</p>
           </div>
-          <p className="text-lg font-semibold text-white">{formatCurrency(amountMinor, "PHP")}</p>
+          <div className="text-right"><p className="text-lg font-semibold text-white">{formatCurrency(amountMinor, "PHP")}</p><p className="text-xs text-stone-400">VAT-exclusive base price</p></div>
         </div>
 
         {bookingState.existingCustomer ? <p className="text-sm text-amber-200">{bookingState.message} <Link className="underline" href="/login?callbackUrl=/facilities">Ask them to sign in.</Link></p> : null}

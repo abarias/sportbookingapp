@@ -8,6 +8,7 @@ import { getBookingWindow } from "@/server/bookings/booking-window";
 import { normalizeDateKeyWithinBookingWindow } from "@/server/bookings/booking-window";
 import { getFacilityDayAvailability } from "@/server/bookings/service";
 import { prisma } from "@/lib/db/prisma";
+import { getFacilityPricingView } from "@/server/pricing/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,7 @@ export default async function AdminWalkInsPage({ searchParams }: AdminWalkInsPag
       operatingHours: true,
       pricingRules: {
         where: { isActive: true },
-        orderBy: { createdAt: "desc" },
-        take: 1
+        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }]
       }
     }
   });
@@ -36,14 +36,13 @@ export default async function AdminWalkInsPage({ searchParams }: AdminWalkInsPag
   const facilityOptions = await Promise.all(
     facilities.map(async (facility) => {
       const availability = await getFacilityDayAvailability(facility, dateKey);
-      const pricingRule = facility.pricingRules[0];
+      const pricingView = await getFacilityPricingView(facility, dateKey);
 
       return {
         id: facility.id,
         name: facility.name,
         timezone: facility.timezone,
-        priceAmountMinor: pricingRule?.amountMinor ?? 0,
-        priceBillingMode: pricingRule?.billingMode ?? "PER_HOUR",
+        priceQuotes: pricingView.quotes,
         slotIntervalMinutes: availability.slotIntervalMinutes,
         slots: availability.slots
       };

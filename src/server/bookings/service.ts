@@ -1,13 +1,14 @@
 import crypto from "node:crypto";
 
-import { BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingBillingMode, type Facility } from "@prisma/client";
+import { BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingDayType, type Facility, type PricingRule } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { getPaymentMode, isProductionMockPaymentAllowed, isStrictProductionEnvironment } from "@/lib/config/env";
-import { buildUtcDateFromLocalMinutes, getDayOfWeek, getLocalMinutesForDate } from "@/lib/time/slots";
+import { buildLocalDayUtcRange, buildUtcDateFromLocalMinutes, getDayOfWeek, getLocalMinutesForDate } from "@/lib/time/slots";
 import { isDateWithinBookingWindow } from "@/server/bookings/booking-window";
 import { buildDaySlots, canFitDuration, rangesOverlapByMinute, rangesOverlap, type DaySlot, type MinuteInterval } from "@/server/bookings/core";
 import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellationWindowHours } from "@/server/bookings/policies";
+import { calculatePrice } from "@/server/pricing/engine";
 
 export type FacilityDayAvailability = {
   dateKey: string;
@@ -157,12 +158,45 @@ async function findReusableBooking(
   return existingBooking;
 }
 
-function getBookingAmount(amountMinor: number, billingMode: PricingBillingMode, durationMinutes: number) {
-  if (billingMode === PricingBillingMode.PER_BLOCK) {
-    return amountMinor;
+function getDefaultPricingRule(rules: PricingRule[]) {
+  const defaultRule = rules.find((rule) => rule.isActive && rule.dayType === PricingDayType.DEFAULT);
+  if (!defaultRule) {
+    throw new Error("Facility default pricing is not configured.");
   }
+  return defaultRule;
+}
 
-  return Math.round((amountMinor * durationMinutes) / 60);
+async function calculateAuthoritativePrice(params: {
+  tx: Prisma.TransactionClient;
+  facilityId: string;
+  timezone: string;
+  slotIntervalMinutes: number;
+  dateKey: string;
+  startMinutes: number;
+  durationMinutes: number;
+  rules: PricingRule[];
+  calculatedAt: Date;
+}) {
+  const holidayDate = new Date(`${params.dateKey}T00:00:00.000Z`);
+  const holidays = await params.tx.holiday.findMany({
+    where: {
+      date: holidayDate,
+      isActive: true,
+      OR: [{ facilityId: null }, { facilityId: params.facilityId }]
+    }
+  });
+
+  return calculatePrice({
+    facilityId: params.facilityId,
+    timezone: params.timezone,
+    dateKey: params.dateKey,
+    startMinutes: params.startMinutes,
+    durationMinutes: params.durationMinutes,
+    intervalMinutes: params.slotIntervalMinutes,
+    rules: params.rules,
+    holidays,
+    calculatedAt: params.calculatedAt
+  });
 }
 
 function getDailyOpeningRange(facility: Pick<Facility, "slotIntervalMinutes" | "timezone"> & {
@@ -208,6 +242,7 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
 
   const dayStartUtc = buildUtcDateFromLocalMinutes(dateKey, openingRange.startMinutes, facility.timezone);
   const dayEndUtc = buildUtcDateFromLocalMinutes(dateKey, openingRange.endMinutes, facility.timezone);
+  const calendarDay = buildLocalDayUtcRange(dateKey, facility.timezone);
   const now = new Date();
 
   const [bookings, blockedSchedules] = await Promise.all([
@@ -231,10 +266,10 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
       where: {
         facilityId: facility.id,
         startAtUtc: {
-          lt: dayEndUtc
+          lt: calendarDay.endUtc
         },
         endAtUtc: {
-          gt: dayStartUtc
+          gt: calendarDay.startUtc
         }
       },
       select: {
@@ -306,8 +341,7 @@ export async function createBookingHold(input: BookingCreationInput) {
             operatingHours: true,
             pricingRules: {
               where: { isActive: true },
-              orderBy: { createdAt: "desc" },
-              take: 1
+              orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }]
             }
           }
         }),
@@ -322,13 +356,8 @@ export async function createBookingHold(input: BookingCreationInput) {
 
       await expireStaleAwaitingPaymentHolds(tx, now);
 
-      const pricingRule = facility.pricingRules[0];
-
-      if (!pricingRule) {
-        throw new Error("Facility pricing is not configured.");
-      }
-
-      assertAllowedBookingDuration(input.durationMinutes, pricingRule.minimumMinutes, facility.slotIntervalMinutes);
+      const defaultPricingRule = getDefaultPricingRule(facility.pricingRules);
+      assertAllowedBookingDuration(input.durationMinutes, defaultPricingRule.minimumMinutes, facility.slotIntervalMinutes);
 
       const openingRange = getDailyOpeningRange(facility, input.dateKey);
 
@@ -408,7 +437,18 @@ export async function createBookingHold(input: BookingCreationInput) {
       }
 
       const paymentHoldMinutes = getPaymentHoldMinutes(holdSetting?.value);
-      const amountMinor = getBookingAmount(pricingRule.amountMinor, pricingRule.billingMode, input.durationMinutes);
+      const price = await calculateAuthoritativePrice({
+        tx,
+        facilityId: facility.id,
+        timezone: facility.timezone,
+        slotIntervalMinutes: facility.slotIntervalMinutes,
+        dateKey: input.dateKey,
+        startMinutes: input.startMinutes,
+        durationMinutes: input.durationMinutes,
+        rules: facility.pricingRules,
+        calculatedAt: now
+      });
+      const amountMinor = price.amountMinor;
       const paymentHoldExpiresAt = new Date(now.getTime() + paymentHoldMinutes * 60_000);
 
       return tx.booking.create({
@@ -421,7 +461,8 @@ export async function createBookingHold(input: BookingCreationInput) {
           timezone: facility.timezone,
           slotCount: input.durationMinutes / facility.slotIntervalMinutes,
           amountMinor,
-          currency: pricingRule.currency,
+          currency: price.currency,
+          priceSnapshot: price as unknown as Prisma.InputJsonValue,
           idempotencyKey: input.idempotencyKey,
           paymentHoldExpiresAt,
           payment: {
@@ -431,7 +472,7 @@ export async function createBookingHold(input: BookingCreationInput) {
               method: "manual_gcash",
               status: PaymentStatus.AWAITING_PAYMENT,
               amountMinor,
-              currency: pricingRule.currency,
+              currency: price.currency,
               expiresAt: paymentHoldExpiresAt
             }
           }
@@ -485,8 +526,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
             operatingHours: true,
             pricingRules: {
               where: { isActive: true },
-              orderBy: { createdAt: "desc" },
-              take: 1
+              orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }]
             }
           }
         }),
@@ -506,13 +546,8 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
       await expireStaleAwaitingPaymentHolds(tx, now);
       await assertBookingUserExists(tx, input.userId);
 
-      const pricingRule = facility.pricingRules[0];
-
-      if (!pricingRule) {
-        throw new Error("Facility pricing is not configured.");
-      }
-
-      assertAllowedBookingDuration(input.durationMinutes, pricingRule.minimumMinutes, facility.slotIntervalMinutes);
+      const defaultPricingRule = getDefaultPricingRule(facility.pricingRules);
+      assertAllowedBookingDuration(input.durationMinutes, defaultPricingRule.minimumMinutes, facility.slotIntervalMinutes);
 
       const openingRange = getDailyOpeningRange(facility, input.dateKey);
 
@@ -591,7 +626,18 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         throw new Error("Selected time is no longer available.");
       }
 
-      const amountMinor = getBookingAmount(pricingRule.amountMinor, pricingRule.billingMode, input.durationMinutes);
+      const price = await calculateAuthoritativePrice({
+        tx,
+        facilityId: facility.id,
+        timezone: facility.timezone,
+        slotIntervalMinutes: facility.slotIntervalMinutes,
+        dateKey: input.dateKey,
+        startMinutes: input.startMinutes,
+        durationMinutes: input.durationMinutes,
+        rules: facility.pricingRules,
+        calculatedAt: now
+      });
+      const amountMinor = price.amountMinor;
 
       return tx.booking.create({
         data: {
@@ -603,7 +649,8 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
           timezone: facility.timezone,
           slotCount: input.durationMinutes / facility.slotIntervalMinutes,
           amountMinor,
-          currency: pricingRule.currency,
+          currency: price.currency,
+          priceSnapshot: price as unknown as Prisma.InputJsonValue,
           idempotencyKey: input.idempotencyKey,
           paymentHoldExpiresAt: null,
           payment: {
@@ -612,7 +659,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
               providerReference: `mock_${input.idempotencyKey ?? crypto.randomUUID()}`,
               status: PaymentStatus.PAID,
               amountMinor,
-              currency: pricingRule.currency,
+              currency: price.currency,
               paidAt: now
             }
           }
@@ -654,8 +701,7 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
             operatingHours: true,
             pricingRules: {
               where: { isActive: true },
-              orderBy: { createdAt: "desc" },
-              take: 1
+              orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }]
             }
           }
         })
@@ -665,13 +711,8 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
         throw new Error("Facility is not available.");
       }
 
-      const pricingRule = facility.pricingRules[0];
-
-      if (!pricingRule) {
-        throw new Error("Facility pricing is not configured.");
-      }
-
-      assertAllowedBookingDuration(input.durationMinutes, pricingRule.minimumMinutes, facility.slotIntervalMinutes);
+      const defaultPricingRule = getDefaultPricingRule(facility.pricingRules);
+      assertAllowedBookingDuration(input.durationMinutes, defaultPricingRule.minimumMinutes, facility.slotIntervalMinutes);
 
       const openingRange = getDailyOpeningRange(facility, input.dateKey);
 
@@ -742,7 +783,18 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
         throw new Error("Selected time is no longer available.");
       }
 
-      const amountMinor = getBookingAmount(pricingRule.amountMinor, pricingRule.billingMode, input.durationMinutes);
+      const price = await calculateAuthoritativePrice({
+        tx,
+        facilityId: facility.id,
+        timezone: facility.timezone,
+        slotIntervalMinutes: facility.slotIntervalMinutes,
+        dateKey: input.dateKey,
+        startMinutes: input.startMinutes,
+        durationMinutes: input.durationMinutes,
+        rules: facility.pricingRules,
+        calculatedAt: now
+      });
+      const amountMinor = price.amountMinor;
 
       return tx.booking.create({
         data: {
@@ -754,7 +806,8 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
           timezone: facility.timezone,
           slotCount: input.durationMinutes / facility.slotIntervalMinutes,
           amountMinor,
-          currency: pricingRule.currency,
+          currency: price.currency,
+          priceSnapshot: price as unknown as Prisma.InputJsonValue,
           paymentHoldExpiresAt: null,
           payment: {
             create: {
@@ -765,7 +818,7 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
               status: PaymentStatus.VERIFIED,
               amountMinor,
               amountPaidMinor: amountMinor,
-              currency: pricingRule.currency,
+              currency: price.currency,
               paidAt: now,
               submittedAt: now,
               verifiedAt: now

@@ -10,6 +10,8 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { getPaymentProofUrl } from "@/lib/storage/payment-proofs";
+import { parsePriceSnapshot } from "@/server/pricing/snapshot";
+import { minutesToTimeLabel } from "@/lib/time/slots";
 import { formatDateTimeRange } from "@/lib/time/slots";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +63,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
   }
 
   const paymentProofUrl = await getPaymentProofUrl(booking.payment.proofImageUrl);
+  const priceSnapshot = parsePriceSnapshot(booking.priceSnapshot);
 
   const now = new Date();
   const isAwaitingPayment = booking.payment.status === PaymentStatus.AWAITING_PAYMENT;
@@ -86,6 +89,20 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
             <h1 className="mt-3 font-serif text-3xl text-white">{booking.facility.name}</h1>
             <p className="mt-2 text-sm text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p>
           </div>
+          {priceSnapshot?.segments.length ? (
+            <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-stone-500">Base price breakdown</p>
+              <div className="mt-3 space-y-2">
+                {priceSnapshot.segments.map((segment) => (
+                  <div key={`${segment.startMinutes}-${segment.ruleId}`} className="flex items-start justify-between gap-4 text-sm">
+                    <span className="text-stone-300">{minutesToTimeLabel(segment.startMinutes)}-{minutesToTimeLabel(segment.endMinutes)} · {segment.rateLabel}</span>
+                    <span className="font-medium text-white">{formatCurrency(segment.amountMinor, "PHP")}</span>
+                  </div>
+                ))}
+              </div>
+              {priceSnapshot.holidayName ? <p className="mt-3 text-sm text-amber-200">Holiday pricing: {priceSnapshot.holidayName}</p> : null}
+            </div>
+          ) : null}
           <div className="grid gap-3 text-sm text-stone-300 sm:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
               <p className="text-stone-500">Reference</p>
@@ -94,6 +111,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
               <p className="text-stone-500">Amount due</p>
               <p className="mt-1 text-lg font-semibold text-white">{formatCurrency(booking.amountMinor, "PHP")}</p>
+              <p className="text-xs text-stone-400">VAT-exclusive base amount</p>
             </div>
           </div>
           {booking.paymentHoldExpiresAt && isAwaitingPayment && !isExpiredHold ? (

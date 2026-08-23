@@ -121,7 +121,7 @@ export async function getAdminFacilitiesData() {
       orderBy: [{ type: "asc" }, { name: "asc" }],
       include: {
         images: { orderBy: { sortOrder: "asc" } },
-        pricingRules: { where: { isActive: true }, orderBy: { createdAt: "desc" }, take: 1 },
+        pricingRules: { where: { isActive: true, dayType: "DEFAULT" }, orderBy: { createdAt: "desc" }, take: 1 },
         operatingHours: { orderBy: { dayOfWeek: "asc" } },
         bookings: {
           where: {
