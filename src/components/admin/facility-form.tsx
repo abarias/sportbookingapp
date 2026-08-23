@@ -98,61 +98,63 @@ export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }
         <SubmitButton section="images" />
       </div>
 
-      <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
-        <div>
-          <h3 className="font-semibold text-white">Operating hours</h3>
-          <p className="mt-1 text-sm text-stone-400">Set the local operating window. Closed days cannot be booked.</p>
-        </div>
-        <div className="space-y-3">
-          {dayLabels.map((label, dayOfWeek) => {
-            const hour = facility.operatingHours.find((item) => item.dayOfWeek === dayOfWeek);
+      <div key={facility.updatedAt.toISOString()} className="space-y-6">
+        <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
+          <div>
+            <h3 className="font-semibold text-white">Operating hours</h3>
+            <p className="mt-1 text-sm text-stone-400">Set the local operating window. Closed days cannot be booked.</p>
+          </div>
+          <div className="space-y-3">
+            {dayLabels.map((label, dayOfWeek) => {
+              const hour = facility.operatingHours.find((item) => item.dayOfWeek === dayOfWeek);
 
-            return (
-              <div key={label} className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 sm:grid-cols-[120px_1fr_1fr_auto] sm:items-end">
-                <div className="text-sm font-medium text-white">{label}</div>
-                <label className="space-y-1 text-sm text-stone-300">
-                  <span>Open</span>
-                  <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.opensAtMinutes ?? 480} name={`opensAtMinutes_${dayOfWeek}`} required>
-                    {openingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}</option>)}
-                  </select>
-                </label>
-                <label className="space-y-1 text-sm text-stone-300">
-                  <span>Close</span>
-                  <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.closesAtMinutes ?? 1320} name={`closesAtMinutes_${dayOfWeek}`} required>
-                    {closingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}{minutes === 1440 ? " (midnight)" : ""}</option>)}
-                  </select>
-                </label>
-                <label className="flex items-center gap-2 text-sm text-stone-300">
-                  <input defaultChecked={hour?.isClosed ?? false} name={`isClosed_${dayOfWeek}`} type="checkbox" />
-                  Closed
-                </label>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              return (
+                <div key={label} className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 sm:grid-cols-[120px_1fr_1fr_auto] sm:items-end">
+                  <div className="text-sm font-medium text-white">{label}</div>
+                  <label className="space-y-1 text-sm text-stone-300">
+                    <span>Open</span>
+                    <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.opensAtMinutes ?? 480} name={`opensAtMinutes_${dayOfWeek}`} required>
+                      {openingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}</option>)}
+                    </select>
+                  </label>
+                  <label className="space-y-1 text-sm text-stone-300">
+                    <span>Close</span>
+                    <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.closesAtMinutes ?? 1320} name={`closesAtMinutes_${dayOfWeek}`} required>
+                      {closingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}{minutes === 1440 ? " (midnight)" : ""}</option>)}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-stone-300">
+                    <input defaultChecked={hour?.isClosed ?? false} name={`isClosed_${dayOfWeek}`} type="checkbox" />
+                    Closed
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-      <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
-        <div>
-          <h3 className="font-semibold text-white">Cancellation settings</h3>
-          <p className="mt-1 text-sm text-stone-400">Override the global customer cancellation policy for this facility when needed.</p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2 text-sm text-stone-200">
-            <span>Cancellation policy</span>
-            <select className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.cancellationEnabledOverride === null ? "inherit" : facility.cancellationEnabledOverride ? "enabled" : "disabled"} name="cancellationEnabledOverride">
-              <option value="inherit">Inherit global setting</option>
-              <option value="enabled">Enabled</option>
-              <option value="disabled">Disabled</option>
-            </select>
-          </label>
-          <label className="space-y-2 text-sm text-stone-200">
-            <span>Cancellation window override (hours)</span>
-            <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.cancellationWindowHoursOverride ?? ""} min={1} name="cancellationWindowHoursOverride" placeholder="Inherit global" type="number" />
-            {state.fieldErrors?.cancellationWindowHoursOverride ? <p className="text-sm text-rose-300">{state.fieldErrors.cancellationWindowHoursOverride}</p> : null}
-          </label>
-        </div>
-      </section>
+        <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
+          <div>
+            <h3 className="font-semibold text-white">Cancellation settings</h3>
+            <p className="mt-1 text-sm text-stone-400">Override the global customer cancellation policy for this facility when needed.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2 text-sm text-stone-200">
+              <span>Cancellation policy</span>
+              <select className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.cancellationEnabledOverride === null ? "inherit" : facility.cancellationEnabledOverride ? "enabled" : "disabled"} name="cancellationEnabledOverride">
+                <option value="inherit">Inherit global setting</option>
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </label>
+            <label className="space-y-2 text-sm text-stone-200">
+              <span>Cancellation window override (hours)</span>
+              <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.cancellationWindowHoursOverride ?? ""} min={1} name="cancellationWindowHoursOverride" placeholder="Inherit global" type="number" />
+              {state.fieldErrors?.cancellationWindowHoursOverride ? <p className="text-sm text-rose-300">{state.fieldErrors.cancellationWindowHoursOverride}</p> : null}
+            </label>
+          </div>
+        </section>
+      </div>
 
       <div className="flex flex-col items-end gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
         {state.section === "schedule" && state.fieldErrors?.operatingHours ? <p className="text-sm text-rose-300">{state.fieldErrors.operatingHours}</p> : null}
