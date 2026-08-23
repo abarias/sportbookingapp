@@ -115,6 +115,7 @@ function buildBlockedScheduleDate(dateKey: string, time: string, timezone: strin
 export type FacilityActionState = {
   success?: string;
   message?: string;
+  section?: "details" | "images" | "schedule";
   fieldErrors?: Partial<Record<"name" | "slug" | "type" | "description" | "amount" | "imageUrls" | "operatingHours" | "cancellationWindowHoursOverride", string>>;
 };
 
@@ -200,6 +201,8 @@ export async function updateFacilityAction(
   const session = await requireAdminSession();
 
   const facilityId = String(formData.get("facilityId") ?? "");
+  const requestedSection = String(formData.get("saveSection") ?? "details");
+  const section = requestedSection === "images" || requestedSection === "schedule" ? requestedSection : "details";
   const imageUrls = String(formData.get("imageUrls") ?? "")
     .split("\n")
     .map((item) => item.trim())
@@ -209,7 +212,7 @@ export async function updateFacilityAction(
   try {
     uploadedUrls = await persistFacilityUploads(formData, String(formData.get("name") ?? facilityId));
   } catch (error) {
-    return { message: error instanceof Error ? error.message : "Facility images could not be uploaded." };
+    return { section, message: error instanceof Error ? error.message : "Facility images could not be uploaded." };
   }
   const weekdays = buildWeekdays(formData);
   const cancellationWindowHoursOverride = parseNullablePositiveInteger(formData.get("cancellationWindowHoursOverride"));
@@ -230,6 +233,7 @@ export async function updateFacilityAction(
     const operatingHourIssue = parsed.success ? undefined : parsed.error.issues.find((issue) => issue.path[0] === "operatingHours");
 
     return {
+      section,
       message: "Please correct the facility details and try again.",
       fieldErrors: {
         name: flattened?.name?.[0],
@@ -306,6 +310,7 @@ export async function updateFacilityAction(
   revalidatePath("/facilities");
 
   return {
+    section,
     success: "Facility details saved."
   };
 }
@@ -416,7 +421,7 @@ export async function createFacilityAction(
   revalidatePath("/admin/facilities");
   revalidatePath("/facilities");
 
-  redirect(`/admin/facilities?facilityId=${encodeURIComponent(createdFacility.id)}`);
+  redirect(`/admin/facilities?facilityId=${encodeURIComponent(createdFacility.id)}&created=1`);
 }
 
 export async function createBlockedScheduleAction(

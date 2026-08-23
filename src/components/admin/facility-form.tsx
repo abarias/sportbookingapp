@@ -22,10 +22,18 @@ const openingTimeOptions = Array.from({ length: 24 }, (_, index) => index * 60);
 const closingTimeOptions = Array.from({ length: 24 }, (_, index) => (index + 1) * 60);
 const initialState: FacilityActionState = {};
 
-function SubmitButton() {
+function SubmitButton({ section }: { section: "details" | "images" | "schedule" }) {
   const { pending } = useFormStatus();
 
-  return <Button disabled={pending} type="submit">{pending ? "Saving changes..." : "Save changes"}</Button>;
+  return <Button disabled={pending} name="saveSection" type="submit" value={section}>{pending ? "Saving changes..." : "Save changes"}</Button>;
+}
+
+function SaveStatus({ state, section }: { state: FacilityActionState; section: "details" | "images" | "schedule" }) {
+  if (state.section !== section || (!state.message && !state.success)) {
+    return null;
+  }
+
+  return <p className={`rounded-xl border p-3 text-sm ${state.message ? "border-rose-400/25 bg-rose-400/10 text-rose-200" : "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"}`}>{state.message ?? state.success}</p>;
 }
 
 export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }) {
@@ -77,14 +85,17 @@ export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }
         </label>
       </section>
 
-      <div className="flex justify-end">
-        <SubmitButton />
+      <div className="flex flex-col items-end gap-3 sm:flex-row sm:justify-end">
+        <SaveStatus section="details" state={state} />
+        <SubmitButton section="details" />
       </div>
 
       <FacilityImageManager key={`${facility.id}-${facility.updatedAt.toISOString()}`} facilityName={facility.name} initialImageUrls={facility.images.map((image) => image.url)} />
 
-      <div className="flex justify-end">
-        <SubmitButton />
+      <div className="flex flex-col items-end gap-3 sm:flex-row sm:justify-end">
+        {state.section === "images" && state.fieldErrors?.imageUrls ? <p className="text-sm text-rose-300">{state.fieldErrors.imageUrls}</p> : null}
+        <SaveStatus section="images" state={state} />
+        <SubmitButton section="images" />
       </div>
 
       <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
@@ -143,12 +154,10 @@ export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }
         </div>
       </section>
 
-      {state.fieldErrors?.imageUrls ? <p className="text-sm text-rose-300">{state.fieldErrors.imageUrls}</p> : null}
-      {state.fieldErrors?.operatingHours ? <p className="text-sm text-rose-300">{state.fieldErrors.operatingHours}</p> : null}
-      {state.message ? <p className="text-sm text-rose-300">{state.message}</p> : null}
-      {state.success ? <p className="text-sm text-emerald-300">{state.success}</p> : null}
-      <div className="flex justify-end border-t border-white/10 pt-5">
-        <SubmitButton />
+      <div className="flex flex-col items-end gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
+        {state.section === "schedule" && state.fieldErrors?.operatingHours ? <p className="text-sm text-rose-300">{state.fieldErrors.operatingHours}</p> : null}
+        <SaveStatus section="schedule" state={state} />
+        <SubmitButton section="schedule" />
       </div>
     </form>
   );
