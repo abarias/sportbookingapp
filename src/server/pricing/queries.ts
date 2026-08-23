@@ -54,7 +54,7 @@ export async function getFacilityPricingView(facility: PriceableFacility, dateKe
 
 export async function getPricingAdminData(facilityId?: string, dateKey?: string, startMinutes = 480, durationMinutes = 60) {
   const facilities = await prisma.facility.findMany({
-    orderBy: { name: "asc" },
+    orderBy: [{ type: "asc" }, { name: "asc" }],
     include: {
       images: { orderBy: { sortOrder: "asc" } },
       pricingRules: { orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }] },
