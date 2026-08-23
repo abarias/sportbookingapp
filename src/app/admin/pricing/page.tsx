@@ -9,25 +9,37 @@ import { RateCard } from "@/components/pricing/rate-card";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { requireAdminSession } from "@/lib/auth/session";
-import { getTodayDateKey, minutesToTimeInputValue, minutesToTimeLabel } from "@/lib/time/slots";
+import { getTodayDateKey, minutesToTimeLabel } from "@/lib/time/slots";
 import { analyzePricingRules, deriveRateCard } from "@/server/pricing/engine";
 import { getPricingAdminData } from "@/server/pricing/queries";
 
 export const dynamic = "force-dynamic";
 
-function parseTime(value: string | undefined) {
-  if (!value || !/^\d{2}:\d{2}$/.test(value)) return 480;
+const previewStartOptions = Array.from({ length: 24 }, (_, index) => index * 60);
+const previewEndOptions = Array.from({ length: 24 }, (_, index) => (index + 1) * 60);
+
+function parseTime(value: string | undefined, isEnd = false, fallback = isEnd ? 1020 : 480) {
+  if (value && /^\d+$/.test(value)) return Number.parseInt(value, 10);
+  if (!value || !/^\d{2}:\d{2}$/.test(value)) return fallback;
   const [hours, minutes] = value.split(":").map(Number);
+  if (isEnd && hours === 0 && minutes === 0) return 1440;
   return hours * 60 + minutes;
 }
 
-export default async function AdminPricingPage({ searchParams }: { searchParams: Promise<{ facilityId?: string; date?: string; start?: string; duration?: string; ruleId?: string }> }) {
+export default async function AdminPricingPage({ searchParams }: { searchParams: Promise<{ facilityId?: string; date?: string; start?: string; end?: string; duration?: string; ruleId?: string }> }) {
   await requireAdminSession();
   const params = await searchParams;
   const dateKey = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : getTodayDateKey("Asia/Manila");
   const startMinutes = parseTime(params.start);
-  const durationMinutes = Math.max(30, Math.min(240, Number.parseInt(params.duration ?? "60", 10) || 60));
-  const { facilities, selectedFacility, preview, futureBookingCount } = await getPricingAdminData(params.facilityId, dateKey, startMinutes, durationMinutes);
+  const endMinutes = parseTime(params.end, true, Math.min(startMinutes + 60, 1440));
+  const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : 0;
+  const previewRangeError = endMinutes <= startMinutes
+    ? "End time must be later than the start time."
+    : durationMinutes > 240
+      ? "Preview ranges can be up to 4 hours."
+      : null;
+  const calculationDurationMinutes = previewRangeError ? 60 : durationMinutes;
+  const { facilities, selectedFacility, preview, futureBookingCount } = await getPricingAdminData(params.facilityId, dateKey, startMinutes, calculationDurationMinutes);
 
   if (!selectedFacility) {
     return <main className="space-y-8 pb-16"><SectionHeading eyebrow="Admin" title="Dynamic pricing" description="Create a facility before configuring pricing." /><AdminNav current="pricing" /></main>;
@@ -55,7 +67,7 @@ export default async function AdminPricingPage({ searchParams }: { searchParams:
             type: facility.type,
             isEnabled: facility.isEnabled,
             images: facility.images,
-            pricingRules: facility.pricingRules.filter((rule) => rule.dayType === PricingDayType.DEFAULT)
+            pricingRules: facility.pricingRules.filter((rule) => rule.dayType === PricingDayType.DEFAULT && rule.isActive)
           }))}
           selectedFacilityId={selectedFacility.id}
         />
@@ -113,11 +125,11 @@ export default async function AdminPricingPage({ searchParams }: { searchParams:
             <h2 className="text-lg font-semibold text-white">Price preview</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <label className="text-sm text-stone-300">Date<input className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-stone-900 px-3 text-white" defaultValue={dateKey} name="date" type="date" /></label>
-              <label className="text-sm text-stone-300">Start<input className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-stone-900 px-3 text-white" defaultValue={minutesToTimeInputValue(startMinutes)} name="start" step="1800" type="time" /></label>
-              <label className="text-sm text-stone-300">Minutes<select className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-stone-900 px-3 text-white" defaultValue={durationMinutes} name="duration"><option value="60">60</option><option value="120">120</option><option value="180">180</option><option value="240">240</option></select></label>
+              <label className="text-sm text-stone-300">Start time<select className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-stone-900 px-3 text-white" defaultValue={startMinutes} name="start"><option disabled value="">Select start time</option>{previewStartOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}</option>)}</select></label>
+              <label className="text-sm text-stone-300">End time<select className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-stone-900 px-3 text-white" defaultValue={endMinutes} name="end"><option disabled value="">Select end time</option>{previewEndOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}{minutes === 1440 ? " (midnight)" : ""}</option>)}</select></label>
             </div>
             <button className="mt-4 rounded-full bg-white px-4 py-2 text-sm font-semibold text-stone-950" type="submit">Preview price</button>
-            {preview ? <div className="mt-4 rounded-2xl bg-stone-950/60 p-4"><p className="text-sm text-stone-400">VAT-exclusive base amount</p><p className="mt-1 text-2xl font-semibold text-white">{formatCurrency(preview.amountMinor, "PHP")}</p>{preview.holidayName ? <p className="mt-1 text-sm text-amber-200">Holiday: {preview.holidayName}</p> : null}<div className="mt-3 space-y-2">{preview.segments.map((segment) => <p key={`${segment.startMinutes}-${segment.ruleId}`} className="text-sm text-stone-300">{minutesToTimeLabel(segment.startMinutes)}-{minutesToTimeLabel(segment.endMinutes)} · {segment.rateLabel} · {formatCurrency(segment.amountMinor, "PHP")}</p>)}</div></div> : <p className="mt-4 text-sm text-rose-200">The selected range is closed, outside operating hours, or not covered by a valid rule.</p>}
+            {previewRangeError ? <p className="mt-4 text-sm text-rose-200">{previewRangeError}</p> : preview ? <div className="mt-4 rounded-2xl bg-stone-950/60 p-4"><p className="text-sm text-stone-400">VAT-exclusive base amount · {durationMinutes / 60} hour{durationMinutes === 60 ? "" : "s"}</p><p className="mt-1 text-2xl font-semibold text-white">{formatCurrency(preview.amountMinor, "PHP")}</p>{preview.holidayName ? <p className="mt-1 text-sm text-amber-200">Holiday: {preview.holidayName}</p> : null}<div className="mt-3 space-y-2">{preview.segments.map((segment) => <p key={`${segment.startMinutes}-${segment.ruleId}`} className="text-sm text-stone-300">{minutesToTimeLabel(segment.startMinutes)}-{minutesToTimeLabel(segment.endMinutes)} · {segment.rateLabel} · {formatCurrency(segment.amountMinor, "PHP")}</p>)}</div></div> : <p className="mt-4 text-sm text-rose-200">The selected range is closed, outside operating hours, or not covered by a valid rule.</p>}
           </form>
 
           <RateCard rows={rateCard} compact />
