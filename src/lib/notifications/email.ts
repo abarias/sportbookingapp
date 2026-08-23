@@ -23,7 +23,7 @@ function getResendConfig() {
 function buildVerificationEmailHtml(params: VerificationEmailParams) {
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1c1917">
-      <h1 style="font-size:24px;margin-bottom:16px">Verify your Sport Booking PH account</h1>
+      <h1 style="font-size:24px;margin-bottom:16px">Verify your MMG Stellar account</h1>
       <p>Hi ${params.fullName},</p>
       <p>Use this verification code to finish creating your account:</p>
       <p style="font-size:28px;font-weight:700;letter-spacing:0.2em;margin:24px 0">${params.code}</p>
@@ -37,7 +37,7 @@ function buildVerificationEmailText(params: VerificationEmailParams) {
   return [
     `Hi ${params.fullName},`,
     "",
-    "Use this verification code to finish creating your Sport Booking PH account:",
+    "Use this verification code to finish creating your MMG Stellar account:",
     "",
     params.code,
     "",
