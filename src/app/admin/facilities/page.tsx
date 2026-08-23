@@ -15,6 +15,7 @@ type AdminFacilitiesPageProps = {
   searchParams: Promise<{
     facilityId?: string;
     new?: string;
+    created?: string;
   }>;
 };
 
@@ -63,7 +64,8 @@ export default async function AdminFacilitiesPage({ searchParams }: AdminFacilit
             </div>
           ) : selectedFacility ? (
             <div className="space-y-8">
-              <FacilityForm key={`${selectedFacility.id}-${selectedFacility.updatedAt.toISOString()}`} facility={selectedFacility} />
+              {params.created === "1" ? <p className="rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-4 text-sm text-emerald-200">Facility added successfully. You can now finish configuring its images, hours, pricing, and blocked schedules below.</p> : null}
+              <FacilityForm key={selectedFacility.id} facility={selectedFacility} />
 
               <section className="space-y-5 border-t border-white/10 pt-6">
                 <div>
