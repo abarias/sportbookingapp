@@ -22,10 +22,18 @@ const openingTimeOptions = Array.from({ length: 24 }, (_, index) => index * 60);
 const closingTimeOptions = Array.from({ length: 24 }, (_, index) => (index + 1) * 60);
 const initialState: FacilityActionState = {};
 
-function SubmitButton() {
+function SubmitButton({ section }: { section: "details" | "images" | "schedule" }) {
   const { pending } = useFormStatus();
 
-  return <Button disabled={pending} type="submit">{pending ? "Saving changes..." : "Save changes"}</Button>;
+  return <Button disabled={pending} name="saveSection" type="submit" value={section}>{pending ? "Saving changes..." : "Save changes"}</Button>;
+}
+
+function SaveStatus({ state, section }: { state: FacilityActionState; section: "details" | "images" | "schedule" }) {
+  if (state.section !== section || (!state.message && !state.success)) {
+    return null;
+  }
+
+  return <p className={`rounded-xl border p-3 text-sm ${state.message ? "border-rose-400/25 bg-rose-400/10 text-rose-200" : "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"}`}>{state.message ?? state.success}</p>;
 }
 
 export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }) {
@@ -77,78 +85,81 @@ export function FacilityForm({ facility }: { facility: FacilityWithAdminFields }
         </label>
       </section>
 
-      <div className="flex justify-end">
-        <SubmitButton />
+      <div className="flex flex-col items-end gap-3 sm:flex-row sm:justify-end">
+        <SaveStatus section="details" state={state} />
+        <SubmitButton section="details" />
       </div>
 
       <FacilityImageManager key={`${facility.id}-${facility.updatedAt.toISOString()}`} facilityName={facility.name} initialImageUrls={facility.images.map((image) => image.url)} />
 
-      <div className="flex justify-end">
-        <SubmitButton />
+      <div className="flex flex-col items-end gap-3 sm:flex-row sm:justify-end">
+        {state.section === "images" && state.fieldErrors?.imageUrls ? <p className="text-sm text-rose-300">{state.fieldErrors.imageUrls}</p> : null}
+        <SaveStatus section="images" state={state} />
+        <SubmitButton section="images" />
       </div>
 
-      <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
-        <div>
-          <h3 className="font-semibold text-white">Operating hours</h3>
-          <p className="mt-1 text-sm text-stone-400">Set the local operating window. Closed days cannot be booked.</p>
-        </div>
-        <div className="space-y-3">
-          {dayLabels.map((label, dayOfWeek) => {
-            const hour = facility.operatingHours.find((item) => item.dayOfWeek === dayOfWeek);
+      <div key={facility.updatedAt.toISOString()} className="space-y-6">
+        <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
+          <div>
+            <h3 className="font-semibold text-white">Operating hours</h3>
+            <p className="mt-1 text-sm text-stone-400">Set the local operating window. Closed days cannot be booked.</p>
+          </div>
+          <div className="space-y-3">
+            {dayLabels.map((label, dayOfWeek) => {
+              const hour = facility.operatingHours.find((item) => item.dayOfWeek === dayOfWeek);
 
-            return (
-              <div key={label} className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 sm:grid-cols-[120px_1fr_1fr_auto] sm:items-end">
-                <div className="text-sm font-medium text-white">{label}</div>
-                <label className="space-y-1 text-sm text-stone-300">
-                  <span>Open</span>
-                  <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.opensAtMinutes ?? 480} name={`opensAtMinutes_${dayOfWeek}`} required>
-                    {openingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}</option>)}
-                  </select>
-                </label>
-                <label className="space-y-1 text-sm text-stone-300">
-                  <span>Close</span>
-                  <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.closesAtMinutes ?? 1320} name={`closesAtMinutes_${dayOfWeek}`} required>
-                    {closingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}{minutes === 1440 ? " (midnight)" : ""}</option>)}
-                  </select>
-                </label>
-                <label className="flex items-center gap-2 text-sm text-stone-300">
-                  <input defaultChecked={hour?.isClosed ?? false} name={`isClosed_${dayOfWeek}`} type="checkbox" />
-                  Closed
-                </label>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              return (
+                <div key={label} className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 sm:grid-cols-[120px_1fr_1fr_auto] sm:items-end">
+                  <div className="text-sm font-medium text-white">{label}</div>
+                  <label className="space-y-1 text-sm text-stone-300">
+                    <span>Open</span>
+                    <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.opensAtMinutes ?? 480} name={`opensAtMinutes_${dayOfWeek}`} required>
+                      {openingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}</option>)}
+                    </select>
+                  </label>
+                  <label className="space-y-1 text-sm text-stone-300">
+                    <span>Close</span>
+                    <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" defaultValue={hour?.closesAtMinutes ?? 1320} name={`closesAtMinutes_${dayOfWeek}`} required>
+                      {closingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}{minutes === 1440 ? " (midnight)" : ""}</option>)}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-stone-300">
+                    <input defaultChecked={hour?.isClosed ?? false} name={`isClosed_${dayOfWeek}`} type="checkbox" />
+                    Closed
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-      <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
-        <div>
-          <h3 className="font-semibold text-white">Cancellation settings</h3>
-          <p className="mt-1 text-sm text-stone-400">Override the global customer cancellation policy for this facility when needed.</p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2 text-sm text-stone-200">
-            <span>Cancellation policy</span>
-            <select className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.cancellationEnabledOverride === null ? "inherit" : facility.cancellationEnabledOverride ? "enabled" : "disabled"} name="cancellationEnabledOverride">
-              <option value="inherit">Inherit global setting</option>
-              <option value="enabled">Enabled</option>
-              <option value="disabled">Disabled</option>
-            </select>
-          </label>
-          <label className="space-y-2 text-sm text-stone-200">
-            <span>Cancellation window override (hours)</span>
-            <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.cancellationWindowHoursOverride ?? ""} min={1} name="cancellationWindowHoursOverride" placeholder="Inherit global" type="number" />
-            {state.fieldErrors?.cancellationWindowHoursOverride ? <p className="text-sm text-rose-300">{state.fieldErrors.cancellationWindowHoursOverride}</p> : null}
-          </label>
-        </div>
-      </section>
+        <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-950/40 p-4">
+          <div>
+            <h3 className="font-semibold text-white">Cancellation settings</h3>
+            <p className="mt-1 text-sm text-stone-400">Override the global customer cancellation policy for this facility when needed.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2 text-sm text-stone-200">
+              <span>Cancellation policy</span>
+              <select className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.cancellationEnabledOverride === null ? "inherit" : facility.cancellationEnabledOverride ? "enabled" : "disabled"} name="cancellationEnabledOverride">
+                <option value="inherit">Inherit global setting</option>
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </label>
+            <label className="space-y-2 text-sm text-stone-200">
+              <span>Cancellation window override (hours)</span>
+              <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" defaultValue={facility.cancellationWindowHoursOverride ?? ""} min={1} name="cancellationWindowHoursOverride" placeholder="Inherit global" type="number" />
+              {state.fieldErrors?.cancellationWindowHoursOverride ? <p className="text-sm text-rose-300">{state.fieldErrors.cancellationWindowHoursOverride}</p> : null}
+            </label>
+          </div>
+        </section>
+      </div>
 
-      {state.fieldErrors?.imageUrls ? <p className="text-sm text-rose-300">{state.fieldErrors.imageUrls}</p> : null}
-      {state.fieldErrors?.operatingHours ? <p className="text-sm text-rose-300">{state.fieldErrors.operatingHours}</p> : null}
-      {state.message ? <p className="text-sm text-rose-300">{state.message}</p> : null}
-      {state.success ? <p className="text-sm text-emerald-300">{state.success}</p> : null}
-      <div className="flex justify-end border-t border-white/10 pt-5">
-        <SubmitButton />
+      <div className="flex flex-col items-end gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
+        {state.section === "schedule" && state.fieldErrors?.operatingHours ? <p className="text-sm text-rose-300">{state.fieldErrors.operatingHours}</p> : null}
+        <SaveStatus section="schedule" state={state} />
+        <SubmitButton section="schedule" />
       </div>
     </form>
   );
