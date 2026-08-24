@@ -42,12 +42,16 @@ export function minutesToTimeInputValue(totalMinutes: number) {
 }
 
 export function buildUtcDateFromLocalMinutes(dateKey: string, totalMinutes: number, timezone: string) {
-  const hours = Math.floor(totalMinutes / 60)
+  const dayOffset = Math.floor(totalMinutes / 1440);
+  const minutesWithinDay = totalMinutes % 1440;
+  const dateAtNoonUtc = fromZonedTime(`${dateKey}T12:00:00`, timezone);
+  const targetDateKey = formatInTimeZone(addDays(dateAtNoonUtc, dayOffset), timezone, "yyyy-MM-dd");
+  const hours = Math.floor(minutesWithinDay / 60)
     .toString()
     .padStart(2, "0");
-  const minutes = (totalMinutes % 60).toString().padStart(2, "0");
+  const minutes = (minutesWithinDay % 60).toString().padStart(2, "0");
 
-  return fromZonedTime(`${dateKey}T${hours}:${minutes}:00`, timezone);
+  return fromZonedTime(`${targetDateKey}T${hours}:${minutes}:00`, timezone);
 }
 
 export function buildLocalDayUtcRange(dateKey: string, timezone: string) {

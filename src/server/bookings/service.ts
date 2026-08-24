@@ -61,7 +61,7 @@ function assertMockPaymentModeAllowed() {
   }
 }
 
-function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
+export function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
   return {
     OR: [
       { status: BookingStatus.CONFIRMED },
@@ -75,7 +75,13 @@ function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
           {
             payment: {
               status: {
-                in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED]
+                in: [
+                  PaymentStatus.SUBMITTED,
+                  PaymentStatus.ACTION_REQUIRED,
+                  PaymentStatus.VERIFIED,
+                  PaymentStatus.PAID,
+                  PaymentStatus.PENDING
+                ]
               }
             }
           }
@@ -83,7 +89,10 @@ function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
       },
       {
         status: BookingStatus.PENDING_PAYMENT,
-        paymentHoldExpiresAt: { gt: now }
+        OR: [
+          { paymentHoldExpiresAt: { gt: now } },
+          { payment: { status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED, PaymentStatus.VERIFIED, PaymentStatus.PAID, PaymentStatus.PENDING] } } }
+        ]
       }
     ]
   };
