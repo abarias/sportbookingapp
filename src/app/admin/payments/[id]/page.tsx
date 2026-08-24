@@ -7,7 +7,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { PaymentReviewForm } from "@/components/admin/payment-review-form";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { formatDateTimeRange } from "@/lib/time/slots";
 import { getPaymentProofUrl } from "@/lib/storage/payment-proofs";
@@ -37,7 +37,7 @@ const paymentLabels: Record<PaymentStatus, string> = {
 };
 
 export default async function AdminPaymentDetailPage({ params }: AdminPaymentDetailPageProps) {
-  await requireAdminSession();
+  const authorization = await requirePermission("payments.view");
   const { id } = await params;
   const payment = await getAdminPaymentDetailData(id);
 
@@ -110,7 +110,7 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
           )}
         </div>
 
-        {payment.status === PaymentStatus.SUBMITTED ? (
+        {payment.status === PaymentStatus.SUBMITTED && authorization.permissions.has("payments.verify") ? (
           <PaymentReviewForm paymentId={payment.id} />
         ) : (
           <section className="rounded-2xl border border-white/10 bg-stone-950/40 p-4 text-sm leading-7 text-stone-300">

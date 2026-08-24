@@ -16,7 +16,7 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
-      <body className="bg-stone-950 text-stone-50 antialiased">
+      <body className="overflow-x-clip bg-stone-950 text-stone-50 antialiased">
         <AppShell>{children}</AppShell>
       </body>
     </html>

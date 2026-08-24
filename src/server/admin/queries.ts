@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus } from "@prisma/client";
+import { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { subDays } from "date-fns";
 
 import { prisma } from "@/lib/db/prisma";
@@ -19,20 +19,31 @@ export async function getCancellationWindowHoursSetting() {
   return typeof setting?.value === "number" ? setting.value : 24;
 }
 
-export async function getAdminOverviewData() {
+export async function getAdminOverviewData(options: { fullCustomerAccess: boolean; includeFinancials: boolean; includePaymentDetails: boolean }) {
+  const recentBookingQuery = options.fullCustomerAccess
+    ? prisma.booking.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: {
+          facility: { select: { name: true } },
+          user: { select: { fullName: true, email: true } },
+          payment: { select: { status: true, provider: true } }
+        }
+      })
+    : prisma.booking.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: {
+          facility: { select: { name: true } },
+          user: { select: { fullName: true } },
+          payment: { select: { status: true } }
+        }
+      });
   const [recentBookings, paidPayments, enabledFacilities, cancellationEnabled, cancellationWindowHours] = await Promise.all([
-    prisma.booking.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      include: {
-        facility: { select: { name: true } },
-        user: { select: { fullName: true, email: true } },
-        payment: { select: { status: true, provider: true } }
-      }
-    }),
-    prisma.payment.findMany({
+    recentBookingQuery,
+    options.includeFinancials ? prisma.payment.findMany({
       where: { status: { in: [PaymentStatus.PAID, PaymentStatus.VERIFIED] } }
-    }),
+    }) : Promise.resolve([]),
     prisma.facility.count({
       where: { isEnabled: true }
     }),
@@ -57,7 +68,17 @@ export async function getAdminOverviewData() {
       paidRevenueMinor,
       enabledFacilities
     },
-    recentBookings,
+    recentBookings: recentBookings.map((booking) => ({
+      id: booking.id,
+      status: booking.status,
+      facility: booking.facility,
+      customerName: booking.user.fullName,
+      customerContact: "email" in booking.user ? booking.user.email : null,
+      payment: booking.payment ? {
+        status: booking.payment.status,
+        provider: options.includePaymentDetails && "provider" in booking.payment ? String(booking.payment.provider) : null
+      } : null
+    })),
     cancellationEnabled,
     cancellationWindowHours
   };
@@ -151,22 +172,86 @@ export async function getAdminFacilitiesData() {
   };
 }
 
-export async function getAdminCustomersData() {
-  const customers = await prisma.user.findMany({
-    where: { role: "CUSTOMER" },
-    orderBy: { createdAt: "desc" },
-    include: {
+type AdminCustomersOptions = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  selectedCustomerId?: string;
+  bookingPage: number;
+  bookingPageSize: number;
+};
+
+export async function getAdminCustomersData(options: AdminCustomersOptions) {
+  const search = options.search?.trim() ?? "";
+  const where: Prisma.UserWhereInput = {
+    role: "CUSTOMER",
+    ...(search ? {
+      OR: [
+        { fullName: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } }
+      ]
+    } : {})
+  };
+
+  const selectedCustomerQuery = options.selectedCustomerId ? prisma.user.findFirst({
+    where: { id: options.selectedCustomerId, role: "CUSTOMER" },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phone: true,
+      createdAt: true,
+      _count: { select: { bookings: true } },
       bookings: {
-        orderBy: { startAtUtc: "desc" },
+        orderBy: [{ startAtUtc: "desc" }, { createdAt: "desc" }],
+        skip: (options.bookingPage - 1) * options.bookingPageSize,
+        take: options.bookingPageSize,
         include: {
-          facility: { select: { name: true } },
-          payment: { select: { status: true, provider: true } }
+          facility: { select: { name: true, timezone: true } },
+          payment: {
+            select: {
+              provider: true,
+              providerReference: true,
+              method: true,
+              externalReference: true,
+              amountMinor: true,
+              amountPaidMinor: true,
+              currency: true,
+              status: true,
+              proofImageUrl: true,
+              submittedAt: true,
+              paidAt: true,
+              verifiedAt: true,
+              reviewNote: true
+            }
+          }
         }
       }
     }
-  });
+  }) : Promise.resolve(null);
 
-  return customers;
+  const [customers, totalCount, selectedCustomer] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
+      skip: (options.page - 1) * options.pageSize,
+      take: options.pageSize,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        createdAt: true,
+        _count: { select: { bookings: true } }
+      }
+    }),
+    prisma.user.count({ where }),
+    selectedCustomerQuery
+  ]);
+
+  const selectedBookingCount = selectedCustomer?._count.bookings ?? 0;
+  return { customers, totalCount, selectedCustomer, selectedBookingCount };
 }
 
 export async function getAdminReportsData() {

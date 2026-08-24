@@ -26,7 +26,7 @@ type DaySchedule = {
     endAtUtc: Date;
     user: {
       fullName: string;
-      email: string;
+      email: string | null;
     };
   }>;
   blockedSchedules: Array<{
@@ -239,7 +239,7 @@ export function AdminDayDetail(props: {
                   {schedule.bookings.map((booking) => (
                     <div key={booking.id} className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone-300">
                       <p className="font-medium text-white">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, schedule.timezone)}</p>
-                      <p className="mt-1">{booking.user.fullName} • {booking.user.email}</p>
+                      <p className="mt-1">{booking.user.fullName}{booking.user.email ? ` • ${booking.user.email}` : ""}</p>
                       <p className="mt-1 text-stone-400">{booking.status.replaceAll("_", " ")}</p>
                     </div>
                   ))}
@@ -333,7 +333,7 @@ export function AdminDayDetail(props: {
                   {selectedFacility.bookings.map((booking) => (
                     <div key={booking.id} className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone-300">
                       <p className="font-medium text-white">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, selectedFacility.timezone)}</p>
-                      <p className="mt-1">{booking.user.fullName} • {booking.user.email}</p>
+                      <p className="mt-1">{booking.user.fullName}{booking.user.email ? ` • ${booking.user.email}` : ""}</p>
                     </div>
                   ))}
                 </div>

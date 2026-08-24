@@ -3,20 +3,27 @@ import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
 import { DashboardStat } from "@/components/shared/dashboard-stat";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { updateCancellationSettingAction } from "@/features/admin/actions";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { getAdminOverviewData } from "@/server/admin/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const session = await requireAdminSession();
-  const { stats: overviewStats, recentBookings, cancellationEnabled, cancellationWindowHours } = await getAdminOverviewData();
+  const authorization = await requirePermission("bookings.view");
+  const { session } = authorization;
+  const canViewFinancials = authorization.permissions.has("reports.view");
+  const canManageFacilities = authorization.permissions.has("facilities.manage");
+  const { stats: overviewStats, recentBookings, cancellationEnabled, cancellationWindowHours } = await getAdminOverviewData({
+    fullCustomerAccess: authorization.permissions.has("customers.view_full"),
+    includeFinancials: canViewFinancials,
+    includePaymentDetails: authorization.permissions.has("payments.view")
+  });
 
   const stats = [
     { label: "Confirmed Bookings", value: String(overviewStats.confirmedCount), hint: "Recent confirmed records" },
     { label: "Pending Payment", value: String(overviewStats.pendingCount), hint: "Reservations still awaiting completion" },
-    { label: "Paid Revenue", value: formatCurrency(overviewStats.paidRevenueMinor, "PHP"), hint: "From paid payment records" },
+    ...(canViewFinancials ? [{ label: "Paid Revenue", value: formatCurrency(overviewStats.paidRevenueMinor, "PHP"), hint: "From paid payment records" }] : []),
     { label: "Enabled Facilities", value: String(overviewStats.enabledFacilities), hint: "Currently bookable inventory" }
   ];
 
@@ -45,18 +52,18 @@ export default async function AdminPage() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="font-medium text-white">{booking.facility.name}</p>
-                    <p>{booking.user.fullName} • {booking.user.email}</p>
+                    <p>{booking.customerName}{booking.customerContact ? ` • ${booking.customerContact}` : ""}</p>
                   </div>
                   <div className="text-right">
                     <BookingStatusBadge bookingStatus={booking.status} paymentStatus={booking.payment?.status ?? null} />
-                    <p className="mt-2 text-stone-400">{booking.payment?.provider ?? "No payment"} provider</p>
+                    {booking.payment?.provider ? <p className="mt-2 text-stone-400">{booking.payment.provider} provider</p> : null}
                   </div>
                 </div>
               </article>
             ))}
           </div>
         </div>
-        <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
+        {canManageFacilities ? <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">Global policy</h2>
           <form action={updateCancellationSettingAction} className="mt-4 space-y-4">
             <label className="flex items-center gap-3 text-sm text-stone-300">
@@ -80,7 +87,7 @@ export default async function AdminPage() {
           <div className="mt-6 rounded-2xl border border-white/10 bg-stone-950/40 p-4 text-sm text-stone-300">
             Use the calendar, facilities, customer, and reporting sections to manage daily operations.
           </div>
-        </div>
+        </div> : null}
       </section>
     </main>
   );

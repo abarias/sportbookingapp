@@ -41,9 +41,9 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
   const dateLabel = formatDateLabel(dateKey, facility.timezone);
 
   return (
-    <main className="space-y-8 pb-16">
-      <section className="grid gap-6 lg:grid-cols-[1.28fr_0.72fr]">
-        <section className="space-y-5 lg:order-1">
+    <main className="min-w-0 space-y-8 pb-16">
+      <section className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.28fr)_minmax(0,0.72fr)]">
+        <section className="min-w-0 space-y-5 lg:order-1">
           <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-[0.24em] text-amber-300">{getFacilityTypeLabel(facility.type)}</p>
             <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -80,7 +80,7 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
           <RateCard rows={pricingView.rateCard} />
         </section>
 
-        <aside className="space-y-4 lg:order-2 lg:sticky lg:top-6 lg:self-start">
+        <aside className="min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-6 lg:self-start">
           <details className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 lg:hidden">
             <summary className="cursor-pointer list-none p-5 text-sm font-medium text-white">
               View facility photos, pricing, and rules

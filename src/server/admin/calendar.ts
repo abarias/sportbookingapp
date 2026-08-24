@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus, type Facility, type FacilityOperatingHour } from "@prisma/client";
+import { BookingStatus, PaymentStatus, Prisma, type Facility, type FacilityOperatingHour } from "@prisma/client";
 import { addDays, subDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
@@ -19,7 +19,7 @@ type CalendarBooking = {
   timezone: string;
   user: {
     fullName: string;
-    email: string;
+    email: string | null;
   };
 };
 
@@ -241,6 +241,7 @@ function buildFacilityDaySchedule(args: {
 export async function getAdminCalendarData(params: {
   month?: string;
   date?: string;
+  fullCustomerAccess?: boolean;
 }) : Promise<AdminCalendarPageData> {
   const timezone = getTimezone();
   const monthKey = normalizeMonthKey(params.month, timezone);
@@ -250,7 +251,20 @@ export async function getAdminCalendarData(params: {
   const gridStartUtc = fromZonedTime(`${gridStartKey}T00:00:00`, timezone);
   const gridEndExclusiveUtc = fromZonedTime(`${formatInTimeZone(addDays(fromZonedTime(`${gridEndKey}T12:00:00`, timezone), 1), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
 
-  const [facilities, bookings, blockedSchedules] = await Promise.all([
+  const bookingWhere: Prisma.BookingWhereInput = {
+    OR: [
+      { status: BookingStatus.CONFIRMED },
+      { status: BookingStatus.HELD, OR: [{ paymentHoldExpiresAt: { gt: new Date() }, payment: { status: PaymentStatus.AWAITING_PAYMENT } }, { payment: { status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED] } } }] },
+      { status: BookingStatus.PENDING_PAYMENT, paymentHoldExpiresAt: { gt: new Date() } }
+    ],
+    startAtUtc: { lt: gridEndExclusiveUtc },
+    endAtUtc: { gt: gridStartUtc }
+  };
+  const bookingQuery = params.fullCustomerAccess
+    ? prisma.booking.findMany({ where: bookingWhere, orderBy: { startAtUtc: "asc" }, include: { user: { select: { fullName: true, email: true } } } })
+    : prisma.booking.findMany({ where: bookingWhere, orderBy: { startAtUtc: "asc" }, include: { user: { select: { fullName: true } } } });
+
+  const [facilities, rawBookings, blockedSchedules] = await Promise.all([
     prisma.facility.findMany({
       orderBy: [{ type: "asc" }, { name: "asc" }],
       include: {
@@ -259,46 +273,7 @@ export async function getAdminCalendarData(params: {
         }
       }
     }),
-    prisma.booking.findMany({
-      where: {
-        OR: [
-          { status: BookingStatus.CONFIRMED },
-          {
-            status: BookingStatus.HELD,
-            OR: [
-              {
-                paymentHoldExpiresAt: { gt: new Date() },
-                payment: { status: PaymentStatus.AWAITING_PAYMENT }
-              },
-              {
-                payment: {
-                  status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED] }
-                }
-              }
-            ]
-          },
-          {
-            status: BookingStatus.PENDING_PAYMENT,
-            paymentHoldExpiresAt: { gt: new Date() }
-          }
-        ],
-        startAtUtc: {
-          lt: gridEndExclusiveUtc
-        },
-        endAtUtc: {
-          gt: gridStartUtc
-        }
-      },
-      orderBy: { startAtUtc: "asc" },
-      include: {
-        user: {
-          select: {
-            fullName: true,
-            email: true
-          }
-        }
-      }
-    }),
+    bookingQuery,
     prisma.blockedSchedule.findMany({
       where: {
         startAtUtc: {
@@ -311,6 +286,10 @@ export async function getAdminCalendarData(params: {
       orderBy: { startAtUtc: "asc" }
     })
   ]);
+  const bookings: CalendarBooking[] = rawBookings.map((booking) => ({
+    ...booking,
+    user: { fullName: booking.user.fullName, email: "email" in booking.user && typeof booking.user.email === "string" ? booking.user.email : null }
+  }));
 
   const days = dateKeys.map((dateKey) => {
     const schedules = facilities.map((facility) =>

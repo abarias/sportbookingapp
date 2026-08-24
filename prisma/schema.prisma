@@ -70,6 +70,7 @@ model User {
   emailVerifiedAt         DateTime?
   phoneVerifiedAt         DateTime?
   role                    UserRole                 @default(CUSTOMER)
+  adminAccessActive       Boolean                  @default(false)
   bookings                Booking[]
   createdBlocks           BlockedSchedule[]        @relation("BlockedScheduleCreator")
   verifiedPayments        Payment[]                @relation("PaymentVerifier")
@@ -80,12 +81,97 @@ model User {
   updatedPricingRules     PricingRule[]            @relation("PricingRuleUpdater")
   createdHolidays         Holiday[]                @relation("HolidayCreator")
   updatedHolidays         Holiday[]                @relation("HolidayUpdater")
+  roleAssignments         UserRoleAssignment[]     @relation("AssignedUserRoles")
+  assignedRoleAssignments UserRoleAssignment[]     @relation("UserRoleAssigner")
+  createdRoles            Role[]                   @relation("RoleCreator")
+  updatedRoles            Role[]                   @relation("RoleUpdater")
+  assignedRolePermissions RolePermission[]         @relation("RolePermissionAssigner")
+  auditLogs               AuditLog[]               @relation("AuditActor")
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 
   @@index([role])
   @@index([phone])
   @@index([emailVerifiedAt])
+}
+
+model Role {
+  id              String               @id @default(cuid())
+  systemKey       String?              @unique
+  name            String               @unique
+  description     String
+  isSystem        Boolean              @default(false)
+  isProtected     Boolean              @default(false)
+  isActive        Boolean              @default(true)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  createdBy       User?                @relation("RoleCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy       User?                @relation("RoleUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  permissions     RolePermission[]
+  users           UserRoleAssignment[]
+
+  @@index([isActive])
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  displayName String
+  description String
+  category    String
+  riskLevel   String           @default("STANDARD")
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+
+  @@index([category, isActive])
+}
+
+model RolePermission {
+  roleId           String
+  permissionId     String
+  assignedByUserId String?
+  assignedAt       DateTime   @default(now())
+  role             Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission       Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  assignedBy       User?      @relation("RolePermissionAssigner", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model UserRoleAssignment {
+  userId           String
+  roleId           String
+  assignedByUserId String?
+  assignedAt       DateTime @default(now())
+  user             User     @relation("AssignedUserRoles", fields: [userId], references: [id], onDelete: Cascade)
+  role             Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedBy       User?    @relation("UserRoleAssigner", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@index([assignedByUserId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  before      Json?
+  after       Json?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId, createdAt])
 }
 
 model Facility {

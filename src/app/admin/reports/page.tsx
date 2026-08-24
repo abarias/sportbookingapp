@@ -3,14 +3,14 @@ import { formatInTimeZone } from "date-fns-tz";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { DashboardStat } from "@/components/shared/dashboard-stat";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { getAdminReportsData } from "@/server/admin/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminReportsPage() {
-  await requireAdminSession();
+  await requirePermission("reports.view");
   const { bookings, facilities, reportStart } = await getAdminReportsData();
 
   const confirmedBookings = bookings.filter((booking) => booking.status === "CONFIRMED");

@@ -8,7 +8,7 @@ import { PricingRuleEditor } from "@/components/admin/pricing-rule-editor";
 import { RateCard } from "@/components/pricing/rate-card";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { formatCurrency } from "@/lib/formatting/currency";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { getTodayDateKey, minutesToTimeLabel } from "@/lib/time/slots";
 import { analyzePricingRules, deriveRateCard } from "@/server/pricing/engine";
 import { getPricingAdminData } from "@/server/pricing/queries";
@@ -27,8 +27,9 @@ function parseTime(value: string | undefined, isEnd = false, fallback = isEnd ? 
 }
 
 export default async function AdminPricingPage({ searchParams }: { searchParams: Promise<{ facilityId?: string; date?: string; start?: string; end?: string; duration?: string; ruleId?: string }> }) {
-  await requireAdminSession();
+  const authorization = await requirePermission("pricing.view");
   const params = await searchParams;
+  const canManagePricing = authorization.permissions.has("pricing.manage");
   const dateKey = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : getTodayDateKey("Asia/Manila");
   const startMinutes = parseTime(params.start);
   const endMinutes = parseTime(params.end, true, Math.min(startMinutes + 60, 1440));
@@ -46,7 +47,7 @@ export default async function AdminPricingPage({ searchParams }: { searchParams:
   }
 
   const editableRules = selectedFacility.pricingRules.filter((rule) => rule.dayType !== PricingDayType.DEFAULT);
-  const selectedRule = editableRules.find((rule) => rule.id === params.ruleId) ?? null;
+  const selectedRule = canManagePricing ? editableRules.find((rule) => rule.id === params.ruleId) ?? null : null;
   const diagnostics = analyzePricingRules(selectedFacility.pricingRules);
   const rateCard = deriveRateCard(selectedFacility.pricingRules);
   const defaultRule = selectedFacility.pricingRules.find((rule) => rule.dayType === PricingDayType.DEFAULT && rule.isActive);
@@ -80,7 +81,7 @@ export default async function AdminPricingPage({ searchParams }: { searchParams:
               <h2 className="mt-2 text-xl font-semibold text-white">Schedule overrides</h2>
               <p className="mt-1 text-sm text-stone-400">Select a rule to edit its rate and schedule.</p>
             </div>
-            <Link className="shrink-0 rounded-full bg-amber-300 px-3 py-2 text-xs font-semibold text-stone-950" href={`/admin/pricing?facilityId=${selectedFacility.id}&date=${dateKey}`}>New rule</Link>
+            {canManagePricing ? <Link className="shrink-0 rounded-full bg-amber-300 px-3 py-2 text-xs font-semibold text-stone-950" href={`/admin/pricing?facilityId=${selectedFacility.id}&date=${dateKey}`}>New rule</Link> : null}
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
@@ -96,7 +97,7 @@ export default async function AdminPricingPage({ searchParams }: { searchParams:
               return (
                 <Link
                   key={rule.id}
-                  href={`/admin/pricing?facilityId=${selectedFacility.id}&date=${dateKey}&ruleId=${rule.id}`}
+                  href={canManagePricing ? `/admin/pricing?facilityId=${selectedFacility.id}&date=${dateKey}&ruleId=${rule.id}` : `/admin/pricing?facilityId=${selectedFacility.id}&date=${dateKey}`}
                   className={`block rounded-2xl border p-4 transition ${isSelected ? "border-amber-300/70 bg-amber-300/10 shadow-[0_0_0_1px_rgba(252,211,77,0.2)]" : "border-white/10 bg-stone-950/40 hover:border-white/25"}`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -112,8 +113,7 @@ export default async function AdminPricingPage({ searchParams }: { searchParams:
 
           </section>
 
-          <PricingRuleEditor key={`${selectedFacility.id}-${selectedRule?.id ?? "new"}`} facilityId={selectedFacility.id} rule={selectedRule} />
-          <CopyPricingScheduleForm sourceFacilityId={selectedFacility.id} facilities={facilities.map(({ id, name }) => ({ id, name }))} />
+          {canManagePricing ? <><PricingRuleEditor key={`${selectedFacility.id}-${selectedRule?.id ?? "new"}`} facilityId={selectedFacility.id} rule={selectedRule} /><CopyPricingScheduleForm sourceFacilityId={selectedFacility.id} facilities={facilities.map(({ id, name }) => ({ id, name }))} /></> : null}
 
           <section className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
             <h2 className="text-lg font-semibold text-white">Configuration checks</h2>

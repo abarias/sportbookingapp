@@ -2,7 +2,7 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { BookingDateSelector } from "@/components/bookings/booking-date-selector";
 import { WalkInBookingForm } from "@/components/admin/walk-in-booking-form";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatDateLabel } from "@/lib/time/slots";
 import { getBookingWindow } from "@/server/bookings/booking-window";
 import { normalizeDateKeyWithinBookingWindow } from "@/server/bookings/booking-window";
@@ -17,7 +17,7 @@ type AdminWalkInsPageProps = {
 };
 
 export default async function AdminWalkInsPage({ searchParams }: AdminWalkInsPageProps) {
-  await requireAdminSession();
+  await requirePermission("bookings.create");
   const requestedDate = (await searchParams).date;
   const facilities = await prisma.facility.findMany({
     where: { isEnabled: true },
