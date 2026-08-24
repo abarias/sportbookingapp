@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AdminDayDetail, AdminCalendarGrid } from "@/components/admin/admin-calendar-view";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatDateLabel } from "@/lib/time/slots";
 import { getAdminCalendarData } from "@/server/admin/calendar";
 
@@ -19,12 +19,13 @@ type AdminCalendarPageProps = {
 };
 
 export default async function AdminCalendarPage({ searchParams }: AdminCalendarPageProps) {
-  await requireAdminSession();
+  const authorization = await requirePermission("availability.view");
   const params = await searchParams;
   const view = params.view === "facility" ? "facility" : "schedule";
   const data = await getAdminCalendarData({
     month: params.month,
-    date: params.date
+    date: params.date,
+    fullCustomerAccess: authorization.permissions.has("customers.view_full")
   });
 
   return (

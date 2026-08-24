@@ -4,7 +4,8 @@ import { Prisma, PricingBillingMode, PricingDayType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { holidaySchema, pricingRuleSchema } from "@/features/pricing/schemas";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
+import { writeAuditLog } from "@/lib/audit/log";
 import { prisma } from "@/lib/db/prisma";
 import { analyzePricingRules } from "@/server/pricing/engine";
 
@@ -44,7 +45,7 @@ function revalidatePricing(facilitySlug?: string) {
 }
 
 export async function savePricingRuleAction(_state: PricingActionState, formData: FormData): Promise<PricingActionState> {
-  const session = await requireAdminSession();
+  const { session } = await requirePermission("pricing.manage");
   const dayType = String(formData.get("dayType") ?? "");
   const isAllDay = dayType === "WEEKEND" || dayType === "HOLIDAY";
   const parsed = pricingRuleSchema.safeParse({
@@ -124,13 +125,14 @@ export async function savePricingRuleAction(_state: PricingActionState, formData
   } else {
     await prisma.pricingRule.create({ data: candidate });
   }
+  await writeAuditLog(prisma, { actorUserId: session.user.id, action: parsed.data.ruleId ? "pricing.rule_updated" : "pricing.rule_created", entityType: "PricingRule", entityId: candidate.id, after: { facilityId: facility.id, name: candidate.name, dayType: candidate.dayType, amountMinor: candidate.amountMinor, isActive: candidate.isActive } });
 
   revalidatePricing(facility.slug);
   return { success: parsed.data.ruleId ? "Pricing rule updated." : "Pricing rule added." };
 }
 
 export async function togglePricingRuleAction(formData: FormData) {
-  const session = await requireAdminSession();
+  const { session } = await requirePermission("pricing.manage");
   const ruleId = String(formData.get("ruleId") ?? "");
   const rule = await prisma.pricingRule.findFirst({ where: { id: ruleId, dayType: { not: PricingDayType.DEFAULT } }, include: { facility: true } });
   if (!rule) throw new Error("Pricing rule not found.");
@@ -140,11 +142,12 @@ export async function togglePricingRuleAction(formData: FormData) {
     if (blockingDiagnostic) throw new Error(blockingDiagnostic.message);
   }
   await prisma.pricingRule.update({ where: { id: rule.id }, data: { isActive: !rule.isActive, updatedByUserId: session.user.id } });
+  await writeAuditLog(prisma, { actorUserId: session.user.id, action: "pricing.rule_status_changed", entityType: "PricingRule", entityId: rule.id, before: { isActive: rule.isActive }, after: { isActive: !rule.isActive } });
   revalidatePricing(rule.facility.slug);
 }
 
 export async function deletePricingRuleAction(formData: FormData) {
-  await requireAdminSession();
+  const { session } = await requirePermission("pricing.manage");
   const ruleId = String(formData.get("ruleId") ?? "");
   const rule = await prisma.pricingRule.findFirst({
     where: { id: ruleId, dayType: { not: PricingDayType.DEFAULT } },
@@ -152,15 +155,16 @@ export async function deletePricingRuleAction(formData: FormData) {
   });
   if (!rule) throw new Error("Pricing rule not found.");
 
-  await prisma.pricingRule.delete({
-    where: { id: rule.id }
+  await prisma.$transaction(async (tx) => {
+    await writeAuditLog(tx, { actorUserId: session.user.id, action: "pricing.rule_deleted", entityType: "PricingRule", entityId: rule.id, before: { facilityId: rule.facilityId, name: rule.name, amountMinor: rule.amountMinor } });
+    await tx.pricingRule.delete({ where: { id: rule.id } });
   });
 
   revalidatePricing(rule.facility.slug);
 }
 
 export async function saveHolidayAction(_state: PricingActionState, formData: FormData): Promise<PricingActionState> {
-  const session = await requireAdminSession();
+  const { session } = await requirePermission("holidays.manage");
   const parsed = holidaySchema.safeParse({
     holidayId: String(formData.get("holidayId") ?? "") || undefined,
     facilityId: String(formData.get("facilityId") ?? ""),
@@ -178,6 +182,7 @@ export async function saveHolidayAction(_state: PricingActionState, formData: Fo
     updatedByUserId: session.user.id
   };
 
+  let savedHolidayId = parsed.data.holidayId ?? null;
   try {
     const duplicate = await prisma.holiday.findFirst({
       where: {
@@ -193,7 +198,8 @@ export async function saveHolidayAction(_state: PricingActionState, formData: Fo
     if (parsed.data.holidayId) {
       await prisma.holiday.update({ where: { id: parsed.data.holidayId }, data });
     } else {
-      await prisma.holiday.create({ data: { ...data, createdByUserId: session.user.id } });
+      const holiday = await prisma.holiday.create({ data: { ...data, createdByUserId: session.user.id }, select: { id: true } });
+      savedHolidayId = holiday.id;
     }
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return { error: "That holiday is already configured for this facility." };
@@ -201,20 +207,22 @@ export async function saveHolidayAction(_state: PricingActionState, formData: Fo
   }
 
   revalidatePricing();
+  await writeAuditLog(prisma, { actorUserId: session.user.id, action: parsed.data.holidayId ? "holiday.updated" : "holiday.created", entityType: "Holiday", entityId: savedHolidayId, after: { name: data.name, date: data.date.toISOString(), facilityId: data.facilityId, isActive: data.isActive } });
   return { success: parsed.data.holidayId ? "Holiday updated." : "Holiday added." };
 }
 
 export async function toggleHolidayAction(formData: FormData) {
-  const session = await requireAdminSession();
+  const { session } = await requirePermission("holidays.manage");
   const holidayId = String(formData.get("holidayId") ?? "");
   const holiday = await prisma.holiday.findUnique({ where: { id: holidayId } });
   if (!holiday) throw new Error("Holiday not found.");
   await prisma.holiday.update({ where: { id: holiday.id }, data: { isActive: !holiday.isActive, updatedByUserId: session.user.id } });
+  await writeAuditLog(prisma, { actorUserId: session.user.id, action: "holiday.status_changed", entityType: "Holiday", entityId: holiday.id, before: { isActive: holiday.isActive }, after: { isActive: !holiday.isActive } });
   revalidatePricing();
 }
 
 export async function copyPricingScheduleAction(_state: PricingActionState, formData: FormData): Promise<PricingActionState> {
-  const session = await requireAdminSession();
+  const { session } = await requirePermission("pricing.manage");
   const sourceFacilityId = String(formData.get("sourceFacilityId") ?? "");
   const targetFacilityId = String(formData.get("targetFacilityId") ?? "");
   if (!sourceFacilityId || !targetFacilityId || sourceFacilityId === targetFacilityId) return { error: "Choose a different target facility." };
@@ -254,6 +262,7 @@ export async function copyPricingScheduleAction(_state: PricingActionState, form
         }))
       });
     }
+    await writeAuditLog(tx, { actorUserId: session.user.id, action: "pricing.schedule_copied", entityType: "Facility", entityId: target.id, metadata: { sourceFacilityId: source.id, ruleCount: source.pricingRules.length } });
   });
 
   revalidatePricing(target.slug);

@@ -7,7 +7,7 @@ import { PaymentQueuePagination } from "@/components/admin/payment-queue-paginat
 import { PaymentQueueTable, type PaymentQueueRow } from "@/components/admin/payment-queue-table";
 import { DashboardStat } from "@/components/shared/dashboard-stat";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { formatDateTimeRange } from "@/lib/time/slots";
 import { getAdminPaymentQueueData } from "@/server/admin/queries";
@@ -68,7 +68,7 @@ function parsePageSize(value: string | undefined) {
 }
 
 export default async function AdminPaymentsPage({ searchParams }: AdminPaymentsPageProps) {
-  await requireAdminSession();
+  await requirePermission("payments.view");
   const params = await searchParams;
   const page = parsePositiveInteger(params.page, 1);
   const pageSize = parsePageSize(params.pageSize);

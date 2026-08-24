@@ -17,7 +17,7 @@ const facilityTypeLabels: Record<FacilityListItem["type"], string> = {
   OTHER: "Other facility"
 };
 
-export function FacilityList({ facilities, selectedFacilityId }: { facilities: FacilityListItem[]; selectedFacilityId?: string }) {
+export function FacilityList({ facilities, selectedFacilityId, canCreate = false }: { facilities: FacilityListItem[]; selectedFacilityId?: string; canCreate?: boolean }) {
   return (
     <aside className="rounded-[1.75rem] border border-white/10 bg-white/5 p-3">
       <div className="flex items-center justify-between gap-3 px-3 py-2">
@@ -25,9 +25,7 @@ export function FacilityList({ facilities, selectedFacilityId }: { facilities: F
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Facilities</p>
           <p className="mt-1 text-sm text-stone-400">{facilities.length} bookable spaces</p>
         </div>
-        <Link className="rounded-full bg-amber-300 px-3 py-2 text-xs font-semibold text-stone-950 transition hover:bg-amber-200" href="/admin/facilities?new=1">
-          Add facility
-        </Link>
+        {canCreate ? <Link className="rounded-full bg-amber-300 px-3 py-2 text-xs font-semibold text-stone-950 transition hover:bg-amber-200" href="/admin/facilities?new=1">Add facility</Link> : null}
       </div>
       <div className="mt-2 space-y-2">
         {facilities.length === 0 ? <p className="px-3 py-6 text-sm text-stone-400">No facilities yet.</p> : null}

@@ -39,6 +39,13 @@ const authConfig: NextAuthConfig = {
           return null;
         }
 
+        if (user.role === "ADMIN") {
+          const activeRoleCount = await prisma.userRoleAssignment.count({
+            where: { userId: user.id, role: { isActive: true, permissions: { some: { permission: { isActive: true } } } } }
+          });
+          if (!user.adminAccessActive || activeRoleCount === 0) return null;
+        }
+
         const isValid = await verifyPassword(parsed.data.password, user.passwordHash);
 
         if (!isValid) {

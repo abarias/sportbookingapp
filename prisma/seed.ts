@@ -182,6 +182,15 @@ async function main() {
     role: UserRole.ADMIN
   });
 
+  await prisma.user.update({ where: { id: admin.id }, data: { adminAccessActive: true } });
+  const superAdminRole = await prisma.role.findUnique({ where: { systemKey: "SUPER_ADMIN" }, select: { id: true } });
+  if (!superAdminRole) throw new Error("RBAC migration is not deployed: Super Admin role is missing.");
+  await prisma.userRoleAssignment.upsert({
+    where: { userId_roleId: { userId: admin.id, roleId: superAdminRole.id } },
+    update: {},
+    create: { userId: admin.id, roleId: superAdminRole.id, assignedByUserId: admin.id }
+  });
+
   const customer = await upsertUser({
     email: customerEmail,
     password: customerPassword,

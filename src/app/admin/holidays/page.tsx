@@ -4,13 +4,13 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { HolidayEditor } from "@/components/admin/holiday-editor";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { toggleHolidayAction } from "@/features/pricing/actions";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHolidaysPage({ searchParams }: { searchParams: Promise<{ holidayId?: string }> }) {
-  await requireAdminSession();
+  await requirePermission("holidays.manage");
   const params = await searchParams;
   const [facilities, holidays] = await Promise.all([
     prisma.facility.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),

@@ -19,6 +19,7 @@ Current MVP feature set:
 - Facility creation and editing with multiple image URLs or uploaded image files
 - Rule-based facility pricing by weekday, weekend, selected day, holiday, time range, and effective date
 - Generated public VAT-exclusive rate cards and immutable booking price snapshots
+- Configurable administrative roles with permission-based navigation, server authorization, protected Super Admin recovery, and audit logging
 - Booking window rules limiting customers to the current/next month, with next-two-month visibility opening on the last Monday of the month
 - Basic automated coverage for availability, cancellation policy, and blocked schedule validation
 
@@ -104,9 +105,22 @@ ADMIN_BOOTSTRAP_PHONE="+639171234567" \
 npm run admin:bootstrap
 ```
 
-The bootstrap script never prints the password. It marks the admin email as verified and marks the phone as verified only when a phone number is provided.
+The bootstrap script never prints the password. It marks the admin email as verified, marks the phone as verified only when a phone number is provided, activates administrative access, and assigns the protected Super Admin role. Apply all database migrations before running it.
 
 ## Feature Notes
+
+### Administrative Roles And Permissions
+
+Administrative access is derived from active role assignments rather than editable role names. The initial templates are Super Admin, Receptionist, Booking Admin, and Social Media Person.
+
+- `/admin/roles` manages role definitions, permission assignments, cloning, activation, and safe deletion.
+- `/admin/admin-users` assigns one or more active roles to an existing user account and previews the resulting permission union.
+- `/admin/audit-logs` shows recent role, access, facility, pricing, payment, and security events.
+- The protected Super Admin role cannot be deleted, deactivated, or stripped of permissions. Database triggers also prevent removal or deactivation of the last active Super Admin.
+- Permission checks query the database on every protected request. Role changes therefore take effect on the next request without a permission cache flush.
+- `User.role=ADMIN` remains temporarily as an account-type compatibility flag; it does not grant application capabilities without active RBAC assignments.
+
+The RBAC migration enables deny-by-default RLS and revokes direct `anon`/`authenticated` access on RBAC and audit tables when those Supabase roles exist. Prisma must connect with the trusted server-side database role. Do not expose `DATABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY` to browser code.
 
 ### Facility Management
 

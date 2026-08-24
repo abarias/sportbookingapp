@@ -214,7 +214,7 @@ export function BookingPanel({
   return (
     <form
       action={action}
-      className="overflow-hidden rounded-[2rem] border border-amber-300/25 bg-stone-950/70 shadow-[0_24px_90px_rgba(251,191,36,0.10)]"
+      className="w-full max-w-full min-w-0 overflow-hidden rounded-[2rem] border border-amber-300/25 bg-stone-950/70 shadow-[0_24px_90px_rgba(251,191,36,0.10)]"
       onSubmit={(event) => {
         if (!window.confirm(confirmationMessage)) {
           event.preventDefault();
@@ -245,7 +245,7 @@ export function BookingPanel({
       </div>
 
       <div className="space-y-5 p-5 sm:p-6">
-        <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-stone-400">
+        <div className="flex min-w-0 flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-stone-400">
           <span className="rounded-full bg-emerald-400/25 px-3 py-1 text-emerald-100">Available</span>
           <span className="rounded-full bg-amber-300 px-3 py-1 text-stone-950">Selected</span>
           <span className="rounded-full bg-rose-400/25 px-3 py-1 text-rose-100">Booked</span>

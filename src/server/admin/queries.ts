@@ -19,20 +19,31 @@ export async function getCancellationWindowHoursSetting() {
   return typeof setting?.value === "number" ? setting.value : 24;
 }
 
-export async function getAdminOverviewData() {
+export async function getAdminOverviewData(options: { fullCustomerAccess: boolean; includeFinancials: boolean; includePaymentDetails: boolean }) {
+  const recentBookingQuery = options.fullCustomerAccess
+    ? prisma.booking.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: {
+          facility: { select: { name: true } },
+          user: { select: { fullName: true, email: true } },
+          payment: { select: { status: true, provider: true } }
+        }
+      })
+    : prisma.booking.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: {
+          facility: { select: { name: true } },
+          user: { select: { fullName: true } },
+          payment: { select: { status: true } }
+        }
+      });
   const [recentBookings, paidPayments, enabledFacilities, cancellationEnabled, cancellationWindowHours] = await Promise.all([
-    prisma.booking.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      include: {
-        facility: { select: { name: true } },
-        user: { select: { fullName: true, email: true } },
-        payment: { select: { status: true, provider: true } }
-      }
-    }),
-    prisma.payment.findMany({
+    recentBookingQuery,
+    options.includeFinancials ? prisma.payment.findMany({
       where: { status: { in: [PaymentStatus.PAID, PaymentStatus.VERIFIED] } }
-    }),
+    }) : Promise.resolve([]),
     prisma.facility.count({
       where: { isEnabled: true }
     }),
@@ -57,7 +68,17 @@ export async function getAdminOverviewData() {
       paidRevenueMinor,
       enabledFacilities
     },
-    recentBookings,
+    recentBookings: recentBookings.map((booking) => ({
+      id: booking.id,
+      status: booking.status,
+      facility: booking.facility,
+      customerName: booking.user.fullName,
+      customerContact: "email" in booking.user ? booking.user.email : null,
+      payment: booking.payment ? {
+        status: booking.payment.status,
+        provider: options.includePaymentDetails && "provider" in booking.payment ? String(booking.payment.provider) : null
+      } : null
+    })),
     cancellationEnabled,
     cancellationWindowHours
   };

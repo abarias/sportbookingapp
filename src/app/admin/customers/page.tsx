@@ -1,14 +1,14 @@
 import { AdminNav } from "@/components/admin/admin-nav";
 import { BookingStatusBadge } from "@/components/admin/booking-status-badge";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatDateTimeRange } from "@/lib/time/slots";
 import { getAdminCustomersData } from "@/server/admin/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCustomersPage() {
-  await requireAdminSession();
+  await requirePermission("customers.view_full");
   const customers = await getAdminCustomersData();
 
   return (
