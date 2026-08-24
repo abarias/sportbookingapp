@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus } from "@prisma/client";
+import { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { subDays } from "date-fns";
 
 import { prisma } from "@/lib/db/prisma";
@@ -172,22 +172,86 @@ export async function getAdminFacilitiesData() {
   };
 }
 
-export async function getAdminCustomersData() {
-  const customers = await prisma.user.findMany({
-    where: { role: "CUSTOMER" },
-    orderBy: { createdAt: "desc" },
-    include: {
+type AdminCustomersOptions = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  selectedCustomerId?: string;
+  bookingPage: number;
+  bookingPageSize: number;
+};
+
+export async function getAdminCustomersData(options: AdminCustomersOptions) {
+  const search = options.search?.trim() ?? "";
+  const where: Prisma.UserWhereInput = {
+    role: "CUSTOMER",
+    ...(search ? {
+      OR: [
+        { fullName: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } }
+      ]
+    } : {})
+  };
+
+  const selectedCustomerQuery = options.selectedCustomerId ? prisma.user.findFirst({
+    where: { id: options.selectedCustomerId, role: "CUSTOMER" },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phone: true,
+      createdAt: true,
+      _count: { select: { bookings: true } },
       bookings: {
-        orderBy: { startAtUtc: "desc" },
+        orderBy: [{ startAtUtc: "desc" }, { createdAt: "desc" }],
+        skip: (options.bookingPage - 1) * options.bookingPageSize,
+        take: options.bookingPageSize,
         include: {
-          facility: { select: { name: true } },
-          payment: { select: { status: true, provider: true } }
+          facility: { select: { name: true, timezone: true } },
+          payment: {
+            select: {
+              provider: true,
+              providerReference: true,
+              method: true,
+              externalReference: true,
+              amountMinor: true,
+              amountPaidMinor: true,
+              currency: true,
+              status: true,
+              proofImageUrl: true,
+              submittedAt: true,
+              paidAt: true,
+              verifiedAt: true,
+              reviewNote: true
+            }
+          }
         }
       }
     }
-  });
+  }) : Promise.resolve(null);
 
-  return customers;
+  const [customers, totalCount, selectedCustomer] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: [{ fullName: "asc" }, { createdAt: "desc" }],
+      skip: (options.page - 1) * options.pageSize,
+      take: options.pageSize,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        createdAt: true,
+        _count: { select: { bookings: true } }
+      }
+    }),
+    prisma.user.count({ where }),
+    selectedCustomerQuery
+  ]);
+
+  const selectedBookingCount = selectedCustomer?._count.bookings ?? 0;
+  return { customers, totalCount, selectedCustomer, selectedBookingCount };
 }
 
 export async function getAdminReportsData() {

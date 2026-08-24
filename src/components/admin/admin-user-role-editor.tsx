@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { saveAdminUserRolesAction, type RbacActionState } from "@/features/rbac/actions";
 import { Button } from "@/components/ui/button";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 
 type RoleOption = { id: string; name: string; description: string; isProtected: boolean; permissions: Array<{ permission: { key: string; displayName: string; category: string } }> };
 type UserAccess = {
@@ -23,7 +24,7 @@ function SaveButton() {
   return <Button disabled={pending} type="submit">{pending ? "Saving..." : "Save administrative access"}</Button>;
 }
 
-export function AdminUserRoleEditor({ user, roles, effectivePermissions, accessHistory, isCurrentUser }: { user: UserAccess; roles: RoleOption[]; effectivePermissions: PermissionProvenance[]; accessHistory: AccessHistory[]; isCurrentUser: boolean }) {
+export function AdminUserRoleEditor({ user, roles, effectivePermissions, accessHistory, accessHistoryTotalCount, accessHistoryPage, accessHistoryPageSize, isCurrentUser }: { user: UserAccess; roles: RoleOption[]; effectivePermissions: PermissionProvenance[]; accessHistory: AccessHistory[]; accessHistoryTotalCount: number; accessHistoryPage: number; accessHistoryPageSize: number; isCurrentUser: boolean }) {
   const router = useRouter();
   const [state, action] = useActionState(saveAdminUserRolesAction, {} as RbacActionState);
   const assignedRoleIds = new Set(user.roleAssignments.map((assignment) => assignment.roleId));
@@ -90,6 +91,7 @@ export function AdminUserRoleEditor({ user, roles, effectivePermissions, accessH
         <div className="mt-4 space-y-2 text-sm text-stone-300">
           {accessHistory.length ? accessHistory.map((entry) => <div key={entry.id} className="rounded-2xl border border-white/10 bg-stone-950/40 p-3"><p className="font-medium capitalize text-white">{entry.action.replaceAll("_", " ")}</p><p className="mt-1 text-xs text-stone-500">{new Date(entry.createdAt).toLocaleString()} · {entry.actor?.fullName ?? "System"}</p><p className="mt-2 text-sm leading-6 text-stone-300">{entry.details}</p></div>) : user.roleAssignments.length ? user.roleAssignments.map((assignment) => <p key={assignment.roleId}>{assignment.role.name} assigned {new Date(assignment.assignedAt).toLocaleString()} by {assignment.assignedBy?.fullName ?? "system migration"}</p>) : <p className="text-stone-400">No role-assignment history.</p>}
         </div>
+        {accessHistoryTotalCount > 0 ? <AdminPagination basePath="/admin/admin-users" page={accessHistoryPage} pageSize={accessHistoryPageSize} totalCount={accessHistoryTotalCount} pageParam="historyPage" pageSizeParam="historyPageSize" /> : null}
       </section>
     </div>
   );

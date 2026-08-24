@@ -22,17 +22,23 @@ function parsePageSize(value: string | undefined) {
   return PAGE_SIZE_OPTIONS.includes(parsed as (typeof PAGE_SIZE_OPTIONS)[number]) ? parsed : PAGE_SIZE_OPTIONS[0];
 }
 
-export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ userId?: string; search?: string; page?: string; pageSize?: string }> }) {
+export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ userId?: string; search?: string; page?: string; pageSize?: string; historyPage?: string; historyPageSize?: string }> }) {
   const authorization = await requirePermission("admin_users.view");
   const params = await searchParams;
   const page = parsePositiveInteger(params.page, 1);
   const pageSize = parsePageSize(params.pageSize);
+  const historyPage = parsePositiveInteger(params.historyPage, 1);
+  const historyPageSize = parsePageSize(params.historyPageSize);
   const search = params.search?.trim() ?? "";
   const { users, roles, totalCount } = await getAdminUserManagementData({ includeCustomerCandidates: authorization.permissions.has("customers.view_full"), page, pageSize, search });
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   if (page > totalPages) redirect(`/admin/admin-users?page=${totalPages}&pageSize=${pageSize}${search ? `&search=${encodeURIComponent(search)}` : ""}`);
   const selectedUser = users.find((user) => user.id === params.userId) ?? users.find((user) => user.role === "ADMIN") ?? users[0];
-  const accessHistory = selectedUser ? await getAdminUserAccessHistory(selectedUser.id) : [];
+  const accessHistoryData = selectedUser ? await getAdminUserAccessHistory(selectedUser.id, { page: historyPage, pageSize: historyPageSize }) : { logs: [], totalCount: 0 };
+  const accessHistoryTotalPages = Math.max(1, Math.ceil(accessHistoryData.totalCount / historyPageSize));
+  if (selectedUser && historyPage > accessHistoryTotalPages) {
+    redirect(`/admin/admin-users?userId=${selectedUser.id}&historyPage=${accessHistoryTotalPages}&historyPageSize=${historyPageSize}&page=${page}&pageSize=${pageSize}${search ? `&search=${encodeURIComponent(search)}` : ""}`);
+  }
 
   return (
     <main className="space-y-8 pb-16">
@@ -54,9 +60,9 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
               </Link>
             ))}
           </div>
-          <AdminPagination basePath="/admin/admin-users" page={page} pageSize={pageSize} totalCount={totalCount} />
+          <AdminPagination basePath="/admin/admin-users" page={page} pageSize={pageSize} totalCount={totalCount} compact />
         </aside>
-        {selectedUser ? <AdminUserRoleEditor key={selectedUser.id} user={selectedUser} roles={roles} effectivePermissions={effectivePermissionProvenance(selectedUser)} accessHistory={accessHistory} isCurrentUser={selectedUser.id === authorization.session.user.id} /> : <p className="text-stone-400">No user accounts found.</p>}
+        {selectedUser ? <AdminUserRoleEditor key={selectedUser.id} user={selectedUser} roles={roles} effectivePermissions={effectivePermissionProvenance(selectedUser)} accessHistory={accessHistoryData.logs} accessHistoryTotalCount={accessHistoryData.totalCount} accessHistoryPage={historyPage} accessHistoryPageSize={historyPageSize} isCurrentUser={selectedUser.id === authorization.session.user.id} /> : <p className="text-stone-400">No user accounts found.</p>}
       </div>
     </main>
   );

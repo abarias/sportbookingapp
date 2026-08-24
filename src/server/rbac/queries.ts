@@ -187,12 +187,18 @@ export async function getAuditLogData(options: { page: number; pageSize: number;
   return { logs: logs.map((log) => ({ ...log, targetLabel: auditEntityLabel(log.entityType, log.entityId, references), details: auditDetails(log, references) })), totalCount };
 }
 
-export async function getAdminUserAccessHistory(userId: string) {
-  const [logs, references] = await Promise.all([prisma.auditLog.findMany({
-    where: { entityType: "User", entityId: userId, action: { startsWith: "admin_user." } },
-    take: 50,
-    orderBy: { createdAt: "desc" },
-    include: { actor: { select: { fullName: true } } }
-  }), getAuditReferenceMaps()]);
-  return logs.map((log) => ({ ...log, details: auditDetails(log, references) }));
+export async function getAdminUserAccessHistory(userId: string, options: { page: number; pageSize: number }) {
+  const where = { entityType: "User", entityId: userId, action: { startsWith: "admin_user." } } as const;
+  const [logs, totalCount, references] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      skip: (options.page - 1) * options.pageSize,
+      take: options.pageSize,
+      orderBy: { createdAt: "desc" },
+      include: { actor: { select: { fullName: true } } }
+    }),
+    prisma.auditLog.count({ where }),
+    getAuditReferenceMaps()
+  ]);
+  return { logs: logs.map((log) => ({ ...log, details: auditDetails(log, references) })), totalCount };
 }
