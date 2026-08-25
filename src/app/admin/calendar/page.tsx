@@ -68,6 +68,7 @@ export default async function AdminCalendarPage({ searchParams }: AdminCalendarP
       />
 
       <AdminDayDetail
+        canReschedule={authorization.permissions.has("bookings.reschedule")}
         dateKey={data.selectedDateKey}
         daySchedules={data.daySchedules}
         facilityId={params.facilityId}

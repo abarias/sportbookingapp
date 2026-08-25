@@ -136,6 +136,68 @@ export async function getAdminPaymentDetailData(paymentId: string) {
   });
 }
 
+export async function getAdminBookingDetailData(bookingId: string) {
+  return prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      user: { select: { id: true, fullName: true } },
+      facility: true,
+      payment: { include: { verifiedBy: { select: { fullName: true } } } },
+      reschedules: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          originalFacility: { select: { name: true } },
+          replacementFacility: { select: { name: true } },
+          initiatedBy: { select: { fullName: true } },
+          finalizedBy: { select: { fullName: true } },
+          resolvedBy: { select: { fullName: true } },
+          additionalPayment: { include: { verifiedBy: { select: { fullName: true } } } }
+        }
+      }
+    }
+  });
+}
+
+export async function getReschedulePaymentQueueData(options: { page: number; pageSize: number }) {
+  const where = { status: PaymentStatus.SUBMITTED } as const;
+  const [payments, totalCount] = await prisma.$transaction([
+    prisma.reschedulePayment.findMany({
+      where,
+      skip: (options.page - 1) * options.pageSize,
+      take: options.pageSize,
+      orderBy: { submittedAt: "asc" },
+      include: {
+        bookingReschedule: {
+          include: {
+            booking: { include: { user: { select: { fullName: true, email: true, phone: true } } } },
+            originalFacility: { select: { name: true } },
+            replacementFacility: { select: { name: true } }
+          }
+        }
+      }
+    }),
+    prisma.reschedulePayment.count({ where })
+  ]);
+  return { payments, totalCount };
+}
+
+export async function getAdminReschedulePaymentDetailData(paymentId: string) {
+  return prisma.reschedulePayment.findUnique({
+    where: { id: paymentId },
+    include: {
+      verifiedBy: { select: { fullName: true } },
+      bookingReschedule: {
+        include: {
+          booking: { include: { user: { select: { fullName: true, email: true, phone: true } } } },
+          originalFacility: { select: { name: true } },
+          replacementFacility: { select: { name: true } },
+          initiatedBy: { select: { fullName: true } }
+        }
+      }
+    }
+  });
+}
+
 export async function getAdminFacilitiesData() {
   const [facilities, blocks, cancellationEnabled] = await Promise.all([
     prisma.facility.findMany({
@@ -257,7 +319,7 @@ export async function getAdminCustomersData(options: AdminCustomersOptions) {
 export async function getAdminReportsData() {
   const reportStart = subDays(new Date(), 30);
 
-  const [bookings, facilities] = await Promise.all([
+  const [bookings, facilities, additionalPayments, reschedules] = await Promise.all([
     prisma.booking.findMany({
       where: {
         startAtUtc: {
@@ -278,12 +340,28 @@ export async function getAdminReportsData() {
       include: {
         operatingHours: true
       }
+    }),
+    prisma.reschedulePayment.findMany({
+      where: { status: PaymentStatus.VERIFIED, verifiedAt: { gte: reportStart } },
+      select: { amountMinor: true }
+    }),
+    prisma.bookingReschedule.findMany({
+      where: { createdAt: { gte: reportStart } },
+      orderBy: { createdAt: "desc" },
+      include: {
+        booking: { select: { id: true } },
+        originalFacility: { select: { name: true } },
+        replacementFacility: { select: { name: true } },
+        initiatedBy: { select: { fullName: true } }
+      }
     })
   ]);
 
   return {
     bookings,
     facilities,
+    additionalPayments,
+    reschedules,
     reportStart
   };
 }

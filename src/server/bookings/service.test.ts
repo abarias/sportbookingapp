@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   tx: {
+    $queryRaw: vi.fn(),
     appSetting: {
       findUnique: vi.fn()
     },
@@ -16,6 +17,9 @@ const mocks = vi.hoisted(() => ({
       create: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn()
+    },
+    bookingReschedule: {
+      findMany: vi.fn()
     },
     facility: {
       findUnique: vi.fn()
@@ -53,6 +57,8 @@ beforeEach(() => {
   delete process.env.AUTH_STRICT_ENV_VALIDATION;
   delete process.env.VERCEL_ENV;
   mocks.prisma.$transaction.mockImplementation((callback) => callback(mocks.tx));
+  mocks.tx.$queryRaw.mockResolvedValue([]);
+  mocks.tx.bookingReschedule.findMany.mockResolvedValue([]);
 });
 
 describe("createConfirmedBookingWithMockPayment idempotency", () => {

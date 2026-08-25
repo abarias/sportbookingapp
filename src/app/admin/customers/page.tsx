@@ -43,7 +43,7 @@ type AdminCustomersPageProps = {
 };
 
 export default async function AdminCustomersPage({ searchParams }: AdminCustomersPageProps) {
-  await requirePermission("customers.view_full");
+  const authorization = await requirePermission("customers.view_full");
   const params = await searchParams;
   const page = parsePositiveInteger(params.page, 1);
   const pageSize = parsePageSize(params.pageSize);
@@ -159,6 +159,7 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
                           </div>
                           <p className="mt-2 text-sm text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p>
                           <p className="mt-1 text-xs text-stone-500">Booking reference: {booking.payment?.providerReference ?? `BOOK-${booking.id.slice(0, 8).toUpperCase()}`}</p>
+                          {authorization.permissions.has("bookings.reschedule") ? <Link className="mt-2 inline-flex text-sm text-amber-200 hover:underline" href={`/admin/bookings/${booking.id}`}>View booking details</Link> : null}
                         </div>
                         <div className="text-left lg:text-right">
                           <p className="text-lg font-semibold text-white">{formatCurrency(booking.amountMinor, booking.currency as "PHP")}</p>

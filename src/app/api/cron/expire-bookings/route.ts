@@ -3,7 +3,9 @@ import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isStrictProductionEnvironment } from "@/lib/config/env";
+import { deliverPendingRescheduleNotifications } from "@/lib/notifications/rescheduling";
 import { expirePendingBookings } from "@/server/bookings/expiration";
+import { expirePendingReschedules } from "@/server/bookings/rescheduling";
 
 export const runtime = "nodejs";
 
@@ -36,11 +38,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await expirePendingBookings();
+  const [result, reschedules] = await Promise.all([
+    expirePendingBookings(),
+    expirePendingReschedules()
+  ]);
+  const notifications = await deliverPendingRescheduleNotifications();
 
   return NextResponse.json({
     ok: true,
     expiredBookingCount: result.expiredBookingCount,
-    expiredPaymentCount: result.expiredPaymentCount
+    expiredPaymentCount: result.expiredPaymentCount,
+    expiredRescheduleCount: reschedules.expiredCount,
+    notificationSentCount: notifications.sentCount,
+    notificationFailedCount: notifications.failedCount
   });
 }

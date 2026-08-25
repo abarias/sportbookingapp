@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus } from "@prisma/client";
+import { BookingRescheduleStatus, BookingStatus, PaymentStatus } from "@prisma/client";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { expirePendingBookings } from "@/server/bookings/expiration";
+import { expirePendingReschedules } from "@/server/bookings/rescheduling";
 import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellationWindowHours } from "@/server/bookings/policies";
 
 export const dynamic = "force-dynamic";
@@ -27,13 +28,35 @@ type CustomerBookingListRecord = Awaited<ReturnType<typeof prisma.booking.findMa
     status: PaymentStatus;
     reviewNote: string | null;
   } | null;
+  reschedules: Array<{
+    id: string;
+    status: BookingRescheduleStatus;
+    adjustmentStatus: string;
+    originalFacility: { name: string };
+    replacementFacility: { name: string };
+    originalStartAtUtc: Date;
+    originalEndAtUtc: Date;
+    originalTimezone: string;
+    replacementStartAtUtc: Date;
+    replacementEndAtUtc: Date;
+    replacementTimezone: string;
+    originalAmountMinor: number;
+    replacementAmountMinor: number;
+    priceDifferenceMinor: number;
+    additionalAmountDueMinor: number;
+    holdExpiresAt: Date | null;
+    reason: string;
+    customerNote: string | null;
+    createdAt: Date;
+    additionalPayment: { status: PaymentStatus; reviewNote: string | null } | null;
+  }>;
 };
 
 function needsCustomerPaymentAction(booking: CustomerBookingListRecord) {
   return (
     booking.status === BookingStatus.HELD &&
     (booking.payment?.status === PaymentStatus.AWAITING_PAYMENT || booking.payment?.status === PaymentStatus.ACTION_REQUIRED)
-  );
+  ) || booking.reschedules.some((reschedule) => reschedule.status === BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED);
 }
 
 function sortUpcomingBookings(left: CustomerBookingListRecord, right: CustomerBookingListRecord) {
@@ -86,7 +109,10 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   }
 
   const now = new Date();
-  await expirePendingBookings({ now });
+  await Promise.all([
+    expirePendingBookings({ now }),
+    expirePendingReschedules({ now })
+  ]);
   const historyPage = parsePositiveInteger(params.historyPage, 1);
   const historyPageSize = parseHistoryPageSize(params.historyPageSize);
   const historyWhere = {
@@ -110,6 +136,31 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
       select: {
         status: true,
         reviewNote: true
+      }
+    },
+    reschedules: {
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        adjustmentStatus: true,
+        originalFacility: { select: { name: true } },
+        replacementFacility: { select: { name: true } },
+        originalStartAtUtc: true,
+        originalEndAtUtc: true,
+        originalTimezone: true,
+        replacementStartAtUtc: true,
+        replacementEndAtUtc: true,
+        replacementTimezone: true,
+        originalAmountMinor: true,
+        replacementAmountMinor: true,
+        priceDifferenceMinor: true,
+        additionalAmountDueMinor: true,
+        holdExpiresAt: true,
+        reason: true,
+        customerNote: true,
+        createdAt: true,
+        additionalPayment: { select: { status: true, reviewNote: true } }
       }
     }
   } as const;
@@ -188,7 +239,10 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             timezone: booking.timezone,
             paymentHoldExpiresAt: booking.paymentHoldExpiresAt,
             paymentReviewNote: booking.payment?.reviewNote ?? null,
-            isCancellable: canCustomerCancelBooking({
+            isCancellable: !booking.reschedules.some((reschedule) =>
+              reschedule.status === BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED ||
+              reschedule.status === BookingRescheduleStatus.PAYMENT_SUBMITTED
+            ) && canCustomerCancelBooking({
               bookingStatus: booking.status,
               startAtUtc: booking.startAtUtc,
               createdAt: booking.createdAt,
@@ -198,7 +252,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
                 globalCancellationWindowHours,
                 booking.facility.cancellationWindowHoursOverride
               )
-            })
+            }),
+            reschedules: booking.reschedules
           }))}
           title="Upcoming"
         />
@@ -216,7 +271,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
             timezone: booking.timezone,
             paymentHoldExpiresAt: booking.paymentHoldExpiresAt,
             paymentReviewNote: booking.payment?.reviewNote ?? null,
-            isCancellable: false
+            isCancellable: false,
+            reschedules: booking.reschedules
           }))}
           title="History"
           footer={
