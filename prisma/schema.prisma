@@ -61,34 +61,79 @@ enum PricingDayType {
   SELECTED_DAYS
 }
 
+enum BookingRescheduleStatus {
+  ADDITIONAL_PAYMENT_REQUIRED
+  PAYMENT_SUBMITTED
+  COMPLETED
+  REJECTED
+  EXPIRED
+}
+
+enum PriceAdjustmentType {
+  SAME_PRICE
+  LOWER_PRICE
+  HIGHER_PRICE
+}
+
+enum PriceAdjustmentStatus {
+  NONE
+  UNRESOLVED
+  ADDITIONAL_PAYMENT_REQUIRED
+  SUBMITTED
+  RESOLVED
+  WAIVED
+  REJECTED
+  EXPIRED
+}
+
+enum PriceAdjustmentResolution {
+  MANUAL_REFUND
+  CUSTOMER_CREDIT
+  NO_REFUND
+  OTHER
+  WAIVER
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
 model User {
-  id                      String                   @id @default(cuid())
-  email                   String                   @unique
-  passwordHash            String
-  fullName                String
-  phone                   String?
-  emailVerifiedAt         DateTime?
-  phoneVerifiedAt         DateTime?
-  role                    UserRole                 @default(CUSTOMER)
-  adminAccessActive       Boolean                  @default(false)
-  bookings                Booking[]
-  createdBlocks           BlockedSchedule[]        @relation("BlockedScheduleCreator")
-  verifiedPayments        Payment[]                @relation("PaymentVerifier")
-  otpRequests             OtpRequest[]
-  emailVerificationTokens EmailVerificationToken[]
-  registrationAttempts    RegistrationAttempt[]
-  createdPricingRules     PricingRule[]            @relation("PricingRuleCreator")
-  updatedPricingRules     PricingRule[]            @relation("PricingRuleUpdater")
-  createdHolidays         Holiday[]                @relation("HolidayCreator")
-  updatedHolidays         Holiday[]                @relation("HolidayUpdater")
-  roleAssignments         UserRoleAssignment[]     @relation("AssignedUserRoles")
-  assignedRoleAssignments UserRoleAssignment[]     @relation("UserRoleAssigner")
-  createdRoles            Role[]                   @relation("RoleCreator")
-  updatedRoles            Role[]                   @relation("RoleUpdater")
-  assignedRolePermissions RolePermission[]         @relation("RolePermissionAssigner")
-  auditLogs               AuditLog[]               @relation("AuditActor")
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
+  id                         String                   @id @default(cuid())
+  email                      String                   @unique
+  passwordHash               String
+  fullName                   String
+  phone                      String?
+  emailVerifiedAt            DateTime?
+  phoneVerifiedAt            DateTime?
+  role                       UserRole                 @default(CUSTOMER)
+  adminAccessActive          Boolean                  @default(false)
+  bookings                   Booking[]
+  createdBlocks              BlockedSchedule[]        @relation("BlockedScheduleCreator")
+  verifiedPayments           Payment[]                @relation("PaymentVerifier")
+  otpRequests                OtpRequest[]
+  emailVerificationTokens    EmailVerificationToken[]
+  registrationAttempts       RegistrationAttempt[]
+  createdPricingRules        PricingRule[]            @relation("PricingRuleCreator")
+  updatedPricingRules        PricingRule[]            @relation("PricingRuleUpdater")
+  createdHolidays            Holiday[]                @relation("HolidayCreator")
+  updatedHolidays            Holiday[]                @relation("HolidayUpdater")
+  roleAssignments            UserRoleAssignment[]     @relation("AssignedUserRoles")
+  assignedRoleAssignments    UserRoleAssignment[]     @relation("UserRoleAssigner")
+  createdRoles               Role[]                   @relation("RoleCreator")
+  updatedRoles               Role[]                   @relation("RoleUpdater")
+  assignedRolePermissions    RolePermission[]         @relation("RolePermissionAssigner")
+  auditLogs                  AuditLog[]               @relation("AuditActor")
+  initiatedReschedules       BookingReschedule[]      @relation("RescheduleInitiator")
+  finalizedReschedules       BookingReschedule[]      @relation("RescheduleFinalizer")
+  resolvedReschedules        BookingReschedule[]      @relation("RescheduleResolver")
+  verifiedReschedulePayments ReschedulePayment[]      @relation("ReschedulePaymentVerifier")
+  notificationDeliveries     NotificationDelivery[]
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
 
   @@index([role])
   @@index([phone])
@@ -191,6 +236,8 @@ model Facility {
   bookings                        Booking[]
   blockedSchedules                BlockedSchedule[]
   holidays                        Holiday[]
+  originalReschedules             BookingReschedule[]     @relation("OriginalRescheduleFacility")
+  replacementReschedules          BookingReschedule[]     @relation("ReplacementRescheduleFacility")
   createdAt                       DateTime                @default(now())
   updatedAt                       DateTime                @updatedAt
 
@@ -318,26 +365,28 @@ model Holiday {
 }
 
 model Booking {
-  id                   String        @id @default(cuid())
-  userId               String
-  facilityId           String
-  status               BookingStatus
-  startAtUtc           DateTime
-  endAtUtc             DateTime
-  timezone             String        @default("Asia/Manila")
-  slotCount            Int
-  amountMinor          Int
-  currency             String        @default("PHP")
-  priceSnapshot        Json?
-  idempotencyKey       String?       @unique
-  paymentHoldExpiresAt DateTime?
-  cancellationReason   String?
-  cancelledAt          DateTime?
-  payment              Payment?
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  facility             Facility      @relation(fields: [facilityId], references: [id], onDelete: Restrict)
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  id                     String                 @id @default(cuid())
+  userId                 String
+  facilityId             String
+  status                 BookingStatus
+  startAtUtc             DateTime
+  endAtUtc               DateTime
+  timezone               String                 @default("Asia/Manila")
+  slotCount              Int
+  amountMinor            Int
+  currency               String                 @default("PHP")
+  priceSnapshot          Json?
+  idempotencyKey         String?                @unique
+  paymentHoldExpiresAt   DateTime?
+  cancellationReason     String?
+  cancelledAt            DateTime?
+  payment                Payment?
+  reschedules            BookingReschedule[]
+  notificationDeliveries NotificationDelivery[]
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  facility               Facility               @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
   @@index([facilityId, startAtUtc, endAtUtc])
   @@index([userId, startAtUtc])
@@ -345,10 +394,10 @@ model Booking {
 }
 
 model Payment {
-  id                          String          @id @default(cuid())
-  bookingId                   String          @unique
+  id                          String              @id @default(cuid())
+  bookingId                   String              @unique
   provider                    PaymentProvider
-  providerReference           String?         @unique
+  providerReference           String?             @unique
   method                      String?
   externalReference           String?
   normalizedExternalReference String?
@@ -357,7 +406,7 @@ model Payment {
   checkoutUrl                 String?
   status                      PaymentStatus
   amountMinor                 Int
-  currency                    String          @default("PHP")
+  currency                    String              @default("PHP")
   paidAt                      DateTime?
   submittedAt                 DateTime?
   verifiedAt                  DateTime?
@@ -366,15 +415,123 @@ model Payment {
   actionRequiredAt            DateTime?
   expiresAt                   DateTime?
   reviewNote                  String?
-  duplicateReference          Boolean         @default(false)
+  duplicateReference          Boolean             @default(false)
   rawPayload                  Json?
-  booking                     Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  verifiedBy                  User?           @relation("PaymentVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
-  createdAt                   DateTime        @default(now())
-  updatedAt                   DateTime        @updatedAt
+  booking                     Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  verifiedBy                  User?               @relation("PaymentVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+  originalForReschedules      BookingReschedule[] @relation("OriginalReschedulePayment")
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
 
   @@index([status, expiresAt])
   @@index([normalizedExternalReference, status])
+}
+
+model BookingReschedule {
+  id                       String                     @id @default(cuid())
+  bookingId                String
+  originalPaymentId        String?
+  originalBookingReference String
+  originalFacilityId       String
+  originalStartAtUtc       DateTime
+  originalEndAtUtc         DateTime
+  originalTimezone         String
+  replacementFacilityId    String
+  replacementStartAtUtc    DateTime
+  replacementEndAtUtc      DateTime
+  replacementTimezone      String
+  originalPriceSnapshot    Json?
+  replacementPriceSnapshot Json
+  originalAmountMinor      Int
+  replacementAmountMinor   Int
+  priceDifferenceMinor     Int
+  waivedAmountMinor        Int                        @default(0)
+  additionalAmountDueMinor Int                        @default(0)
+  currency                 String                     @default("PHP")
+  status                   BookingRescheduleStatus
+  adjustmentType           PriceAdjustmentType
+  adjustmentStatus         PriceAdjustmentStatus
+  holdExpiresAt            DateTime?
+  reason                   String
+  internalNote             String?
+  customerNote             String?
+  resolutionMethod         PriceAdjustmentResolution?
+  resolutionAmountMinor    Int?
+  resolutionReference      String?
+  resolutionNote           String?
+  initiatedByUserId        String
+  finalizedByUserId        String?
+  resolvedByUserId         String?
+  idempotencyKey           String                     @unique
+  version                  Int                        @default(1)
+  finalizedAt              DateTime?
+  rejectedAt               DateTime?
+  expiredAt                DateTime?
+  resolvedAt               DateTime?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  booking                  Booking                    @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  originalPayment          Payment?                   @relation("OriginalReschedulePayment", fields: [originalPaymentId], references: [id], onDelete: SetNull)
+  originalFacility         Facility                   @relation("OriginalRescheduleFacility", fields: [originalFacilityId], references: [id], onDelete: Restrict)
+  replacementFacility      Facility                   @relation("ReplacementRescheduleFacility", fields: [replacementFacilityId], references: [id], onDelete: Restrict)
+  initiatedBy              User                       @relation("RescheduleInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  finalizedBy              User?                      @relation("RescheduleFinalizer", fields: [finalizedByUserId], references: [id], onDelete: SetNull)
+  resolvedBy               User?                      @relation("RescheduleResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  additionalPayment        ReschedulePayment?
+  notificationDeliveries   NotificationDelivery[]
+
+  @@index([bookingId, createdAt])
+  @@index([status, holdExpiresAt])
+  @@index([replacementFacilityId, replacementStartAtUtc, replacementEndAtUtc])
+  @@index([adjustmentStatus, createdAt])
+}
+
+model ReschedulePayment {
+  id                          String            @id @default(cuid())
+  bookingRescheduleId         String            @unique
+  provider                    PaymentProvider   @default(MANUAL)
+  providerReference           String            @unique
+  method                      String?
+  externalReference           String?
+  normalizedExternalReference String?
+  amountMinor                 Int
+  currency                    String            @default("PHP")
+  proofImageUrl               String?
+  status                      PaymentStatus
+  submittedAt                 DateTime?
+  verifiedAt                  DateTime?
+  verifiedByUserId            String?
+  rejectedAt                  DateTime?
+  reviewNote                  String?
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
+  bookingReschedule           BookingReschedule @relation(fields: [bookingRescheduleId], references: [id], onDelete: Cascade)
+  verifiedBy                  User?             @relation("ReschedulePaymentVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([normalizedExternalReference, status])
+}
+
+model NotificationDelivery {
+  id           String                     @id @default(cuid())
+  dedupeKey    String                     @unique
+  userId       String
+  bookingId    String
+  rescheduleId String?
+  eventType    String
+  payload      Json
+  status       NotificationDeliveryStatus @default(PENDING)
+  attempts     Int                        @default(0)
+  lastError    String?
+  sentAt       DateTime?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+  user         User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking      Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reschedule   BookingReschedule?         @relation(fields: [rescheduleId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([bookingId, createdAt])
 }
 
 model BlockedSchedule {

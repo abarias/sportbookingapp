@@ -4,6 +4,8 @@ export const permissionCatalog = [
   { key: "bookings.create", name: "Create bookings", description: "Create manual and walk-in bookings.", category: "Bookings and availability", risk: "ELEVATED" },
   { key: "bookings.manage", name: "Manage bookings", description: "Perform ordinary administrative booking operations.", category: "Bookings and availability", risk: "ELEVATED" },
   { key: "bookings.reschedule", name: "Reschedule bookings", description: "Move paid or confirmed bookings to another schedule.", category: "Bookings and availability", risk: "SENSITIVE" },
+  { key: "bookings.reschedule.override_adjustment", name: "Override reschedule adjustment", description: "Waive all or part of an additional rescheduling amount.", category: "Bookings and availability", risk: "CRITICAL" },
+  { key: "bookings.reschedule.resolve_adjustment", name: "Resolve reschedule adjustment", description: "Record manual refund, customer credit, or approved no-refund outcomes.", category: "Bookings and availability", risk: "SENSITIVE" },
   { key: "customers.view_limited", name: "View limited customer details", description: "View only customer details required to service an active booking.", category: "Customers", risk: "STANDARD" },
   { key: "customers.view_full", name: "View full customer records", description: "View customer contact details and booking history.", category: "Customers", risk: "SENSITIVE" },
   { key: "payments.view", name: "View payments", description: "View payment submissions and proof details.", category: "Payments", risk: "SENSITIVE" },
@@ -29,7 +31,9 @@ export type PermissionRisk = (typeof permissionCatalog)[number]["risk"];
 export const permissionDependencies: Partial<Record<PermissionKey, readonly PermissionKey[]>> = {
   "bookings.create": ["availability.view", "bookings.view"],
   "bookings.manage": ["bookings.view"],
-  "bookings.reschedule": ["availability.view", "bookings.view", "bookings.manage"],
+  "bookings.reschedule": ["availability.view", "bookings.view", "bookings.manage", "payments.view"],
+  "bookings.reschedule.override_adjustment": ["bookings.reschedule"],
+  "bookings.reschedule.resolve_adjustment": ["bookings.reschedule"],
   "customers.view_full": ["customers.view_limited"],
   "payments.verify": ["payments.view"],
   "reports.export": ["reports.view"],
@@ -74,6 +78,7 @@ export const seededRolePermissions = {
     "bookings.create",
     "bookings.manage",
     "bookings.reschedule",
+    "bookings.reschedule.resolve_adjustment",
     "customers.view_full",
     "payments.view",
     "payments.verify",
@@ -92,4 +97,3 @@ export const permissionCategoryOrder = [
   "Pricing and holidays",
   "Administration and security"
 ] as const;
-

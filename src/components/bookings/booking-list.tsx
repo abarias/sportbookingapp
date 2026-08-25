@@ -1,4 +1,4 @@
-import { PaymentStatus } from "@prisma/client";
+import { BookingRescheduleStatus, PaymentStatus } from "@prisma/client";
 import { BookingStatus } from "@prisma/client";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -21,6 +21,28 @@ type BookingListItem = {
   paymentHoldExpiresAt: Date | null;
   paymentReviewNote: string | null;
   isCancellable: boolean;
+  reschedules: Array<{
+    id: string;
+    status: BookingRescheduleStatus;
+    adjustmentStatus: string;
+    originalFacility: { name: string };
+    replacementFacility: { name: string };
+    originalStartAtUtc: Date;
+    originalEndAtUtc: Date;
+    originalTimezone: string;
+    replacementStartAtUtc: Date;
+    replacementEndAtUtc: Date;
+    replacementTimezone: string;
+    originalAmountMinor: number;
+    replacementAmountMinor: number;
+    priceDifferenceMinor: number;
+    additionalAmountDueMinor: number;
+    holdExpiresAt: Date | null;
+    reason: string;
+    customerNote: string | null;
+    createdAt: Date;
+    additionalPayment: { status: PaymentStatus; reviewNote: string | null } | null;
+  }>;
 };
 
 type BookingListProps = {
@@ -113,6 +135,25 @@ export function BookingList({ title, items, emptyMessage, footer }: BookingListP
                   <p className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm leading-6 text-amber-100">
                     Staff message: {item.paymentReviewNote}
                   </p>
+                ) : null}
+                {item.reschedules.length ? (
+                  <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-sm font-medium text-white">Rescheduling history</p>
+                    {item.reschedules.map((reschedule) => (
+                      <div key={reschedule.id} className="border-t border-white/10 pt-3 first:border-0 first:pt-0">
+                        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm text-stone-200">{reschedule.originalFacility.name} → {reschedule.replacementFacility.name}</p><span className="text-xs uppercase tracking-[0.14em] text-amber-200">{reschedule.status.replaceAll("_", " ")}</span></div>
+                        <p className="mt-1 text-xs text-stone-400">Previous: {formatDateTimeRange(reschedule.originalStartAtUtc, reschedule.originalEndAtUtc, reschedule.originalTimezone)}</p>
+                        <p className="mt-1 text-xs text-stone-300">Replacement: {formatDateTimeRange(reschedule.replacementStartAtUtc, reschedule.replacementEndAtUtc, reschedule.replacementTimezone)}</p>
+                        <p className="mt-2 text-xs text-stone-400">Base price: {formatCurrency(reschedule.originalAmountMinor, "PHP")} → {formatCurrency(reschedule.replacementAmountMinor, "PHP")}</p>
+                        <p className="mt-1 text-xs text-stone-400">Reason: {reschedule.reason}</p>
+                        {reschedule.customerNote ? <p className="mt-1 text-xs text-amber-100">Staff note: {reschedule.customerNote}</p> : null}
+                        {reschedule.status === BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED ? <Link className="mt-2 inline-flex text-sm font-medium text-amber-200 hover:underline" href={`/bookings/${item.id}/reschedule-payment`}>Pay additional {formatCurrency(reschedule.additionalAmountDueMinor, "PHP")}</Link> : null}
+                        {reschedule.status === BookingRescheduleStatus.PAYMENT_SUBMITTED ? <p className="mt-2 text-sm text-sky-200">Additional payment submitted for verification. Your original booking remains valid.</p> : null}
+                        {(reschedule.status === BookingRescheduleStatus.REJECTED || reschedule.status === BookingRescheduleStatus.EXPIRED) ? <p className="mt-2 text-sm text-stone-300">This attempt did not change your confirmed booking.</p> : null}
+                        {reschedule.additionalPayment?.reviewNote ? <p className="mt-2 text-sm text-amber-100">Staff message: {reschedule.additionalPayment.reviewNote}</p> : null}
+                      </div>
+                    ))}
+                  </div>
                 ) : null}
                 {item.isCancellable ? (
                   <div className="pt-1">

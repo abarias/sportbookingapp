@@ -91,6 +91,7 @@ type AuditReferenceMaps = {
   pricingRules: Map<string, string>;
   blockedSchedules: Map<string, string>;
   bookings: Map<string, string>;
+  bookingReschedules: Map<string, string>;
   permissions: Map<string, string>;
 };
 
@@ -103,6 +104,7 @@ function formatReference(key: string, value: string, references: AuditReferenceM
   if (normalizedKey.includes("pricingruleid")) return references.pricingRules.get(value) ?? value;
   if (normalizedKey.includes("blockedscheduleid")) return references.blockedSchedules.get(value) ?? value;
   if (normalizedKey.includes("bookingid")) return references.bookings.get(value) ?? value;
+  if (normalizedKey.includes("rescheduleid")) return references.bookingReschedules.get(value) ?? value;
   return value;
 }
 
@@ -124,7 +126,8 @@ function auditEntityLabel(entityType: string, entityId: string | null, reference
     Facility: references.facilities,
     PricingRule: references.pricingRules,
     BlockedSchedule: references.blockedSchedules,
-    Booking: references.bookings
+    Booking: references.bookings,
+    BookingReschedule: references.bookingReschedules
   };
   return `${entityType}: ${maps[entityType]?.get(entityId) ?? entityId}`;
 }
@@ -139,13 +142,21 @@ function auditDetails(log: { before: unknown; after: unknown; metadata: unknown 
 }
 
 async function getAuditReferenceMaps(): Promise<AuditReferenceMaps> {
-  const [users, roles, facilities, pricingRules, blockedSchedules, bookings, permissions] = await Promise.all([
+  const [users, roles, facilities, pricingRules, blockedSchedules, bookings, bookingReschedules, permissions] = await Promise.all([
     prisma.user.findMany({ select: { id: true, fullName: true } }),
     prisma.role.findMany({ select: { id: true, name: true } }),
     prisma.facility.findMany({ select: { id: true, name: true } }),
     prisma.pricingRule.findMany({ select: { id: true, name: true } }),
     prisma.blockedSchedule.findMany({ select: { id: true, title: true } }),
     prisma.booking.findMany({ select: { id: true, startAtUtc: true, facility: { select: { name: true } } } }),
+    prisma.bookingReschedule.findMany({
+      select: {
+        id: true,
+        originalBookingReference: true,
+        originalFacility: { select: { name: true } },
+        replacementFacility: { select: { name: true } }
+      }
+    }),
     prisma.permission.findMany({ select: { key: true, displayName: true } })
   ]);
 
@@ -156,6 +167,7 @@ async function getAuditReferenceMaps(): Promise<AuditReferenceMaps> {
     pricingRules: new Map(pricingRules.map((item) => [item.id, item.name])),
     blockedSchedules: new Map(blockedSchedules.map((item) => [item.id, item.title])),
     bookings: new Map(bookings.map((item) => [item.id, `${item.facility.name} · ${item.startAtUtc.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}`])),
+    bookingReschedules: new Map(bookingReschedules.map((item) => [item.id, `${item.originalBookingReference} · ${item.originalFacility.name} → ${item.replacementFacility.name}`])),
     permissions: new Map(permissions.map((item) => [item.key, item.displayName]))
   };
 }

@@ -1,11 +1,12 @@
 import crypto from "node:crypto";
 
-import { BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingDayType, type Facility, type PricingRule } from "@prisma/client";
+import { BookingRescheduleStatus, BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingDayType, type Facility, type PricingRule } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { getPaymentMode, isProductionMockPaymentAllowed, isStrictProductionEnvironment } from "@/lib/config/env";
 import { buildLocalDayUtcRange, buildUtcDateFromLocalMinutes, getDayOfWeek, getLocalMinutesForDate } from "@/lib/time/slots";
 import { isDateWithinBookingWindow } from "@/server/bookings/booking-window";
+import { expireStaleRescheduleHolds } from "@/server/bookings/reschedule-expiration";
 import { buildDaySlots, canFitDuration, rangesOverlapByMinute, rangesOverlap, type DaySlot, type MinuteInterval } from "@/server/bookings/core";
 import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellationWindowHours } from "@/server/bookings/policies";
 import { calculatePrice } from "@/server/pricing/engine";
@@ -29,9 +30,9 @@ type BookingCreationInput = {
   paymentReference?: string;
 };
 
-const BOOKING_INCREMENT_MINUTES = 60;
+export const BOOKING_INCREMENT_MINUTES = 60;
 
-function assertAllowedBookingDuration(durationMinutes: number, pricingMinimumMinutes: number, slotIntervalMinutes: number) {
+export function assertAllowedBookingDuration(durationMinutes: number, pricingMinimumMinutes: number, slotIntervalMinutes: number) {
   const minimumMinutes = Math.max(pricingMinimumMinutes, BOOKING_INCREMENT_MINUTES);
 
   if (
@@ -96,6 +97,30 @@ export function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
       }
     ]
   };
+}
+
+function findActiveReplacementHolds(
+  tx: Prisma.TransactionClient,
+  input: { facilityId: string; startAtUtc: Date; endAtUtc: Date; now: Date }
+) {
+  return tx.bookingReschedule.findMany({
+    where: {
+      replacementFacilityId: input.facilityId,
+      OR: [
+        { status: BookingRescheduleStatus.PAYMENT_SUBMITTED },
+        {
+          status: BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED,
+          holdExpiresAt: { gt: input.now }
+        }
+      ],
+      replacementStartAtUtc: { lt: input.endAtUtc },
+      replacementEndAtUtc: { gt: input.startAtUtc }
+    },
+    select: {
+      replacementStartAtUtc: true,
+      replacementEndAtUtc: true
+    }
+  });
 }
 
 function createBookingReference() {
@@ -175,7 +200,7 @@ function getDefaultPricingRule(rules: PricingRule[]) {
   return defaultRule;
 }
 
-async function calculateAuthoritativePrice(params: {
+export async function calculateAuthoritativePrice(params: {
   tx: Prisma.TransactionClient;
   facilityId: string;
   timezone: string;
@@ -208,7 +233,7 @@ async function calculateAuthoritativePrice(params: {
   });
 }
 
-function getDailyOpeningRange(facility: Pick<Facility, "slotIntervalMinutes" | "timezone"> & {
+export function getDailyOpeningRange(facility: Pick<Facility, "slotIntervalMinutes" | "timezone"> & {
   operatingHours: Array<{
     dayOfWeek: number;
     opensAtMinutes: number;
@@ -236,7 +261,7 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
     closesAtMinutes: number;
     isClosed: boolean;
   }>;
-}, dateKey: string): Promise<FacilityDayAvailability> {
+}, dateKey: string, options: { excludeBookingId?: string } = {}): Promise<FacilityDayAvailability> {
   const openingRange = getDailyOpeningRange(facility, dateKey);
 
   if (!openingRange) {
@@ -254,9 +279,10 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
   const calendarDay = buildLocalDayUtcRange(dateKey, facility.timezone);
   const now = new Date();
 
-  const [bookings, blockedSchedules] = await Promise.all([
+  const [bookings, replacementHolds, blockedSchedules] = await Promise.all([
     prisma.booking.findMany({
       where: {
+        ...(options.excludeBookingId ? { id: { not: options.excludeBookingId } } : {}),
         facilityId: facility.id,
         ...activeBookingWhere(now),
         startAtUtc: {
@@ -269,6 +295,22 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
       select: {
         startAtUtc: true,
         endAtUtc: true
+      }
+    }),
+    prisma.bookingReschedule.findMany({
+      where: {
+        ...(options.excludeBookingId ? { bookingId: { not: options.excludeBookingId } } : {}),
+        replacementFacilityId: facility.id,
+        OR: [
+          { status: BookingRescheduleStatus.PAYMENT_SUBMITTED },
+          { status: BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED, holdExpiresAt: { gt: now } }
+        ],
+        replacementStartAtUtc: { lt: dayEndUtc },
+        replacementEndAtUtc: { gt: dayStartUtc }
+      },
+      select: {
+        replacementStartAtUtc: true,
+        replacementEndAtUtc: true
       }
     }),
     prisma.blockedSchedule.findMany({
@@ -292,6 +334,11 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
     ...bookings.map((booking) => ({
       startMinutes: getLocalMinutesForDate(booking.startAtUtc, dateKey, facility.timezone),
       endMinutes: getLocalMinutesForDate(booking.endAtUtc, dateKey, facility.timezone),
+      reason: "BOOKED" as const
+    })),
+    ...replacementHolds.map((hold) => ({
+      startMinutes: getLocalMinutesForDate(hold.replacementStartAtUtc, dateKey, facility.timezone),
+      endMinutes: getLocalMinutesForDate(hold.replacementEndAtUtc, dateKey, facility.timezone),
       reason: "BOOKED" as const
     })),
     ...blockedSchedules.map((block) => ({
@@ -341,6 +388,10 @@ export async function createBookingHold(input: BookingCreationInput) {
       }
 
       await expireStaleAwaitingPaymentHolds(tx, now);
+      await expireStaleRescheduleHolds(tx, {
+        now,
+        replacementFacilityId: input.facilityId
+      });
       await assertBookingUserExists(tx, input.userId);
 
       const [facility, holdSetting] = await Promise.all([
@@ -394,7 +445,7 @@ export async function createBookingHold(input: BookingCreationInput) {
         throw new Error("You can only book future time slots.");
       }
 
-      const [conflictingBookings, blockedSchedules] = await Promise.all([
+      const [conflictingBookings, replacementHolds, blockedSchedules] = await Promise.all([
         tx.booking.findMany({
           where: {
             facilityId: facility.id,
@@ -407,6 +458,12 @@ export async function createBookingHold(input: BookingCreationInput) {
             }
           },
           select: { startAtUtc: true, endAtUtc: true }
+        }),
+        findActiveReplacementHolds(tx, {
+          facilityId: facility.id,
+          startAtUtc,
+          endAtUtc,
+          now
         }),
         tx.blockedSchedule.findMany({
           where: {
@@ -426,6 +483,11 @@ export async function createBookingHold(input: BookingCreationInput) {
         ...conflictingBookings.map((booking) => ({
           startMinutes: getLocalMinutesForDate(booking.startAtUtc, input.dateKey, facility.timezone),
           endMinutes: getLocalMinutesForDate(booking.endAtUtc, input.dateKey, facility.timezone),
+          reason: "BOOKED" as const
+        })),
+        ...replacementHolds.map((hold) => ({
+          startMinutes: getLocalMinutesForDate(hold.replacementStartAtUtc, input.dateKey, facility.timezone),
+          endMinutes: getLocalMinutesForDate(hold.replacementEndAtUtc, input.dateKey, facility.timezone),
           reason: "BOOKED" as const
         })),
         ...blockedSchedules.map((block) => ({
@@ -526,6 +588,10 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         }
 
         await expireStaleAwaitingPaymentHolds(tx, now);
+        await expireStaleRescheduleHolds(tx, {
+          now,
+          replacementFacilityId: input.facilityId
+        });
         await assertBookingUserExists(tx, input.userId);
 
       const [facility, mockSetting] = await Promise.all([
@@ -584,7 +650,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         throw new Error("You can only book future time slots.");
       }
 
-      const [conflictingBookings, blockedSchedules] = await Promise.all([
+      const [conflictingBookings, replacementHolds, blockedSchedules] = await Promise.all([
         tx.booking.findMany({
           where: {
             facilityId: facility.id,
@@ -597,6 +663,12 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
             }
           },
           select: { startAtUtc: true, endAtUtc: true }
+        }),
+        findActiveReplacementHolds(tx, {
+          facilityId: facility.id,
+          startAtUtc,
+          endAtUtc,
+          now
         }),
         tx.blockedSchedule.findMany({
           where: {
@@ -616,6 +688,11 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         ...conflictingBookings.map((booking) => ({
           startMinutes: getLocalMinutesForDate(booking.startAtUtc, input.dateKey, facility.timezone),
           endMinutes: getLocalMinutesForDate(booking.endAtUtc, input.dateKey, facility.timezone),
+          reason: "BOOKED" as const
+        })),
+        ...replacementHolds.map((hold) => ({
+          startMinutes: getLocalMinutesForDate(hold.replacementStartAtUtc, input.dateKey, facility.timezone),
+          endMinutes: getLocalMinutesForDate(hold.replacementEndAtUtc, input.dateKey, facility.timezone),
           reason: "BOOKED" as const
         })),
         ...blockedSchedules.map((block) => ({
@@ -703,6 +780,12 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
 
   return prisma.$transaction(
     async (tx) => {
+      await expireStaleAwaitingPaymentHolds(tx, now);
+      await expireStaleRescheduleHolds(tx, {
+        now,
+        replacementFacilityId: input.facilityId
+      });
+
       const [facility] = await Promise.all([
         tx.facility.findUnique({
           where: { id: input.facilityId },
@@ -749,7 +832,7 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
         throw new Error("You can only book future time slots.");
       }
 
-      const [conflictingBookings, blockedSchedules] = await Promise.all([
+      const [conflictingBookings, replacementHolds, blockedSchedules] = await Promise.all([
         tx.booking.findMany({
           where: {
             facilityId: facility.id,
@@ -758,6 +841,12 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
             endAtUtc: { gt: startAtUtc }
           },
           select: { startAtUtc: true, endAtUtc: true }
+        }),
+        findActiveReplacementHolds(tx, {
+          facilityId: facility.id,
+          startAtUtc,
+          endAtUtc,
+          now
         }),
         tx.blockedSchedule.findMany({
           where: {
@@ -773,6 +862,11 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
         ...conflictingBookings.map((booking) => ({
           startMinutes: getLocalMinutesForDate(booking.startAtUtc, input.dateKey, facility.timezone),
           endMinutes: getLocalMinutesForDate(booking.endAtUtc, input.dateKey, facility.timezone),
+          reason: "BOOKED" as const
+        })),
+        ...replacementHolds.map((hold) => ({
+          startMinutes: getLocalMinutesForDate(hold.replacementStartAtUtc, input.dateKey, facility.timezone),
+          endMinutes: getLocalMinutesForDate(hold.replacementEndAtUtc, input.dateKey, facility.timezone),
           reason: "BOOKED" as const
         })),
         ...blockedSchedules.map((block) => ({
@@ -849,6 +943,7 @@ export async function cancelBookingByCustomer(input: { bookingId: string; userId
   const now = new Date();
 
   return prisma.$transaction(async (tx) => {
+    await expireStaleRescheduleHolds(tx, { now });
     const [booking, cancellationSetting, cancellationWindowSetting] = await Promise.all([
       tx.booking.findFirst({
         where: {
@@ -862,6 +957,17 @@ export async function cancelBookingByCustomer(input: { bookingId: string; userId
               cancellationEnabledOverride: true,
               cancellationWindowHoursOverride: true
             }
+          },
+          reschedules: {
+            where: {
+              status: {
+                in: [
+                  BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED,
+                  BookingRescheduleStatus.PAYMENT_SUBMITTED
+                ]
+              }
+            },
+            select: { id: true }
           }
         }
       }),
@@ -875,6 +981,9 @@ export async function cancelBookingByCustomer(input: { bookingId: string; userId
 
     if (!booking) {
       throw new Error("Booking not found.");
+    }
+    if (booking.reschedules.length > 0) {
+      throw new Error("This booking cannot be cancelled while a rescheduling request is active.");
     }
 
     const cancellationEnabled = resolveCancellationEnabled(

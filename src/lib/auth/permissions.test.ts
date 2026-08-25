@@ -76,8 +76,15 @@ describe("seeded role matrix", () => {
     expect(permissions.has("payments.verify")).toBe(true);
     expect(permissions.has("reports.export")).toBe(true);
     expect(permissions.has("bookings.reschedule")).toBe(true);
+    expect(permissions.has("bookings.reschedule.resolve_adjustment")).toBe(true);
+    expect(permissions.has("bookings.reschedule.override_adjustment")).toBe(false);
     expect(permissions.has("pricing.manage")).toBe(false);
     expect(permissions.has("roles.manage")).toBe(false);
+  });
+
+  it("does not grant paid-booking rescheduling to Receptionist or Social Media roles", () => {
+    expect(seededRolePermissions.RECEPTIONIST).not.toContain("bookings.reschedule");
+    expect(seededRolePermissions.SOCIAL_MEDIA).not.toContain("bookings.reschedule");
   });
 
   it("limits Social Media Person to facility content and photos", () => {

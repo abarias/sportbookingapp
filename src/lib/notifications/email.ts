@@ -81,3 +81,23 @@ export async function sendVerificationEmail(params: VerificationEmailParams) {
     providerMessageId: result.data?.id
   } satisfies EmailDeliveryResult;
 }
+
+export async function sendBookingLifecycleEmail(params: { to: string; fullName: string; subject: string; heading: string; lines: string[] }) {
+  const resendConfig = getResendConfig();
+  const escapeHtml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+  if (!resendConfig) {
+    if (process.env.NODE_ENV === "production") throw new Error("Email delivery is not configured.");
+    console.info(`[email:booking] to=${params.to} subject="${params.subject}"`);
+    return { delivered: false as const, provider: "console" as const };
+  }
+  const resend = new Resend(resendConfig.apiKey);
+  const result = await resend.emails.send({
+    from: resendConfig.from,
+    to: params.to,
+    subject: params.subject,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1c1917"><h1>${escapeHtml(params.heading)}</h1><p>Hello ${escapeHtml(params.fullName)},</p>${params.lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}</div>`,
+    text: [`${params.heading}`, `Hello ${params.fullName},`, ...params.lines].join("\n\n")
+  });
+  if (result.error) throw new Error(`Resend email delivery failed: ${result.error.message}`);
+  return { delivered: true as const, provider: "resend" as const, id: result.data?.id ?? null };
+}

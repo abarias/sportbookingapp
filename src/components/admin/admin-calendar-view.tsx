@@ -168,6 +168,7 @@ function StatusChip({ label, tone }: { label: string; tone: string }) {
 }
 
 export function AdminDayDetail(props: {
+  canReschedule: boolean;
   monthKey: string;
   dateKey: string;
   view: "schedule" | "facility";
@@ -241,6 +242,7 @@ export function AdminDayDetail(props: {
                       <p className="font-medium text-white">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, schedule.timezone)}</p>
                       <p className="mt-1">{booking.user.fullName}{booking.user.email ? ` • ${booking.user.email}` : ""}</p>
                       <p className="mt-1 text-stone-400">{booking.status.replaceAll("_", " ")}</p>
+                      {props.canReschedule ? <Link className="mt-2 inline-flex text-amber-200 hover:underline" href={`/admin/bookings/${booking.id}`}>View booking</Link> : null}
                     </div>
                   ))}
                 </div>
@@ -334,6 +336,7 @@ export function AdminDayDetail(props: {
                     <div key={booking.id} className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone-300">
                       <p className="font-medium text-white">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, selectedFacility.timezone)}</p>
                       <p className="mt-1">{booking.user.fullName}{booking.user.email ? ` • ${booking.user.email}` : ""}</p>
+                      {props.canReschedule ? <Link className="mt-2 inline-flex text-amber-200 hover:underline" href={`/admin/bookings/${booking.id}`}>View booking</Link> : null}
                     </div>
                   ))}
                 </div>
