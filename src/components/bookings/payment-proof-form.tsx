@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { submitPaymentProofAction, type PaymentProofActionState } from "@/features/bookings/actions";
 import { Button } from "@/components/ui/button";
+import { PaymentMethodMenu } from "@/components/bookings/payment-method-menu";
 
 const initialState: PaymentProofActionState = {};
 const maxProofFileSizeBytes = 5 * 1024 * 1024;
@@ -18,6 +19,7 @@ function SubmitButton() {
 export function PaymentProofForm({ bookingId }: { bookingId: string }) {
   const [state, action] = useActionState(submitPaymentProofAction, initialState);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [method, setMethod] = useState("manual_gcash");
 
   return (
     <form
@@ -45,14 +47,11 @@ export function PaymentProofForm({ bookingId }: { bookingId: string }) {
         <p className="mt-1 text-sm text-stone-400">Uploading a receipt does not confirm your booking yet. Staff will verify the payment first.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2 text-sm text-stone-200">
-          <span>Payment method</span>
-          <select className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="method" required>
-            <option value="manual_gcash">GCash transfer</option>
-            <option value="manual_bank_transfer">Bank transfer</option>
-          </select>
+        <fieldset className="space-y-2 text-sm text-stone-200">
+          <legend>Payment method</legend>
+          <PaymentMethodMenu name="method" onChange={setMethod} value={method} />
           {state.fieldErrors?.method ? <p className="text-sm text-rose-300">{state.fieldErrors.method}</p> : null}
-        </label>
+        </fieldset>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Transfer reference number</span>
           <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="externalReference" required />
@@ -76,9 +75,11 @@ export function PaymentProofForm({ bookingId }: { bookingId: string }) {
           {state.fieldErrors?.proofImage ? <p className="text-sm text-rose-300">{state.fieldErrors.proofImage}</p> : null}
         </label>
       </div>
-      {state.error ? <p className="text-sm text-rose-300">{state.error}</p> : null}
-      {state.success ? <p className="text-sm text-emerald-300">{state.success}</p> : null}
-      <SubmitButton />
+      <div aria-live="polite">
+        {state.error ? <p className="rounded-2xl border border-rose-300/30 bg-rose-300/10 p-4 text-sm text-rose-100">{state.error}</p> : null}
+        {state.success ? <p className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">{state.success}</p> : null}
+      </div>
+      {!state.success ? <SubmitButton /> : null}
     </form>
   );
 }

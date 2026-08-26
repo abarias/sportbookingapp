@@ -23,7 +23,7 @@ function getResendConfig() {
 function buildVerificationEmailHtml(params: VerificationEmailParams) {
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1c1917">
-      <h1 style="font-size:24px;margin-bottom:16px">Verify your Sport Booking PH account</h1>
+      <h1 style="font-size:24px;margin-bottom:16px">Verify your MMG Stellar account</h1>
       <p>Hi ${params.fullName},</p>
       <p>Use this verification code to finish creating your account:</p>
       <p style="font-size:28px;font-weight:700;letter-spacing:0.2em;margin:24px 0">${params.code}</p>
@@ -37,7 +37,7 @@ function buildVerificationEmailText(params: VerificationEmailParams) {
   return [
     `Hi ${params.fullName},`,
     "",
-    "Use this verification code to finish creating your Sport Booking PH account:",
+    "Use this verification code to finish creating your MMG Stellar account:",
     "",
     params.code,
     "",
@@ -80,4 +80,24 @@ export async function sendVerificationEmail(params: VerificationEmailParams) {
     provider: "resend",
     providerMessageId: result.data?.id
   } satisfies EmailDeliveryResult;
+}
+
+export async function sendBookingLifecycleEmail(params: { to: string; fullName: string; subject: string; heading: string; lines: string[] }) {
+  const resendConfig = getResendConfig();
+  const escapeHtml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+  if (!resendConfig) {
+    if (process.env.NODE_ENV === "production") throw new Error("Email delivery is not configured.");
+    console.info(`[email:booking] to=${params.to} subject="${params.subject}"`);
+    return { delivered: false as const, provider: "console" as const };
+  }
+  const resend = new Resend(resendConfig.apiKey);
+  const result = await resend.emails.send({
+    from: resendConfig.from,
+    to: params.to,
+    subject: params.subject,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1c1917"><h1>${escapeHtml(params.heading)}</h1><p>Hello ${escapeHtml(params.fullName)},</p>${params.lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}</div>`,
+    text: [`${params.heading}`, `Hello ${params.fullName},`, ...params.lines].join("\n\n")
+  });
+  if (result.error) throw new Error(`Resend email delivery failed: ${result.error.message}`);
+  return { delivered: true as const, provider: "resend" as const, id: result.data?.id ?? null };
 }

@@ -5,9 +5,10 @@ import { FacilityCreateForm } from "@/components/admin/facility-create-form";
 import { FacilityForm } from "@/components/admin/facility-form";
 import { FacilityList } from "@/components/admin/facility-list";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requireAnyPermission } from "@/lib/auth/authorization";
 import { formatDateTimeRange } from "@/lib/time/slots";
 import { getAdminFacilitiesData } from "@/server/admin/queries";
+import { resolveFacilityCapabilities } from "@/features/admin/facility-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +16,19 @@ type AdminFacilitiesPageProps = {
   searchParams: Promise<{
     facilityId?: string;
     new?: string;
+    created?: string;
   }>;
 };
 
 export default async function AdminFacilitiesPage({ searchParams }: AdminFacilitiesPageProps) {
-  await requireAdminSession();
+  const authorization = await requireAnyPermission(["facilities.manage", "facility_content.edit", "facility_photos.manage", "pricing.manage"]);
   const params = await searchParams;
+  const capabilities = resolveFacilityCapabilities(authorization.permissions);
+  const canManageFacilities = capabilities.operations;
+  const canManageContent = capabilities.content;
+  const canManagePhotos = capabilities.photos;
+  const canManagePricing = capabilities.pricing;
+  const canCreateFacility = canManageFacilities && canManageContent && canManagePricing && canManagePhotos;
   const { facilities, blocks, cancellationEnabled } = await getAdminFacilitiesData();
   const selectedFacility = facilities.find((facility) => facility.id === params.facilityId) ?? (params.new === "1" ? null : facilities[0]);
   const selectedBlocks = selectedFacility ? blocks.filter((block) => block.facilityId === selectedFacility.id) : [];
@@ -33,9 +41,9 @@ export default async function AdminFacilitiesPage({ searchParams }: AdminFacilit
         description="Select a facility to manage its details, images, operating hours, pricing, and blocked schedules."
       />
       <AdminNav current="facilities" />
-      <section className="rounded-2xl border border-amber-400/15 bg-amber-400/10 p-4 text-sm text-amber-100">
+      {canManageFacilities ? <section className="rounded-2xl border border-amber-400/15 bg-amber-400/10 p-4 text-sm text-amber-100">
         Global cancellation is currently {cancellationEnabled ? "enabled" : "disabled"}. Facility-specific settings can inherit or override it.
-      </section>
+      </section> : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <FacilityList
@@ -49,10 +57,11 @@ export default async function AdminFacilitiesPage({ searchParams }: AdminFacilit
             blockedScheduleCount: blocks.filter((block) => block.facilityId === facility.id).length
           }))}
           selectedFacilityId={selectedFacility?.id}
+          canCreate={canCreateFacility}
         />
 
         <section className="min-w-0 rounded-[1.75rem] border border-white/10 bg-white/5 p-5 sm:p-6">
-          {params.new === "1" ? (
+          {params.new === "1" && canCreateFacility ? (
             <div className="space-y-5">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-amber-300">New facility</p>
@@ -63,9 +72,10 @@ export default async function AdminFacilitiesPage({ searchParams }: AdminFacilit
             </div>
           ) : selectedFacility ? (
             <div className="space-y-8">
-              <FacilityForm key={`${selectedFacility.id}-${selectedFacility.updatedAt.toISOString()}`} facility={selectedFacility} />
+              {params.created === "1" ? <p className="rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-4 text-sm text-emerald-200">Facility added successfully. You can now finish configuring its images, hours, pricing, and blocked schedules below.</p> : null}
+              <FacilityForm key={selectedFacility.id} facility={selectedFacility} canManageContent={canManageContent} canManageFacilities={canManageFacilities} canManagePhotos={canManagePhotos} canManagePricing={canManagePricing} />
 
-              <section className="space-y-5 border-t border-white/10 pt-6">
+              {canManageFacilities ? <section className="space-y-5 border-t border-white/10 pt-6">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Availability controls</p>
                   <h2 className="mt-2 text-xl font-semibold text-white">Blocked schedules</h2>
@@ -85,7 +95,7 @@ export default async function AdminFacilitiesPage({ searchParams }: AdminFacilit
                     </article>
                   ))}
                 </div>
-              </section>
+              </section> : null}
             </div>
           ) : (
             <div className="flex min-h-96 items-center justify-center rounded-2xl border border-dashed border-white/15 p-6 text-center">

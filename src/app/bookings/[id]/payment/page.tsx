@@ -10,6 +10,8 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { getPaymentProofUrl } from "@/lib/storage/payment-proofs";
+import { parsePriceSnapshot } from "@/server/pricing/snapshot";
+import { minutesToTimeLabel } from "@/lib/time/slots";
 import { formatDateTimeRange } from "@/lib/time/slots";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,9 @@ export const dynamic = "force-dynamic";
 type PaymentPageProps = {
   params: Promise<{
     id: string;
+  }>;
+  searchParams: Promise<{
+    submitted?: string;
   }>;
 };
 
@@ -37,7 +42,7 @@ function getPaymentLabel(status: PaymentStatus) {
   return labels[status];
 }
 
-export default async function BookingPaymentPage({ params }: PaymentPageProps) {
+export default async function BookingPaymentPage({ params, searchParams }: PaymentPageProps) {
   const session = await getSession();
 
   if (!session?.user) {
@@ -45,6 +50,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
   }
 
   const { id } = await params;
+  const query = await searchParams;
   const booking = await prisma.booking.findFirst({
     where: {
       id,
@@ -61,6 +67,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
   }
 
   const paymentProofUrl = await getPaymentProofUrl(booking.payment.proofImageUrl);
+  const priceSnapshot = parsePriceSnapshot(booking.priceSnapshot);
 
   const now = new Date();
   const isAwaitingPayment = booking.payment.status === PaymentStatus.AWAITING_PAYMENT;
@@ -78,14 +85,29 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
         title="Complete your reservation payment"
         description="Your slot is held while payment is pending. Staff confirmation is required before the booking is final."
       />
+      {query.submitted === "1" ? <p aria-live="polite" className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">Payment proof submitted successfully. Staff will verify your payment before confirming the booking.</p> : null}
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+      <section className="space-y-6">
         <div className="space-y-5 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
           <div>
             <p className="text-sm uppercase tracking-[0.2em] text-amber-300">{getPaymentLabel(booking.payment.status)}</p>
             <h1 className="mt-3 font-serif text-3xl text-white">{booking.facility.name}</h1>
             <p className="mt-2 text-sm text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p>
           </div>
+          {priceSnapshot?.segments.length ? (
+            <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-stone-500">Base price breakdown</p>
+              <div className="mt-3 space-y-2">
+                {priceSnapshot.segments.map((segment) => (
+                  <div key={`${segment.startMinutes}-${segment.ruleId}`} className="flex items-start justify-between gap-4 text-sm">
+                    <span className="text-stone-300">{minutesToTimeLabel(segment.startMinutes)}-{minutesToTimeLabel(segment.endMinutes)} · {segment.rateLabel}</span>
+                    <span className="font-medium text-white">{formatCurrency(segment.amountMinor, "PHP")}</span>
+                  </div>
+                ))}
+              </div>
+              {priceSnapshot.holidayName ? <p className="mt-3 text-sm text-amber-200">Holiday pricing: {priceSnapshot.holidayName}</p> : null}
+            </div>
+          ) : null}
           <div className="grid gap-3 text-sm text-stone-300 sm:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
               <p className="text-stone-500">Reference</p>
@@ -94,6 +116,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
               <p className="text-stone-500">Amount due</p>
               <p className="mt-1 text-lg font-semibold text-white">{formatCurrency(booking.amountMinor, "PHP")}</p>
+              <p className="text-xs text-stone-400">VAT-exclusive base amount</p>
             </div>
           </div>
           {booking.paymentHoldExpiresAt && isAwaitingPayment && !isExpiredHold ? (
@@ -148,14 +171,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
           ) : null}
         </div>
 
-        {canSubmitProof ? (
-          <PaymentProofForm bookingId={booking.id} />
-        ) : (
-          <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-stone-300">
-            <h2 className="text-lg font-semibold text-white">Payment status</h2>
-            <p className="mt-2">{getPaymentLabel(booking.payment.status)}</p>
-          </section>
-        )}
+        {canSubmitProof ? <PaymentProofForm bookingId={booking.id} /> : <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-stone-300"><h2 className="text-lg font-semibold text-white">Payment status</h2><p className="mt-2">{getPaymentLabel(booking.payment.status)}</p></section>}
       </section>
     </main>
   );

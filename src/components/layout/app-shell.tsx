@@ -4,7 +4,10 @@ import { auth } from "@/auth";
 import { DesktopAdminMenu } from "@/components/layout/desktop-admin-menu";
 import { MobileNavMenu } from "@/components/layout/mobile-nav-menu";
 import { SessionNav } from "@/components/layout/session-nav";
+import { AdminSessionGuard } from "@/components/layout/admin-session-guard";
 import { siteConfig } from "@/lib/config/site";
+import { getCurrentAdminAuthorization } from "@/lib/auth/authorization";
+import { visibleAdminNavigation } from "@/lib/auth/admin-navigation";
 
 type AppShellProps = Readonly<{
   children: React.ReactNode;
@@ -15,19 +18,12 @@ const navItems = [
   { href: "/bookings", label: "My Bookings" }
 ] as const;
 
-const adminItems = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/calendar", label: "Calendar" },
-  { href: "/admin/walk-ins", label: "Walk-ins" },
-  { href: "/admin/facilities", label: "Facilities" },
-  { href: "/admin/payments", label: "Payments" },
-  { href: "/admin/customers", label: "Customers" },
-  { href: "/admin/reports", label: "Reports" }
-] as const;
-
 export async function AppShell({ children }: AppShellProps) {
   const session = await auth();
-  const showAdminItems = session?.user?.role === "ADMIN";
+  const authorization = session?.user ? await getCurrentAdminAuthorization() : null;
+  const adminItems = authorization ? visibleAdminNavigation(authorization.permissions) : [];
+  const showAdminItems = adminItems.length > 0;
+  const displaySession = session?.user?.role === "ADMIN" && !authorization ? null : session;
 
   return (
     <div className="min-h-screen">
@@ -45,17 +41,18 @@ export async function AppShell({ children }: AppShellProps) {
             {showAdminItems ? (
               <DesktopAdminMenu items={adminItems} />
             ) : null}
-            <SessionNav session={session} />
+            <SessionNav session={displaySession} />
           </nav>
           <MobileNavMenu
             adminItems={adminItems}
             navItems={navItems}
-            sessionControls={<SessionNav session={session} />}
+            sessionControls={<SessionNav session={displaySession} />}
             showAdminItems={showAdminItems}
           />
         </div>
       </header>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
+      <AdminSessionGuard enabled={session?.user?.role === "ADMIN"} />
+      <div className="mx-auto min-w-0 max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
     </div>
   );
 }

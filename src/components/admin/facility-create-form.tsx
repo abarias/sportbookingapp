@@ -6,10 +6,12 @@ import { useFormStatus } from "react-dom";
 import { createFacilityAction, type FacilityActionState } from "@/features/admin/actions";
 import { FacilityImageManager } from "@/components/admin/facility-image-manager";
 import { Button } from "@/components/ui/button";
-import { minutesToTimeInputValue } from "@/lib/time/slots";
+import { minutesToTimeLabel } from "@/lib/time/slots";
 
 const initialState: FacilityActionState = {};
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const openingTimeOptions = Array.from({ length: 24 }, (_, index) => index * 60);
+const closingTimeOptions = Array.from({ length: 24 }, (_, index) => (index + 1) * 60);
 
 type HourValue = {
   opensAt: string;
@@ -33,23 +35,32 @@ export function FacilityCreateForm() {
   const [amount, setAmount] = useState("");
   const [cancellationWindow, setCancellationWindow] = useState("");
   const [cancellationPolicy, setCancellationPolicy] = useState("inherit");
+  const [clientError, setClientError] = useState<string | null>(null);
   const [hours, setHours] = useState<HourValue[]>(() =>
     Array.from({ length: 7 }, () => ({
-      opensAt: minutesToTimeInputValue(480),
-      closesAt: minutesToTimeInputValue(1320),
+      opensAt: "360",
+      closesAt: "1440",
       isClosed: false
     }))
   );
 
   function updateHour(dayOfWeek: number, values: Partial<HourValue>) {
+    setClientError(null);
     setHours((current) => current.map((hour, index) => (index === dayOfWeek ? { ...hour, ...values } : hour)));
   }
 
   return (
-    <form action={action} className="space-y-5 rounded-[1.75rem] border border-amber-400/20 bg-amber-400/10 p-6">
+    <form action={action} className="space-y-5 rounded-[1.75rem] border border-amber-400/20 bg-amber-400/10 p-6" onSubmit={(event) => {
+      const invalidDayIndex = hours.findIndex((hour) => !hour.isClosed && Number(hour.opensAt) >= Number(hour.closesAt));
+
+      if (invalidDayIndex >= 0) {
+        event.preventDefault();
+        setClientError(`${dayLabels[invalidDayIndex]} opening time must be earlier than its closing time.`);
+      }
+    }}>
       <div>
-        <h2 className="text-lg font-semibold text-white">Add a facility</h2>
-        <p className="mt-1 text-sm text-amber-100/80">Create a new bookable court or activity with pricing, images, and operating hours.</p>
+        <h2 className="text-lg font-semibold text-white">General information</h2>
+        <p className="mt-1 text-sm text-amber-100/80">Keep the customer-facing name and description clear and accurate.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-2 text-sm text-stone-200">
@@ -86,8 +97,9 @@ export function FacilityCreateForm() {
           {state.fieldErrors?.description ? <p className="text-sm text-rose-300">{state.fieldErrors.description}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">
-          <span>Price (PHP per hour)</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" min="0" name="amount" onChange={(event) => setAmount(event.target.value)} required step="0.01" type="number" value={amount} />
+          <span>Default base rate (PHP per hour)</span>
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" min="0.01" name="amount" onChange={(event) => setAmount(event.target.value)} required step="0.01" type="number" value={amount} />
+          <span className="block text-xs text-stone-500">VAT exclusive. Add weekday, weekend, and holiday overrides after creating the facility.</span>
           {state.fieldErrors?.amount ? <p className="text-sm text-rose-300">{state.fieldErrors.amount}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200">
@@ -119,11 +131,15 @@ export function FacilityCreateForm() {
               <div className="text-sm font-medium text-white">{label}</div>
               <label className="space-y-1 text-sm text-stone-300">
                 <span>Open</span>
-                <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" name={`opensAtMinutes_${dayOfWeek}`} required step={1800} type="time" value={hours[dayOfWeek]?.opensAt ?? "08:00"} onChange={(event) => updateHour(dayOfWeek, { opensAt: event.target.value })} />
+                <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" name={`opensAtMinutes_${dayOfWeek}`} required value={hours[dayOfWeek]?.opensAt ?? "360"} onChange={(event) => updateHour(dayOfWeek, { opensAt: event.target.value })}>
+                  {openingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}</option>)}
+                </select>
               </label>
               <label className="space-y-1 text-sm text-stone-300">
                 <span>Close</span>
-                <input className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" name={`closesAtMinutes_${dayOfWeek}`} required step={1800} type="time" value={hours[dayOfWeek]?.closesAt ?? "22:00"} onChange={(event) => updateHour(dayOfWeek, { closesAt: event.target.value })} />
+                <select className="h-10 w-full rounded-xl border border-white/10 bg-stone-900/80 px-3 text-white" name={`closesAtMinutes_${dayOfWeek}`} required value={hours[dayOfWeek]?.closesAt ?? "1440"} onChange={(event) => updateHour(dayOfWeek, { closesAt: event.target.value })}>
+                  {closingTimeOptions.map((minutes) => <option key={minutes} value={minutes}>{minutesToTimeLabel(minutes)}{minutes === 1440 ? " (midnight)" : ""}</option>)}
+                </select>
               </label>
               <label className="flex items-center gap-2 self-end text-sm text-stone-300">
                 <input name={`isClosed_${dayOfWeek}`} type="checkbox" checked={hours[dayOfWeek]?.isClosed ?? false} onChange={(event) => updateHour(dayOfWeek, { isClosed: event.target.checked })} />
@@ -134,6 +150,7 @@ export function FacilityCreateForm() {
         </div>
         {state.fieldErrors?.operatingHours ? <p className="text-sm text-rose-300">{state.fieldErrors.operatingHours}</p> : null}
       </div>
+      {clientError ? <p className="rounded-xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm text-rose-200">{clientError}</p> : null}
       {state.message ? <p className="text-sm text-rose-300">{state.message}</p> : null}
       {state.success ? <p className="text-sm text-emerald-300">{state.success}</p> : null}
       <SubmitButton />

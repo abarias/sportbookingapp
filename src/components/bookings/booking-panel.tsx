@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { minutesToTimeLabel } from "@/lib/time/slots";
 import type { DaySlot } from "@/server/bookings/core";
-
-type BillingMode = "PER_HOUR" | "PER_BLOCK";
+import type { PriceCalculation, PriceSegment } from "@/server/pricing/types";
 
 type BookingPanelProps = {
   facilityId: string;
@@ -20,8 +19,7 @@ type BookingPanelProps = {
   slotIntervalMinutes: number;
   slots: DaySlot[];
   isAuthenticated: boolean;
-  priceAmountMinor: number;
-  priceBillingMode: BillingMode;
+  priceQuotes: PriceCalculation[];
 };
 
 type HourBlock = {
@@ -91,12 +89,18 @@ function getSelectionBlocks(blocks: HourBlock[], startMinutes: number | null, en
   return blocks.filter((block) => block.startMinutes >= startMinutes && block.endMinutes <= endMinutes);
 }
 
-function getBookingAmount(amountMinor: number, billingMode: BillingMode, durationMinutes: number) {
-  if (billingMode === "PER_BLOCK") {
-    return amountMinor;
-  }
-
-  return Math.round((amountMinor * durationMinutes) / 60);
+function mergePriceSegments(segments: PriceSegment[]) {
+  return segments.reduce<PriceSegment[]>((result, segment) => {
+    const previous = result[result.length - 1];
+    if (previous && previous.ruleId === segment.ruleId && previous.endMinutes === segment.startMinutes) {
+      previous.endMinutes = segment.endMinutes;
+      previous.durationMinutes += segment.durationMinutes;
+      previous.amountMinor = Math.round((previous.rateAmountMinor * previous.durationMinutes) / previous.rateUnitMinutes);
+    } else {
+      result.push({ ...segment });
+    }
+    return result;
+  }, []);
 }
 
 function getSlotTone(block: HourBlock, isSelected: boolean) {
@@ -112,7 +116,7 @@ function getSlotTone(block: HourBlock, isSelected: boolean) {
     return "cursor-not-allowed border-rose-300/50 bg-rose-500/20 text-rose-100 opacity-80";
   }
 
-  return "cursor-not-allowed border-stone-500/50 bg-stone-700/40 text-stone-300 opacity-80";
+  return "cursor-not-allowed border-rose-300/50 bg-rose-500/20 text-rose-100 opacity-80";
 }
 
 export function BookingPanel({
@@ -123,8 +127,7 @@ export function BookingPanel({
   slotIntervalMinutes,
   slots,
   isAuthenticated,
-  priceAmountMinor,
-  priceBillingMode
+  priceQuotes
 }: BookingPanelProps) {
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
@@ -138,11 +141,13 @@ export function BookingPanel({
   );
   const availableHourCount = hourBlocks.filter((block) => block.isAvailable).length;
   const durationMinutes = selectedBlocks.length * CUSTOMER_BOOKING_INCREMENT_MINUTES;
-  const amountMinor = durationMinutes > 0 ? getBookingAmount(priceAmountMinor, priceBillingMode, durationMinutes) : 0;
-  const isSelectionValid = selectedBlocks.length > 0 && areContiguousAvailableBlocks(selectedBlocks);
+  const selectedQuotes = selectedBlocks.map((block) => priceQuotes.find((quote) => quote.segments[0]?.startMinutes === block.startMinutes)).filter((quote): quote is PriceCalculation => Boolean(quote));
+  const priceSegments = mergePriceSegments(selectedQuotes.flatMap((quote) => quote.segments));
+  const amountMinor = selectedQuotes.reduce((sum, quote) => sum + quote.amountMinor, 0);
+  const isSelectionValid = selectedBlocks.length > 0 && selectedQuotes.length === selectedBlocks.length && areContiguousAvailableBlocks(selectedBlocks);
   const confirmationMessage =
     isSelectionValid && selectionStart !== null && selectionEnd !== null
-      ? `Reserve ${minutesToTimeLabel(selectionStart)} - ${minutesToTimeLabel(selectionEnd)} on ${dateLabel} for ${formatCurrency(amountMinor, "PHP")}?`
+      ? `Reserve ${minutesToTimeLabel(selectionStart)} - ${minutesToTimeLabel(selectionEnd)} on ${dateLabel} for a VAT-exclusive base price of ${formatCurrency(amountMinor, "PHP")}?`
       : "Reserve this selected booking?";
 
   function selectBlock(block: HourBlock) {
@@ -209,7 +214,7 @@ export function BookingPanel({
   return (
     <form
       action={action}
-      className="overflow-hidden rounded-[2rem] border border-amber-300/25 bg-stone-950/70 shadow-[0_24px_90px_rgba(251,191,36,0.10)]"
+      className="w-full max-w-full min-w-0 overflow-hidden rounded-[2rem] border border-amber-300/25 bg-stone-950/70 shadow-[0_24px_90px_rgba(251,191,36,0.10)]"
       onSubmit={(event) => {
         if (!window.confirm(confirmationMessage)) {
           event.preventDefault();
@@ -240,11 +245,10 @@ export function BookingPanel({
       </div>
 
       <div className="space-y-5 p-5 sm:p-6">
-        <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-stone-400">
+        <div className="flex min-w-0 flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-stone-400">
           <span className="rounded-full bg-emerald-400/25 px-3 py-1 text-emerald-100">Available</span>
           <span className="rounded-full bg-amber-300 px-3 py-1 text-stone-950">Selected</span>
           <span className="rounded-full bg-rose-400/25 px-3 py-1 text-rose-100">Booked</span>
-          <span className="rounded-full bg-stone-600/60 px-3 py-1 text-stone-200">Blocked / Closed</span>
         </div>
 
         {hourBlocks.length === 0 ? (
@@ -255,14 +259,17 @@ export function BookingPanel({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {hourBlocks.map((block) => {
               const isSelected = selectedBlocks.some((selected) => selected.startMinutes === block.startMinutes);
-              const label = block.reason === "AVAILABLE" ? "Available" : block.reason === "BOOKED" ? "Booked" : "Blocked";
+              const quote = priceQuotes.find((item) => item.segments[0]?.startMinutes === block.startMinutes);
+              const isBookable = block.isAvailable && Boolean(quote);
+              const displayBlock = isBookable ? block : block.isAvailable ? { ...block, isAvailable: false, reason: "BLOCKED" as const } : block;
+              const label = block.isAvailable && !quote ? "Pricing unavailable" : block.reason === "AVAILABLE" ? "Available" : "Booked";
 
               return (
                 <button
                   key={block.startMinutes}
                   aria-pressed={isSelected}
-                  className={`rounded-2xl border px-4 py-4 text-left text-sm transition ${getSlotTone(block, isSelected)}`}
-                  disabled={!block.isAvailable}
+                  className={`rounded-2xl border px-4 py-4 text-left text-sm transition ${getSlotTone(displayBlock, isSelected)}`}
+                  disabled={!isBookable}
                   onClick={() => selectBlock(block)}
                   type="button"
                 >
@@ -270,6 +277,7 @@ export function BookingPanel({
                     {minutesToTimeLabel(block.startMinutes)} - {minutesToTimeLabel(block.endMinutes)}
                   </p>
                   <p className="mt-2 text-xs uppercase tracking-[0.16em]">{isSelected ? "Selected" : label}</p>
+                  {block.isAvailable && quote ? <p className="mt-2 text-sm font-medium">Base {formatCurrency(quote.amountMinor, "PHP")}{quote.isHoliday ? ` · ${quote.holidayName ?? "Holiday"}` : ""}</p> : null}
                 </button>
               );
             })}
@@ -291,8 +299,9 @@ export function BookingPanel({
                   {minutesToTimeLabel(selectionStart)} - {minutesToTimeLabel(selectionEnd)}
                 </p>
                 <p className="text-sm text-stone-300">
-                  {durationMinutes / 60} hour{durationMinutes === 60 ? "" : "s"} • {formatCurrency(amountMinor, "PHP")}
+                  {durationMinutes / 60} hour{durationMinutes === 60 ? "" : "s"} • VAT-exclusive base price {formatCurrency(amountMinor, "PHP")}
                 </p>
+                {priceSegments.length > 1 ? <div className="pt-2 text-xs leading-5 text-stone-400">{priceSegments.map((segment) => <p key={`${segment.startMinutes}-${segment.ruleId}`}>{minutesToTimeLabel(segment.startMinutes)}-{minutesToTimeLabel(segment.endMinutes)} · {segment.rateLabel} · {formatCurrency(segment.amountMinor, "PHP")}</p>)}</div> : null}
                 <button
                   className="text-sm font-medium text-amber-200 underline-offset-4 hover:underline"
                   onClick={() => {

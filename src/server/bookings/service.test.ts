@@ -1,12 +1,16 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, PricingBillingMode, PricingDayType } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   tx: {
+    $queryRaw: vi.fn(),
     appSetting: {
       findUnique: vi.fn()
     },
     blockedSchedule: {
+      findMany: vi.fn()
+    },
+    holiday: {
       findMany: vi.fn()
     },
     booking: {
@@ -14,7 +18,13 @@ const mocks = vi.hoisted(() => ({
       findMany: vi.fn(),
       findUnique: vi.fn()
     },
+    bookingReschedule: {
+      findMany: vi.fn()
+    },
     facility: {
+      findUnique: vi.fn()
+    },
+    user: {
       findUnique: vi.fn()
     }
   },
@@ -30,7 +40,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: mocks.prisma
 }));
 
-import { createConfirmedBookingWithMockPayment } from "./service";
+import { createBookingHold, createConfirmedBookingWithMockPayment } from "./service";
 
 const bookingInput = {
   userId: "user-1",
@@ -47,6 +57,8 @@ beforeEach(() => {
   delete process.env.AUTH_STRICT_ENV_VALIDATION;
   delete process.env.VERCEL_ENV;
   mocks.prisma.$transaction.mockImplementation((callback) => callback(mocks.tx));
+  mocks.tx.$queryRaw.mockResolvedValue([]);
+  mocks.tx.bookingReschedule.findMany.mockResolvedValue([]);
 });
 
 describe("createConfirmedBookingWithMockPayment idempotency", () => {
@@ -91,5 +103,41 @@ describe("createConfirmedBookingWithMockPayment idempotency", () => {
       where: { idempotencyKey: bookingInput.idempotencyKey },
       include: { payment: true }
     });
+  });
+});
+
+describe("createBookingHold pricing authority", () => {
+  it("ignores browser pricing and stores the server-calculated snapshot", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-18T00:00:00.000Z"));
+    mocks.tx.booking.findUnique.mockResolvedValue(null);
+    mocks.tx.booking.findMany.mockResolvedValue([]);
+    mocks.tx.user.findUnique.mockResolvedValue({ id: bookingInput.userId });
+    mocks.tx.appSetting.findUnique.mockResolvedValue({ value: 15 });
+    mocks.tx.blockedSchedule.findMany.mockResolvedValue([]);
+    mocks.tx.holiday.findMany.mockResolvedValue([]);
+    mocks.tx.facility.findUnique.mockResolvedValue({
+      id: bookingInput.facilityId,
+      isEnabled: true,
+      timezone: "Asia/Manila",
+      slotIntervalMinutes: 30,
+      operatingHours: [{ dayOfWeek: 4, opensAtMinutes: 480, closesAtMinutes: 1320, isClosed: false }],
+      pricingRules: [
+        { id: "default", facilityId: bookingInput.facilityId, name: "Default", customerLabel: null, dayType: PricingDayType.DEFAULT, daysOfWeek: [], startMinutes: 0, endMinutes: 1440, currency: "PHP", amountMinor: 100000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, effectiveFrom: null, effectiveUntil: null, isActive: true, displayOrder: 0, createdByUserId: null, updatedByUserId: null, createdAt: new Date(), updatedAt: new Date() },
+        { id: "weekday", facilityId: bookingInput.facilityId, name: "Weekday", customerLabel: "Weekday base rate", dayType: PricingDayType.WEEKDAY, daysOfWeek: [], startMinutes: 480, endMinutes: 1020, currency: "PHP", amountMinor: 150000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, effectiveFrom: null, effectiveUntil: null, isActive: true, displayOrder: 1, createdByUserId: null, updatedByUserId: null, createdAt: new Date(), updatedAt: new Date() }
+      ]
+    });
+    mocks.tx.booking.create.mockImplementation(({ data }) => Promise.resolve({ id: "booking-created", ...data }));
+
+    await createBookingHold({ ...bookingInput, amountMinor: 1 } as Parameters<typeof createBookingHold>[0]);
+
+    expect(mocks.tx.booking.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        amountMinor: 150000,
+        currency: "PHP",
+        priceSnapshot: expect.objectContaining({ amountMinor: 150000, vatTreatment: "EXCLUSIVE" })
+      })
+    }));
+    vi.useRealTimers();
   });
 });

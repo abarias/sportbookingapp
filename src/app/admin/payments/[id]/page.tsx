@@ -7,10 +7,12 @@ import { formatInTimeZone } from "date-fns-tz";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { PaymentReviewForm } from "@/components/admin/payment-review-form";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { formatDateTimeRange } from "@/lib/time/slots";
 import { getPaymentProofUrl } from "@/lib/storage/payment-proofs";
+import { parsePriceSnapshot } from "@/server/pricing/snapshot";
+import { minutesToTimeLabel } from "@/lib/time/slots";
 import { getAdminPaymentDetailData } from "@/server/admin/queries";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,9 @@ export const dynamic = "force-dynamic";
 type AdminPaymentDetailPageProps = {
   params: Promise<{
     id: string;
+  }>;
+  searchParams: Promise<{
+    outcome?: string;
   }>;
 };
 
@@ -34,9 +39,10 @@ const paymentLabels: Record<PaymentStatus, string> = {
   REFUNDED: "Refunded"
 };
 
-export default async function AdminPaymentDetailPage({ params }: AdminPaymentDetailPageProps) {
-  await requireAdminSession();
+export default async function AdminPaymentDetailPage({ params, searchParams }: AdminPaymentDetailPageProps) {
+  const authorization = await requirePermission("payments.view");
   const { id } = await params;
+  const query = await searchParams;
   const payment = await getAdminPaymentDetailData(id);
 
   if (!payment) {
@@ -44,6 +50,7 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
   }
 
   const paymentProofUrl = await getPaymentProofUrl(payment.proofImageUrl);
+  const priceSnapshot = parsePriceSnapshot(payment.booking.priceSnapshot);
 
   return (
     <main className="space-y-8 pb-16">
@@ -52,6 +59,9 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
         title="Payment review"
         description="Compare submitted proof against the actual payment account before confirming the booking."
       />
+      {query.outcome === "verified" ? <p aria-live="polite" className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">Payment confirmed successfully. The booking is now confirmed.</p> : null}
+      {query.outcome === "rejected" ? <p aria-live="polite" className="rounded-2xl border border-rose-300/30 bg-rose-300/10 p-4 text-sm text-rose-100">Payment rejected successfully. The reservation no longer blocks inventory.</p> : null}
+      {query.outcome === "action-required" ? <p aria-live="polite" className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">Customer action requested successfully.</p> : null}
       <AdminNav current="payments" />
       <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href="/admin/payments">
         Back to payment queue
@@ -71,12 +81,13 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
               {payment.providerReference}
             </span>
           </div>
+          {priceSnapshot?.segments.length ? <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4"><p className="text-xs uppercase tracking-[0.16em] text-stone-500">Recorded base price breakdown</p><div className="mt-3 space-y-2">{priceSnapshot.segments.map((segment) => <div key={`${segment.startMinutes}-${segment.ruleId}`} className="flex justify-between gap-4 text-sm text-stone-300"><span>{minutesToTimeLabel(segment.startMinutes)}-{minutesToTimeLabel(segment.endMinutes)} · {segment.rateLabel}</span><span className="text-white">{formatCurrency(segment.amountMinor, "PHP")}</span></div>)}</div></div> : null}
 
           <div className="grid gap-3 text-sm text-stone-300 md:grid-cols-2">
             <p><span className="text-stone-500">Customer:</span> {payment.booking.user.fullName}</p>
             <p><span className="text-stone-500">Email:</span> {payment.booking.user.email}</p>
             <p><span className="text-stone-500">Phone:</span> {payment.booking.user.phone ?? "Not provided"}</p>
-            <p><span className="text-stone-500">Expected:</span> {formatCurrency(payment.amountMinor, "PHP")}</p>
+            <p><span className="text-stone-500">Expected base amount (VAT exclusive):</span> {formatCurrency(payment.amountMinor, "PHP")}</p>
             <p><span className="text-stone-500">Method:</span> {payment.method?.replaceAll("_", " ") ?? "Not set"}</p>
             <p><span className="text-stone-500">Transfer ref:</span> {payment.externalReference ?? "Not set"}</p>
             <p>
@@ -106,7 +117,7 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
           )}
         </div>
 
-        {payment.status === PaymentStatus.SUBMITTED ? (
+        {payment.status === PaymentStatus.SUBMITTED && authorization.permissions.has("payments.verify") ? (
           <PaymentReviewForm paymentId={payment.id} />
         ) : (
           <section className="rounded-2xl border border-white/10 bg-stone-950/40 p-4 text-sm leading-7 text-stone-300">

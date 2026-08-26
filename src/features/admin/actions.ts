@@ -2,13 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { addDays } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
 import { z } from "zod";
 import { FacilityType } from "@prisma/client";
 
 import { adminWalkInBookingSchema, blockedScheduleSchema, facilityCreateSchema, facilityUpdateSchema, walkInCustomerSchema } from "@/features/admin/schemas";
+import { resolveFacilityCapabilities } from "@/features/admin/facility-permissions";
 import { hashPassword } from "@/lib/auth/password";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requireAllPermissions, requireAnyPermission, requirePermission } from "@/lib/auth/authorization";
+import { writeAuditLog } from "@/lib/audit/log";
 import { prisma } from "@/lib/db/prisma";
 import { storeFacilityImages } from "@/lib/storage/facility-images";
 import { createAdminConfirmedBooking } from "@/server/bookings/service";
@@ -103,9 +107,18 @@ function timeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
+function buildBlockedScheduleDate(dateKey: string, time: string, timezone: string) {
+  if (time === "24:00") {
+    return addDays(fromZonedTime(`${dateKey}T00:00:00`, timezone), 1);
+  }
+
+  return fromZonedTime(`${dateKey}T${time}:00`, timezone);
+}
+
 export type FacilityActionState = {
   success?: string;
   message?: string;
+  section?: "details" | "images" | "schedule";
   fieldErrors?: Partial<Record<"name" | "slug" | "type" | "description" | "amount" | "imageUrls" | "operatingHours" | "cancellationWindowHoursOverride", string>>;
 };
 
@@ -150,15 +163,15 @@ const paymentReviewSchema = z.object({
 });
 
 export async function updateCancellationSettingAction(formData: FormData) {
-  await requireAdminSession();
+  const authorization = await requirePermission("facilities.manage");
   const cancellationWindowHours = parseNullablePositiveInteger(formData.get("cancellationWindowHours"));
 
   if (cancellationWindowHours === null || !Number.isFinite(cancellationWindowHours) || cancellationWindowHours < 1) {
     throw new Error("Cancellation window must be at least 1 hour.");
   }
 
-  await prisma.$transaction([
-    prisma.appSetting.upsert({
+  await prisma.$transaction(async (tx) => {
+    await tx.appSetting.upsert({
       where: { key: "booking.cancellationEnabled" },
       update: {
         value: parseBoolean(formData.get("enabled"))
@@ -167,8 +180,8 @@ export async function updateCancellationSettingAction(formData: FormData) {
         key: "booking.cancellationEnabled",
         value: parseBoolean(formData.get("enabled"))
       }
-    }),
-    prisma.appSetting.upsert({
+    });
+    await tx.appSetting.upsert({
       where: { key: "booking.cancellationWindowHours" },
       update: {
         value: cancellationWindowHours
@@ -177,8 +190,9 @@ export async function updateCancellationSettingAction(formData: FormData) {
         key: "booking.cancellationWindowHours",
         value: cancellationWindowHours
       }
-    })
-  ]);
+    });
+    await writeAuditLog(tx, { actorUserId: authorization.session.user.id, action: "facility.cancellation_policy_updated", entityType: "AppSetting", entityId: "booking.cancellationEnabled", after: { enabled: parseBoolean(formData.get("enabled")), cancellationWindowHours } });
+  });
 
   revalidatePath("/admin");
   revalidatePath("/admin/facilities");
@@ -188,31 +202,57 @@ export async function updateFacilityAction(
   _prevState: FacilityActionState,
   formData: FormData
 ): Promise<FacilityActionState> {
-  await requireAdminSession();
-
   const facilityId = String(formData.get("facilityId") ?? "");
-  const imageUrls = String(formData.get("imageUrls") ?? "")
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean);
-  let uploadedUrls: string[];
+  const requestedSection = String(formData.get("saveSection") ?? "details");
+  const section = requestedSection === "images" || requestedSection === "schedule" ? requestedSection : "details";
+  const authorization = section === "images"
+    ? await requirePermission("facility_photos.manage")
+    : section === "schedule"
+      ? await requirePermission("facilities.manage")
+      : await requireAnyPermission(["facility_content.edit", "facilities.manage", "pricing.manage"]);
+  const capabilities = resolveFacilityCapabilities(authorization.permissions);
+  const canManageContent = capabilities.content;
+  const canManageFacilities = capabilities.operations;
+  const canManagePricing = capabilities.pricing;
+  const session = authorization.session;
 
-  try {
-    uploadedUrls = await persistFacilityUploads(formData, String(formData.get("name") ?? facilityId));
-  } catch (error) {
-    return { message: error instanceof Error ? error.message : "Facility images could not be uploaded." };
+  const existing = await prisma.facility.findUnique({
+    where: { id: facilityId },
+    include: {
+      images: { orderBy: { sortOrder: "asc" } },
+      operatingHours: { orderBy: { dayOfWeek: "asc" } },
+      pricingRules: { where: { isActive: true, dayType: "DEFAULT" }, orderBy: { createdAt: "desc" }, take: 1 }
+    }
+  });
+  if (!existing) return { section, message: "Facility not found." };
+
+  let imageUrls = existing.images.map((image) => image.url);
+  if (section === "images") {
+    const retainedUrls = String(formData.get("imageUrls") ?? "").split("\n").map((item) => item.trim()).filter(Boolean);
+    try {
+      imageUrls = [...retainedUrls, ...await persistFacilityUploads(formData, existing.name)];
+    } catch (error) {
+      return { section, message: error instanceof Error ? error.message : "Facility images could not be uploaded." };
+    }
   }
-  const weekdays = buildWeekdays(formData);
-  const cancellationWindowHoursOverride = parseNullablePositiveInteger(formData.get("cancellationWindowHoursOverride"));
+
+  const weekdays = section === "schedule"
+    ? buildWeekdays(formData)
+    : existing.operatingHours.map(({ dayOfWeek, opensAtMinutes, closesAtMinutes, isClosed }) => ({ dayOfWeek, opensAtMinutes, closesAtMinutes, isClosed }));
+  const requestedCancellationWindow = parseNullablePositiveInteger(formData.get("cancellationWindowHoursOverride"));
+  const cancellationWindowHoursOverride = section === "schedule" ? requestedCancellationWindow : existing.cancellationWindowHoursOverride;
+  const currentPricing = existing.pricingRules[0];
 
   const parsed = facilityUpdateSchema.safeParse({
     facilityId,
-    name: String(formData.get("name") ?? ""),
-    description: String(formData.get("description") ?? ""),
-    isEnabled: parseBoolean(formData.get("isEnabled")),
-    amountMinor: parseAmountMinor(formData.get("amount")),
-    imageUrls: [...imageUrls, ...uploadedUrls],
-    cancellationEnabledOverride: String(formData.get("cancellationEnabledOverride") ?? "inherit"),
+    name: section === "details" && canManageContent ? String(formData.get("name") ?? "") : existing.name,
+    description: section === "details" && canManageContent ? String(formData.get("description") ?? "") : existing.description,
+    isEnabled: section === "details" && canManageFacilities ? parseBoolean(formData.get("isEnabled")) : existing.isEnabled,
+    amountMinor: section === "details" && canManagePricing ? parseAmountMinor(formData.get("amount")) : currentPricing?.amountMinor ?? 0,
+    imageUrls,
+    cancellationEnabledOverride: section === "schedule"
+      ? String(formData.get("cancellationEnabledOverride") ?? "inherit")
+      : existing.cancellationEnabledOverride === null ? "inherit" : existing.cancellationEnabledOverride ? "enabled" : "disabled",
     operatingHours: weekdays
   });
 
@@ -221,6 +261,7 @@ export async function updateFacilityAction(
     const operatingHourIssue = parsed.success ? undefined : parsed.error.issues.find((issue) => issue.path[0] === "operatingHours");
 
     return {
+      section,
       message: "Please correct the facility details and try again.",
       fieldErrors: {
         name: flattened?.name?.[0],
@@ -237,54 +278,64 @@ export async function updateFacilityAction(
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.facility.update({
-      where: { id: parsed.data.facilityId },
-      data: {
-        name: parsed.data.name,
-        description: parsed.data.description,
-        isEnabled: parsed.data.isEnabled,
-        cancellationEnabledOverride: parseNullableBoolean(parsed.data.cancellationEnabledOverride),
-        cancellationWindowHoursOverride,
-        images: {
-          deleteMany: {},
-          create: parsed.data.imageUrls.map((url, index) => ({
-            url,
-            altText: `${parsed.data.name} image ${index + 1}`,
-            sortOrder: index
-          }))
-        },
-        operatingHours: {
-          deleteMany: {},
-          create: parsed.data.operatingHours
+    if (section === "details") {
+      await tx.facility.update({
+        where: { id: parsed.data.facilityId },
+        data: {
+          ...(canManageContent ? { name: parsed.data.name, description: parsed.data.description } : {}),
+          ...(canManageFacilities ? { isEnabled: parsed.data.isEnabled } : {})
         }
-      }
-    });
-
-    const activePricing = await tx.pricingRule.findFirst({
-      where: { facilityId: parsed.data.facilityId, isActive: true },
-      orderBy: { createdAt: "desc" }
-    });
+      });
+    } else if (section === "images") {
+      await tx.facility.update({
+        where: { id: parsed.data.facilityId },
+        data: { images: { deleteMany: {}, create: parsed.data.imageUrls.map((url, index) => ({ url, altText: `${existing.name} image ${index + 1}`, sortOrder: index })) } }
+      });
+    } else {
+      await tx.facility.update({
+        where: { id: parsed.data.facilityId },
+        data: {
+          cancellationEnabledOverride: parseNullableBoolean(parsed.data.cancellationEnabledOverride),
+          cancellationWindowHoursOverride,
+          operatingHours: { deleteMany: {}, create: parsed.data.operatingHours }
+        }
+      });
+    }
 
     const nextPrice = parsed.data.amountMinor;
     const nextMinimumMinutes = 60;
 
-    if (!activePricing || activePricing.amountMinor !== nextPrice || activePricing.minimumMinutes !== nextMinimumMinutes) {
+    if (section === "details" && canManagePricing && (!currentPricing || currentPricing.amountMinor !== nextPrice || currentPricing.minimumMinutes !== nextMinimumMinutes)) {
       await tx.pricingRule.updateMany({
-        where: { facilityId: parsed.data.facilityId, isActive: true },
+        where: { facilityId: parsed.data.facilityId, isActive: true, dayType: "DEFAULT" },
         data: { isActive: false }
       });
 
       await tx.pricingRule.create({
         data: {
           facilityId: parsed.data.facilityId,
+          name: "Default rate",
+          customerLabel: "Standard base rate",
+          dayType: "DEFAULT",
           currency: "PHP",
           amountMinor: nextPrice,
           billingMode: "PER_HOUR",
           minimumMinutes: nextMinimumMinutes,
-          isActive: true
+          isActive: true,
+          createdByUserId: session.user.id,
+          updatedByUserId: session.user.id
         }
       });
     }
+
+    await writeAuditLog(tx, {
+      actorUserId: session.user.id,
+      action: section === "images" ? "facility.photos_updated" : section === "schedule" ? "facility.operations_updated" : "facility.content_updated",
+      entityType: "Facility",
+      entityId: existing.id,
+      before: { name: existing.name, description: existing.description, isEnabled: existing.isEnabled, imageUrls: existing.images.map((image) => image.url), amountMinor: currentPricing?.amountMinor ?? null },
+      after: { section, name: parsed.data.name, description: parsed.data.description, isEnabled: parsed.data.isEnabled, imageUrls: parsed.data.imageUrls, amountMinor: parsed.data.amountMinor }
+    });
   });
 
   revalidatePath("/admin");
@@ -292,6 +343,7 @@ export async function updateFacilityAction(
   revalidatePath("/facilities");
 
   return {
+    section,
     success: "Facility details saved."
   };
 }
@@ -300,7 +352,7 @@ export async function createFacilityAction(
   _prevState: FacilityActionState,
   formData: FormData
 ): Promise<FacilityActionState> {
-  await requireAdminSession();
+  const { session } = await requireAllPermissions(["facilities.manage", "facility_content.edit", "pricing.manage", "facility_photos.manage"]);
 
   const imageUrls = String(formData.get("imageUrls") ?? "")
     .split("\n")
@@ -362,8 +414,9 @@ export async function createFacilityAction(
     };
   }
 
-  const createdFacility = await prisma.facility.create({
-    data: {
+  const createdFacility = await prisma.$transaction(async (tx) => {
+    const facility = await tx.facility.create({
+      data: {
       slug: parsed.data.slug,
       name: parsed.data.name,
       description: parsed.data.description,
@@ -383,28 +436,36 @@ export async function createFacilityAction(
       operatingHours: { create: parsed.data.operatingHours },
       pricingRules: {
         create: {
+          name: "Default rate",
+          customerLabel: "Standard base rate",
+          dayType: "DEFAULT",
           currency: "PHP",
           amountMinor: parsed.data.amountMinor,
           billingMode: "PER_HOUR",
           minimumMinutes: 60,
-          isActive: true
+          isActive: true,
+          createdByUserId: session.user.id,
+          updatedByUserId: session.user.id
         }
       }
-    }
+      }
+    });
+    await writeAuditLog(tx, { actorUserId: session.user.id, action: "facility.created", entityType: "Facility", entityId: facility.id, after: { name: facility.name, slug: facility.slug, type: facility.type, isEnabled: facility.isEnabled } });
+    return facility;
   });
 
   revalidatePath("/admin");
   revalidatePath("/admin/facilities");
   revalidatePath("/facilities");
 
-  redirect(`/admin/facilities?facilityId=${encodeURIComponent(createdFacility.id)}`);
+  redirect(`/admin/facilities?facilityId=${encodeURIComponent(createdFacility.id)}&created=1`);
 }
 
 export async function createBlockedScheduleAction(
   _prevState: BlockScheduleActionState,
   formData: FormData
 ): Promise<BlockScheduleActionState> {
-  const session = await requireAdminSession();
+  const { session } = await requirePermission("facilities.manage");
 
   const parsed = blockedScheduleSchema.safeParse({
     facilityId: String(formData.get("facilityId") ?? ""),
@@ -413,7 +474,8 @@ export async function createBlockedScheduleAction(
     startDate: String(formData.get("startDate") ?? ""),
     endDate: String(formData.get("endDate") ?? ""),
     startTime: String(formData.get("startTime") ?? ""),
-    endTime: String(formData.get("endTime") ?? "")
+    endTime: String(formData.get("endTime") ?? ""),
+    allDay: parseBoolean(formData.get("allDay"))
   });
 
   if (!parsed.success) {
@@ -443,18 +505,14 @@ export async function createBlockedScheduleAction(
     };
   }
 
-  const startAtUtc = fromZonedTime(`${parsed.data.startDate}T${parsed.data.startTime}:00`, facility.timezone);
-  const endAtUtc = fromZonedTime(`${parsed.data.endDate}T${parsed.data.endTime}:00`, facility.timezone);
+  const startAtUtc = buildBlockedScheduleDate(parsed.data.startDate, parsed.data.allDay ? "00:00" : parsed.data.startTime, facility.timezone);
+  const endAtUtc = buildBlockedScheduleDate(parsed.data.endDate, parsed.data.allDay ? "24:00" : parsed.data.endTime, facility.timezone);
 
-  await prisma.blockedSchedule.create({
-    data: {
-      facilityId: parsed.data.facilityId,
-      title: parsed.data.title,
-      reason: parsed.data.reason || null,
-      startAtUtc,
-      endAtUtc,
-      createdByUserId: session.user.id
-    }
+  await prisma.$transaction(async (tx) => {
+    const block = await tx.blockedSchedule.create({
+      data: { facilityId: parsed.data.facilityId, title: parsed.data.title, reason: parsed.data.reason || null, startAtUtc, endAtUtc, createdByUserId: session.user.id }
+    });
+    await writeAuditLog(tx, { actorUserId: session.user.id, action: "facility.schedule_blocked", entityType: "BlockedSchedule", entityId: block.id, after: { facilityId: block.facilityId, title: block.title, startAtUtc: block.startAtUtc.toISOString(), endAtUtc: block.endAtUtc.toISOString() } });
   });
 
   revalidatePath("/admin");
@@ -470,7 +528,7 @@ export async function deleteBlockedScheduleAction(
   _prevState: DeleteBlockScheduleActionState,
   formData: FormData
 ): Promise<DeleteBlockScheduleActionState> {
-  await requireAdminSession();
+  const authorization = await requirePermission("facilities.manage");
 
   const parsed = deleteBlockScheduleSchema.safeParse({
     blockId: String(formData.get("blockId") ?? "")
@@ -482,8 +540,11 @@ export async function deleteBlockedScheduleAction(
     };
   }
 
-  await prisma.blockedSchedule.delete({
-    where: { id: parsed.data.blockId }
+  await prisma.$transaction(async (tx) => {
+    const block = await tx.blockedSchedule.findUnique({ where: { id: parsed.data.blockId } });
+    if (!block) throw new Error("Blocked schedule not found.");
+    await writeAuditLog(tx, { actorUserId: authorization.session.user.id, action: "facility.schedule_block_removed", entityType: "BlockedSchedule", entityId: block.id, before: { facilityId: block.facilityId, title: block.title, startAtUtc: block.startAtUtc.toISOString(), endAtUtc: block.endAtUtc.toISOString() } });
+    await tx.blockedSchedule.delete({ where: { id: block.id } });
   });
 
   revalidatePath("/admin");
@@ -521,7 +582,7 @@ export async function checkWalkInCustomerAction(
   _prevState: WalkInBookingActionState,
   formData: FormData
 ): Promise<WalkInBookingActionState> {
-  await requireAdminSession();
+  await requirePermission("bookings.create");
 
   const parsed = walkInCustomerSchema.safeParse(getWalkInCustomerValues(formData));
 
@@ -563,7 +624,7 @@ export async function createWalkInBookingAction(
   _prevState: WalkInBookingActionState,
   formData: FormData
 ): Promise<WalkInBookingActionState> {
-  await requireAdminSession();
+  const authorization = await requirePermission("bookings.create");
 
   const parsed = adminWalkInBookingSchema.safeParse({
     fullName: String(formData.get("fullName") ?? ""),
@@ -632,7 +693,7 @@ export async function createWalkInBookingAction(
   });
 
   try {
-    await createAdminConfirmedBooking({
+    const booking = await createAdminConfirmedBooking({
       userId: user.id,
       facilityId: parsed.data.facilityId,
       dateKey: parsed.data.dateKey,
@@ -641,6 +702,7 @@ export async function createWalkInBookingAction(
       paymentMethod: parsed.data.paymentMethod,
       paymentReference: parsed.data.paymentReference
     });
+    await writeAuditLog(prisma, { actorUserId: authorization.session.user.id, action: "booking.walk_in_created", entityType: "Booking", entityId: booking.id, after: { facilityId: parsed.data.facilityId, customerUserId: user.id, dateKey: parsed.data.dateKey, startTime: parsed.data.startTime, durationMinutes: parsed.data.durationMinutes, paymentMethod: parsed.data.paymentMethod } });
   } catch (error) {
     return {
       message: error instanceof Error ? error.message : "Booking could not be created."
@@ -661,7 +723,7 @@ export async function verifyPaymentAction(
   formData: FormData
 ): Promise<PaymentReviewActionState> {
   try {
-    const session = await requireAdminSession();
+    const { session } = await requirePermission("payments.verify");
     const parsed = paymentReviewSchema.safeParse({
       paymentId: String(formData.get("paymentId") ?? ""),
       reviewNote: String(formData.get("reviewNote") ?? "")
@@ -676,6 +738,7 @@ export async function verifyPaymentAction(
       adminUserId: session.user.id,
       reviewNote: parsed.data.reviewNote
     });
+    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.verified", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote ?? null } });
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
@@ -683,8 +746,9 @@ export async function verifyPaymentAction(
     revalidatePath("/admin/reports");
     revalidatePath("/bookings");
 
-    return { success: "Payment verified and booking confirmed." };
+    redirect(`/admin/payments/${parsed.data.paymentId}?outcome=verified`);
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     return { error: error instanceof Error ? error.message : "Payment could not be verified." };
   }
 }
@@ -694,7 +758,7 @@ export async function rejectPaymentAction(
   formData: FormData
 ): Promise<PaymentReviewActionState> {
   try {
-    const session = await requireAdminSession();
+    const { session } = await requirePermission("payments.verify");
     const parsed = paymentReviewSchema.extend({
       reviewNote: z.string().trim().min(3, "Add a rejection reason.").max(500)
     }).safeParse({
@@ -711,6 +775,7 @@ export async function rejectPaymentAction(
       adminUserId: session.user.id,
       reviewNote: parsed.data.reviewNote
     });
+    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.rejected", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
@@ -718,8 +783,9 @@ export async function rejectPaymentAction(
     revalidatePath("/admin/reports");
     revalidatePath("/bookings");
 
-    return { success: "Payment rejected. The reservation is no longer blocking inventory." };
+    redirect(`/admin/payments/${parsed.data.paymentId}?outcome=rejected`);
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     return { error: error instanceof Error ? error.message : "Payment could not be rejected." };
   }
 }
@@ -729,7 +795,7 @@ export async function requestPaymentActionRequiredAction(
   formData: FormData
 ): Promise<PaymentReviewActionState> {
   try {
-    const session = await requireAdminSession();
+    const { session } = await requirePermission("payments.verify");
     const parsed = paymentReviewSchema.extend({
       reviewNote: z.string().trim().min(3, "Add instructions for the customer.").max(500)
     }).safeParse({
@@ -746,13 +812,15 @@ export async function requestPaymentActionRequiredAction(
       adminUserId: session.user.id,
       reviewNote: parsed.data.reviewNote
     });
+    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.action_required", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
     revalidatePath("/bookings");
 
-    return { success: "Marked as needing customer action." };
+    redirect(`/admin/payments/${parsed.data.paymentId}?outcome=action-required`);
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     return { error: error instanceof Error ? error.message : "Payment could not be updated." };
   }
 }

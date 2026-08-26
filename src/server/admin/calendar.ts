@@ -1,4 +1,4 @@
-import { BookingStatus, PaymentStatus, type Facility, type FacilityOperatingHour } from "@prisma/client";
+import { BookingRescheduleStatus, BookingStatus, PaymentStatus, Prisma, type Facility, type FacilityOperatingHour } from "@prisma/client";
 import { addDays, subDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
@@ -19,7 +19,7 @@ type CalendarBooking = {
   timezone: string;
   user: {
     fullName: string;
-    email: string;
+    email: string | null;
   };
 };
 
@@ -32,6 +32,13 @@ type CalendarBlock = {
   endAtUtc: Date;
 };
 
+type CalendarReplacementHold = {
+  id: string;
+  replacementFacilityId: string;
+  replacementStartAtUtc: Date;
+  replacementEndAtUtc: Date;
+};
+
 type DayFacilitySchedule = {
   facilityId: string;
   facilityName: string;
@@ -42,6 +49,7 @@ type DayFacilitySchedule = {
   slots: DaySlot[];
   bookings: CalendarBooking[];
   blockedSchedules: CalendarBlock[];
+  replacementHolds: CalendarReplacementHold[];
   summary: {
     bookedSlotCount: number;
     blockedSlotCount: number;
@@ -164,11 +172,17 @@ function filterBlocksForDate(blocks: CalendarBlock[], dateKey: string, timezone:
   return blocks.filter((block) => block.startAtUtc < dayEndUtc && block.endAtUtc > dayStartUtc);
 }
 
+function filterReplacementHoldsForDate(holds: CalendarReplacementHold[], dateKey: string, timezone: string) {
+  const { dayStartUtc, dayEndUtc } = getLocalDayRange(dateKey, timezone);
+  return holds.filter((hold) => hold.replacementStartAtUtc < dayEndUtc && hold.replacementEndAtUtc > dayStartUtc);
+}
+
 function buildFacilityDaySchedule(args: {
   facility: CalendarFacility;
   dateKey: string;
   bookings: CalendarBooking[];
   blockedSchedules: CalendarBlock[];
+  replacementHolds: CalendarReplacementHold[];
 }) {
   const openingRange = getOpeningRange(args.facility, args.dateKey);
 
@@ -183,13 +197,14 @@ function buildFacilityDaySchedule(args: {
       slots: [],
       bookings: args.bookings,
       blockedSchedules: args.blockedSchedules,
+      replacementHolds: args.replacementHolds,
       summary: {
         bookedSlotCount: 0,
         blockedSlotCount: 0,
         availableSlotCount: 0,
         isFullyBooked: false,
         isFullyBlocked: false,
-        hasBookings: args.bookings.length > 0
+        hasBookings: args.bookings.length > 0 || args.replacementHolds.length > 0
       }
     };
   }
@@ -198,6 +213,11 @@ function buildFacilityDaySchedule(args: {
     ...args.bookings.map((booking) => ({
       startMinutes: getLocalMinutesForDate(booking.startAtUtc, args.dateKey, args.facility.timezone),
       endMinutes: getLocalMinutesForDate(booking.endAtUtc, args.dateKey, args.facility.timezone),
+      reason: "BOOKED" as const
+    })),
+    ...args.replacementHolds.map((hold) => ({
+      startMinutes: getLocalMinutesForDate(hold.replacementStartAtUtc, args.dateKey, args.facility.timezone),
+      endMinutes: getLocalMinutesForDate(hold.replacementEndAtUtc, args.dateKey, args.facility.timezone),
       reason: "BOOKED" as const
     })),
     ...args.blockedSchedules.map((block) => ({
@@ -227,13 +247,14 @@ function buildFacilityDaySchedule(args: {
     slots,
     bookings: args.bookings,
     blockedSchedules: args.blockedSchedules,
+    replacementHolds: args.replacementHolds,
     summary: {
       bookedSlotCount,
       blockedSlotCount,
       availableSlotCount,
       isFullyBooked: slots.length > 0 && availableSlotCount === 0 && bookedSlotCount > 0,
       isFullyBlocked: slots.length > 0 && availableSlotCount === 0 && blockedSlotCount > 0 && bookedSlotCount === 0,
-      hasBookings: args.bookings.length > 0
+      hasBookings: args.bookings.length > 0 || args.replacementHolds.length > 0
     }
   };
 }
@@ -241,6 +262,7 @@ function buildFacilityDaySchedule(args: {
 export async function getAdminCalendarData(params: {
   month?: string;
   date?: string;
+  fullCustomerAccess?: boolean;
 }) : Promise<AdminCalendarPageData> {
   const timezone = getTimezone();
   const monthKey = normalizeMonthKey(params.month, timezone);
@@ -249,8 +271,22 @@ export async function getAdminCalendarData(params: {
   const dateKeys = listDateKeys(gridStartKey, gridEndKey, timezone);
   const gridStartUtc = fromZonedTime(`${gridStartKey}T00:00:00`, timezone);
   const gridEndExclusiveUtc = fromZonedTime(`${formatInTimeZone(addDays(fromZonedTime(`${gridEndKey}T12:00:00`, timezone), 1), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+  const now = new Date();
 
-  const [facilities, bookings, blockedSchedules] = await Promise.all([
+  const bookingWhere: Prisma.BookingWhereInput = {
+    OR: [
+      { status: BookingStatus.CONFIRMED },
+      { status: BookingStatus.HELD, OR: [{ paymentHoldExpiresAt: { gt: now }, payment: { status: PaymentStatus.AWAITING_PAYMENT } }, { payment: { status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED] } } }] },
+      { status: BookingStatus.PENDING_PAYMENT, paymentHoldExpiresAt: { gt: now } }
+    ],
+    startAtUtc: { lt: gridEndExclusiveUtc },
+    endAtUtc: { gt: gridStartUtc }
+  };
+  const bookingQuery = params.fullCustomerAccess
+    ? prisma.booking.findMany({ where: bookingWhere, orderBy: { startAtUtc: "asc" }, include: { user: { select: { fullName: true, email: true } } } })
+    : prisma.booking.findMany({ where: bookingWhere, orderBy: { startAtUtc: "asc" }, include: { user: { select: { fullName: true } } } });
+
+  const [facilities, rawBookings, blockedSchedules, replacementHolds] = await Promise.all([
     prisma.facility.findMany({
       orderBy: [{ type: "asc" }, { name: "asc" }],
       include: {
@@ -259,46 +295,7 @@ export async function getAdminCalendarData(params: {
         }
       }
     }),
-    prisma.booking.findMany({
-      where: {
-        OR: [
-          { status: BookingStatus.CONFIRMED },
-          {
-            status: BookingStatus.HELD,
-            OR: [
-              {
-                paymentHoldExpiresAt: { gt: new Date() },
-                payment: { status: PaymentStatus.AWAITING_PAYMENT }
-              },
-              {
-                payment: {
-                  status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED] }
-                }
-              }
-            ]
-          },
-          {
-            status: BookingStatus.PENDING_PAYMENT,
-            paymentHoldExpiresAt: { gt: new Date() }
-          }
-        ],
-        startAtUtc: {
-          lt: gridEndExclusiveUtc
-        },
-        endAtUtc: {
-          gt: gridStartUtc
-        }
-      },
-      orderBy: { startAtUtc: "asc" },
-      include: {
-        user: {
-          select: {
-            fullName: true,
-            email: true
-          }
-        }
-      }
-    }),
+    bookingQuery,
     prisma.blockedSchedule.findMany({
       where: {
         startAtUtc: {
@@ -309,8 +306,23 @@ export async function getAdminCalendarData(params: {
         }
       },
       orderBy: { startAtUtc: "asc" }
+    }),
+    prisma.bookingReschedule.findMany({
+      where: {
+        OR: [
+          { status: BookingRescheduleStatus.PAYMENT_SUBMITTED },
+          { status: BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED, holdExpiresAt: { gt: now } }
+        ],
+        replacementStartAtUtc: { lt: gridEndExclusiveUtc },
+        replacementEndAtUtc: { gt: gridStartUtc }
+      },
+      select: { id: true, replacementFacilityId: true, replacementStartAtUtc: true, replacementEndAtUtc: true }
     })
   ]);
+  const bookings: CalendarBooking[] = rawBookings.map((booking) => ({
+    ...booking,
+    user: { fullName: booking.user.fullName, email: "email" in booking.user && typeof booking.user.email === "string" ? booking.user.email : null }
+  }));
 
   const days = dateKeys.map((dateKey) => {
     const schedules = facilities.map((facility) =>
@@ -318,7 +330,8 @@ export async function getAdminCalendarData(params: {
         facility,
         dateKey,
         bookings: filterBookingsForDate(bookings.filter((booking) => booking.facilityId === facility.id), dateKey, facility.timezone),
-        blockedSchedules: filterBlocksForDate(blockedSchedules.filter((block) => block.facilityId === facility.id), dateKey, facility.timezone)
+        blockedSchedules: filterBlocksForDate(blockedSchedules.filter((block) => block.facilityId === facility.id), dateKey, facility.timezone),
+        replacementHolds: filterReplacementHoldsForDate(replacementHolds.filter((hold) => hold.replacementFacilityId === facility.id), dateKey, facility.timezone)
       })
     );
 
@@ -338,7 +351,8 @@ export async function getAdminCalendarData(params: {
       facility,
       dateKey: selectedDateKey,
       bookings: filterBookingsForDate(bookings.filter((booking) => booking.facilityId === facility.id), selectedDateKey, facility.timezone),
-      blockedSchedules: filterBlocksForDate(blockedSchedules.filter((block) => block.facilityId === facility.id), selectedDateKey, facility.timezone)
+      blockedSchedules: filterBlocksForDate(blockedSchedules.filter((block) => block.facilityId === facility.id), selectedDateKey, facility.timezone),
+      replacementHolds: filterReplacementHoldsForDate(replacementHolds.filter((hold) => hold.replacementFacilityId === facility.id), selectedDateKey, facility.timezone)
     })
   );
 

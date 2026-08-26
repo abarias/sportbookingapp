@@ -166,10 +166,12 @@ export async function submitPaymentProofAction(
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
 
-    return {
-      success: "Payment proof submitted. Staff will verify your payment before confirming the booking."
-    };
+    redirect(`/bookings/${parsed.data.bookingId}/payment?submitted=1`);
   } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     return {
       error: error instanceof Error ? error.message : "Payment proof could not be submitted."
     };

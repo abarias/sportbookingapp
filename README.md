@@ -17,6 +17,10 @@ Current MVP feature set:
 - Customer booking history and policy-based cancellation flow
 - Admin overview, booking calendar, facility management, blocked schedules, walk-in booking, customers, and reports
 - Facility creation and editing with multiple image URLs or uploaded image files
+- Rule-based facility pricing by weekday, weekend, selected day, holiday, time range, and effective date
+- Generated public VAT-exclusive rate cards and immutable booking price snapshots
+- Configurable administrative roles with permission-based navigation, server authorization, protected Super Admin recovery, and audit logging
+- Permission-controlled administrative rescheduling with immutable schedule/price history, additional-payment holds, manual adjustments, and customer notifications
 - Booking window rules limiting customers to the current/next month, with next-two-month visibility opening on the last Monday of the month
 - Basic automated coverage for availability, cancellation policy, and blocked schedule validation
 
@@ -102,9 +106,22 @@ ADMIN_BOOTSTRAP_PHONE="+639171234567" \
 npm run admin:bootstrap
 ```
 
-The bootstrap script never prints the password. It marks the admin email as verified and marks the phone as verified only when a phone number is provided.
+The bootstrap script never prints the password. It marks the admin email as verified, marks the phone as verified only when a phone number is provided, activates administrative access, and assigns the protected Super Admin role. Apply all database migrations before running it.
 
 ## Feature Notes
+
+### Administrative Roles And Permissions
+
+Administrative access is derived from active role assignments rather than editable role names. The initial templates are Super Admin, Receptionist, Booking Admin, and Social Media Person.
+
+- `/admin/roles` manages role definitions, permission assignments, cloning, activation, and safe deletion.
+- `/admin/admin-users` assigns one or more active roles to an existing user account and previews the resulting permission union.
+- `/admin/audit-logs` shows recent role, access, facility, pricing, payment, and security events.
+- The protected Super Admin role cannot be deleted, deactivated, or stripped of permissions. Database triggers also prevent removal or deactivation of the last active Super Admin.
+- Permission checks query the database on every protected request. Role changes therefore take effect on the next request without a permission cache flush.
+- `User.role=ADMIN` remains temporarily as an account-type compatibility flag; it does not grant application capabilities without active RBAC assignments.
+
+The RBAC migration enables deny-by-default RLS and revokes direct `anon`/`authenticated` access on RBAC and audit tables when those Supabase roles exist. Prisma must connect with the trusted server-side database role. Do not expose `DATABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY` to browser code.
 
 ### Facility Management
 
@@ -169,6 +186,19 @@ Cancellation is controlled by both eligibility and timing:
 
 The global cancellation window defaults to 24 hours and can be changed from the admin overview. Facilities can optionally override the cancellation window in hours.
 
+## Administrative Rescheduling
+
+Administrators with `bookings.reschedule` can move a future paid, verified, confirmed booking from its booking-details page. Replacement availability and dynamic pricing are recalculated on the server in the facility timezone.
+
+- Same-price moves complete atomically.
+- Lower-price moves complete atomically and create an unresolved manual refund/credit decision.
+- Higher-price moves hold the replacement slot while preserving the original confirmed slot. Only verification of the additional payment completes the move.
+- `bookings.reschedule.override_adjustment` permits an audited full or partial waiver. It is seeded only for Super Admin.
+- `bookings.reschedule.resolve_adjustment` permits recording a manual refund, customer credit, no-refund policy outcome, or other documented resolution. It is seeded for Super Admin and Booking Admin.
+- Receptionist and Social Media roles do not receive paid-booking rescheduling by default.
+
+Every attempt is stored against the original booking in `BookingReschedule`; additional payments use `ReschedulePayment` and do not overwrite the original `Payment`. This booking-level boundary is intentional so a future consolidated order can contain independently reschedulable child bookings.
+
 ## Environment Variables
 
 Defined in `.env.example`:
@@ -188,6 +218,8 @@ Defined in `.env.example`:
 - `PAYMONGO_WEBHOOK_SECRET`
 - `APP_TIMEZONE`
 - `PAYMENT_HOLD_MINUTES`
+- `RESCHEDULE_PAYMENT_HOLD_MINUTES` — replacement-slot hold while an additional amount is awaiting proof, defaults to 15 minutes
+- `RESCHEDULE_CUTOFF_HOURS` — minimum notice before the current booking start, defaults to 24 hours
 - `PAYMENT_MODE`
 - `ALLOW_PRODUCTION_MOCK_PAYMENTS`
 - `AUTH_STRICT_ENV_VALIDATION`
@@ -254,6 +286,8 @@ For the current demo deployment, use mock payments only if the client understand
 
 Pending unpaid bookings are expired by `GET /api/cron/expire-bookings`.
 
+The same route expires unpaid reschedule replacement holds and retries pending rescheduling notification emails. Expired unpaid replacement holds are also ignored by availability reads and transitioned under a database row lock before any competing booking write, so inventory does not depend on cron timing. Proof submission removes the deadline and keeps the replacement blocked for payment review.
+
 - Vercel Hobby runs this route once daily from `vercel.json`; Vercel Pro or an equivalent scheduler can run it more frequently.
 - Production requests require `Authorization: Bearer <CRON_SECRET>`.
 - Set a strong `CRON_SECRET` in Vercel before deploying this route.
@@ -289,6 +323,8 @@ npx prisma migrate deploy
 4. Create the initial production admin with `npm run admin:bootstrap` from a secure environment.
 5. Deploy the Next.js app to Vercel.
 
+For the rescheduling release, deploy `20260824110000_add_booking_rescheduling` before deploying the application build. The migration is additive: it preserves existing bookings, payment records, references, and price snapshots. After deployment, verify the Super Admin and Booking Admin permission assignments, then smoke-test one same-price, lower-price, and higher-price move using non-production booking data.
+
 For payment-proof uploads, create a **private** Supabase Storage bucket named
 `payment-proofs`, and for facility uploads create a **public** bucket named
 `facility-images`, in each environment's Supabase project. Set the following
@@ -314,6 +350,12 @@ Production notes:
 - Payment proof and facility image uploads use private Supabase Storage buckets on Vercel. Local development falls back to `public/uploads` when Supabase Storage variables are absent.
 - Mock OTP is still enabled in this MVP and should be replaced with a real SMS provider before launch.
 - Refund handling is still manual.
+
+### Dynamic pricing deployment
+
+Apply `20260822090000_add_dynamic_pricing` before deploying this feature. The migration preserves existing booking totals and converts existing facility prices into default fallback rules. It does not recalculate historical bookings.
+
+Administrators manage schedule overrides and the manual holiday calendar under `/admin/pricing`. Pricing precedence is: configured holiday, selected day of week, weekend, weekday, then facility default. All displayed and calculated amounts are base prices exclusive of VAT.
 
 ## Assumptions
 
