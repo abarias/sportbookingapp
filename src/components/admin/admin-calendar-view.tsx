@@ -129,7 +129,8 @@ export function AdminCalendarGrid(props: {
           return (
             <Link
               key={day.dateKey}
-              href={`/admin/calendar?month=${props.monthKey}&date=${day.dateKey}&view=${props.selectedView}`}
+              href={`/admin/calendar?month=${props.monthKey}&date=${day.dateKey}&view=${props.selectedView}#day-detail`}
+              scroll={false}
               className={`min-h-36 rounded-2xl border p-3 text-sm transition hover:border-white/30 ${tone} ${
                 day.isCurrentMonth ? "text-white" : "text-stone-500"
               } ${isSelected ? "ring-2 ring-amber-300/70" : ""}`}

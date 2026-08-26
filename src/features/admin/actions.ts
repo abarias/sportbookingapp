@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { addDays } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
 import { z } from "zod";
@@ -745,8 +746,9 @@ export async function verifyPaymentAction(
     revalidatePath("/admin/reports");
     revalidatePath("/bookings");
 
-    return { success: "Payment verified and booking confirmed." };
+    redirect(`/admin/payments/${parsed.data.paymentId}?outcome=verified`);
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     return { error: error instanceof Error ? error.message : "Payment could not be verified." };
   }
 }
@@ -781,8 +783,9 @@ export async function rejectPaymentAction(
     revalidatePath("/admin/reports");
     revalidatePath("/bookings");
 
-    return { success: "Payment rejected. The reservation is no longer blocking inventory." };
+    redirect(`/admin/payments/${parsed.data.paymentId}?outcome=rejected`);
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     return { error: error instanceof Error ? error.message : "Payment could not be rejected." };
   }
 }
@@ -815,8 +818,9 @@ export async function requestPaymentActionRequiredAction(
     revalidatePath("/admin/payments");
     revalidatePath("/bookings");
 
-    return { success: "Marked as needing customer action." };
+    redirect(`/admin/payments/${parsed.data.paymentId}?outcome=action-required`);
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     return { error: error instanceof Error ? error.message : "Payment could not be updated." };
   }
 }

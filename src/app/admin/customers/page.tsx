@@ -82,9 +82,9 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
       />
       <AdminNav current="customers" />
 
-      <form className="flex flex-col gap-3 sm:flex-row" method="get">
-        <input className="h-11 min-w-0 flex-1 rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-sm text-white" defaultValue={search} name="search" placeholder="Search name, email, or mobile number" />
-        <button className="h-11 rounded-full bg-white/10 px-5 text-sm font-medium text-white transition hover:bg-white/15" type="submit">Search customers</button>
+      <form className="flex w-full min-w-0 flex-col gap-3 sm:flex-row" method="get">
+        <input className="h-12 w-full min-w-0 flex-1 appearance-none rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-sm leading-6 text-white" defaultValue={search} name="search" placeholder="Search name, email, or mobile number" />
+        <button className="h-12 w-full shrink-0 rounded-full bg-white/10 px-5 py-3 text-sm font-medium leading-6 text-white transition hover:bg-white/15 sm:w-auto" type="submit">Search customers</button>
       </form>
 
       <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">

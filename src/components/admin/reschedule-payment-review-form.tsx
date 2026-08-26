@@ -31,7 +31,7 @@ export function ReschedulePaymentReviewForm({ paymentId }: { paymentId: string }
         <textarea className="min-h-20 w-full rounded-xl border border-white/10 bg-stone-950 px-3 py-2 text-white" maxLength={1000} name="reviewNote" placeholder="Rejection reason" required />
         <SubmitButton label="Reject proof" />
       </form>
-      <div aria-live="polite">{state.error ? <p className="text-sm text-rose-200">{state.error}</p> : null}{state.success ? <p className="text-sm text-emerald-200">{state.success}</p> : null}</div>
+      <div aria-live="polite">{state.error ? <p className="rounded-2xl border border-rose-300/30 bg-rose-300/10 p-4 text-sm text-rose-100">{state.error}</p> : null}{state.success ? <p className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">{state.success}</p> : null}</div>
     </div>
   );
 }

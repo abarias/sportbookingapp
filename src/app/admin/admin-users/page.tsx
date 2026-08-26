@@ -44,9 +44,9 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     <main className="space-y-8 pb-16">
       <SectionHeading eyebrow="Admin security" title="Administrative users" description="Assign one or more roles, review effective access, and deactivate administrative entry safely." />
       <AdminNav current="admin-users" />
-      <form className="flex flex-col gap-3 sm:flex-row" method="get">
-        <input className="h-11 min-w-0 flex-1 rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-sm text-white" defaultValue={search} name="search" placeholder="Search name, email, or mobile number" />
-        <button className="h-11 rounded-full bg-white/10 px-5 text-sm font-medium text-white transition hover:bg-white/15" type="submit">Search users</button>
+      <form className="flex w-full min-w-0 flex-col gap-3 sm:flex-row" method="get">
+        <input className="h-12 w-full min-w-0 flex-1 appearance-none rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-sm leading-6 text-white" defaultValue={search} name="search" placeholder="Search name, email, or mobile number" />
+        <button className="h-12 w-full shrink-0 rounded-full bg-white/10 px-5 py-3 text-sm font-medium leading-6 text-white transition hover:bg-white/15 sm:w-auto" type="submit">Search users</button>
       </form>
       <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
         <aside className="self-start rounded-[1.75rem] border border-white/10 bg-white/5 p-4 xl:sticky xl:top-24">
