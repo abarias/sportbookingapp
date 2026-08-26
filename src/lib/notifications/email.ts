@@ -66,7 +66,7 @@ export async function sendVerificationEmail(params: VerificationEmailParams) {
   const result = await resend.emails.send({
     from: resendConfig.from,
     to: params.to,
-    subject: "Verify your Sport Booking PH account",
+    subject: "Verify your MMG Stellar account",
     html: buildVerificationEmailHtml(params),
     text: buildVerificationEmailText(params)
   });
