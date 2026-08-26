@@ -21,6 +21,9 @@ type AdminPaymentDetailPageProps = {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    outcome?: string;
+  }>;
 };
 
 const paymentLabels: Record<PaymentStatus, string> = {
@@ -36,9 +39,10 @@ const paymentLabels: Record<PaymentStatus, string> = {
   REFUNDED: "Refunded"
 };
 
-export default async function AdminPaymentDetailPage({ params }: AdminPaymentDetailPageProps) {
+export default async function AdminPaymentDetailPage({ params, searchParams }: AdminPaymentDetailPageProps) {
   const authorization = await requirePermission("payments.view");
   const { id } = await params;
+  const query = await searchParams;
   const payment = await getAdminPaymentDetailData(id);
 
   if (!payment) {
@@ -55,6 +59,9 @@ export default async function AdminPaymentDetailPage({ params }: AdminPaymentDet
         title="Payment review"
         description="Compare submitted proof against the actual payment account before confirming the booking."
       />
+      {query.outcome === "verified" ? <p aria-live="polite" className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">Payment confirmed successfully. The booking is now confirmed.</p> : null}
+      {query.outcome === "rejected" ? <p aria-live="polite" className="rounded-2xl border border-rose-300/30 bg-rose-300/10 p-4 text-sm text-rose-100">Payment rejected successfully. The reservation no longer blocks inventory.</p> : null}
+      {query.outcome === "action-required" ? <p aria-live="polite" className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">Customer action requested successfully.</p> : null}
       <AdminNav current="payments" />
       <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href="/admin/payments">
         Back to payment queue

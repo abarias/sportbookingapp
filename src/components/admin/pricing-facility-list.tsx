@@ -30,8 +30,10 @@ export function PricingFacilityList({ facilities, selectedFacilityId, dateKey }:
           return (
             <Link
               key={facility.id}
-              href={`/admin/pricing?facilityId=${facility.id}&date=${dateKey}`}
+              href={`/admin/pricing?facilityId=${facility.id}&date=${dateKey}#pricing-facility-${facility.id}`}
+              scroll={false}
               className={`flex items-center gap-3 rounded-2xl p-3 transition ${isSelected ? "bg-amber-300 text-stone-950" : "text-white hover:bg-white/10"}`}
+              id={`pricing-facility-${facility.id}`}
             >
               <div className="relative h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-stone-900">
                 {facility.images[0] ? <Image src={facility.images[0].url} alt={`${facility.name} main image`} fill sizes="64px" className="object-cover" /> : null}

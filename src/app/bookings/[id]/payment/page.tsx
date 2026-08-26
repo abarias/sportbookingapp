@@ -20,6 +20,9 @@ type PaymentPageProps = {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    submitted?: string;
+  }>;
 };
 
 function getPaymentLabel(status: PaymentStatus) {
@@ -39,7 +42,7 @@ function getPaymentLabel(status: PaymentStatus) {
   return labels[status];
 }
 
-export default async function BookingPaymentPage({ params }: PaymentPageProps) {
+export default async function BookingPaymentPage({ params, searchParams }: PaymentPageProps) {
   const session = await getSession();
 
   if (!session?.user) {
@@ -47,6 +50,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
   }
 
   const { id } = await params;
+  const query = await searchParams;
   const booking = await prisma.booking.findFirst({
     where: {
       id,
@@ -81,8 +85,9 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
         title="Complete your reservation payment"
         description="Your slot is held while payment is pending. Staff confirmation is required before the booking is final."
       />
+      {query.submitted === "1" ? <p aria-live="polite" className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">Payment proof submitted successfully. Staff will verify your payment before confirming the booking.</p> : null}
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+      <section className="space-y-6">
         <div className="space-y-5 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
           <div>
             <p className="text-sm uppercase tracking-[0.2em] text-amber-300">{getPaymentLabel(booking.payment.status)}</p>
@@ -166,14 +171,7 @@ export default async function BookingPaymentPage({ params }: PaymentPageProps) {
           ) : null}
         </div>
 
-        {canSubmitProof ? (
-          <PaymentProofForm bookingId={booking.id} />
-        ) : (
-          <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-stone-300">
-            <h2 className="text-lg font-semibold text-white">Payment status</h2>
-            <p className="mt-2">{getPaymentLabel(booking.payment.status)}</p>
-          </section>
-        )}
+        {canSubmitProof ? <PaymentProofForm bookingId={booking.id} /> : <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-stone-300"><h2 className="text-lg font-semibold text-white">Payment status</h2><p className="mt-2">{getPaymentLabel(booking.payment.status)}</p></section>}
       </section>
     </main>
   );

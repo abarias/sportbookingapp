@@ -73,10 +73,10 @@ export default async function AdminPricingPage({ searchParams }: { searchParams:
           selectedFacilityId={selectedFacility.id}
         />
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <section className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.2em] text-amber-300">{selectedFacility.name}</p>
               <h2 className="mt-2 text-xl font-semibold text-white">Schedule overrides</h2>
               <p className="mt-1 text-sm text-stone-400">Select a rule to edit its rate and schedule.</p>

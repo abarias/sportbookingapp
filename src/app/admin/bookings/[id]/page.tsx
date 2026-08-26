@@ -90,7 +90,9 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
   ]);
   if (!booking) notFound();
 
-  const canReschedule = authorization.permissions.has("bookings.reschedule");
+  const hasReschedulePermission = authorization.permissions.has("bookings.reschedule");
+  const isPastOrCompleted = booking.startAtUtc <= new Date();
+  const canReschedule = hasReschedulePermission && !isPastOrCompleted;
   const canOverride = authorization.permissions.has("bookings.reschedule.override_adjustment");
   const canResolve = authorization.permissions.has("bookings.reschedule.resolve_adjustment");
   const selectedFacility = facilities.find((facility) => facility.id === query.facilityId) ?? facilities.find((facility) => facility.id === booking.facilityId) ?? facilities[0];
@@ -100,7 +102,7 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
   const selectedDate = normalizeDateKeyWithinBookingWindow(requestedDate, replacementTimezone);
   const selectedStart = safeStartMinutes(query.start);
   const durationMinutes = Math.round((booking.endAtUtc.getTime() - booking.startAtUtc.getTime()) / 60_000);
-  const availability = selectedFacility ? await getFacilityDayAvailability(selectedFacility, selectedDate, { excludeBookingId: booking.id }) : null;
+  const availability = canReschedule && selectedFacility ? await getFacilityDayAvailability(selectedFacility, selectedDate, { excludeBookingId: booking.id }) : null;
   const currentBookingDateKey = formatInTimeZone(booking.startAtUtc, replacementTimezone, "yyyy-MM-dd");
   const currentBookingRange = selectedFacility?.id === booking.facilityId && selectedDate === currentBookingDateKey
     ? {
@@ -158,10 +160,11 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
         <BookingStatusBadge bookingStatus={booking.status} paymentStatus={booking.payment?.status ?? null} />
       </section>
 
-      {canReschedule ? (
+      {hasReschedulePermission ? (
         <section className="space-y-6 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
           <div><p className="text-xs uppercase tracking-[0.18em] text-amber-300">Reschedule</p><h2 className="mt-2 text-2xl font-semibold text-white">Choose a replacement slot</h2><p className="mt-2 text-sm text-stone-400">Selecting a slot does not change the booking. Availability and price are checked again only when you explicitly confirm.</p></div>
-          <RescheduleSlotFilters facilities={facilities} maxDateKey={bookingWindow.maxDateKey} minDateKey={bookingWindow.minDateKey} selectedFacilityId={selectedFacility?.id} selectedDate={selectedDate} />
+          {!canReschedule ? <p className="rounded-2xl border border-white/10 bg-stone-950/50 p-4 text-sm text-stone-300">Completed or past bookings cannot be rescheduled.</p> : <>
+            <RescheduleSlotFilters facilities={facilities} maxDateKey={bookingWindow.maxDateKey} minDateKey={bookingWindow.minDateKey} selectedFacilityId={selectedFacility?.id} selectedDate={selectedDate} />
           {!availability?.openingRange ? <p className="rounded-2xl border border-white/10 bg-stone-950/50 p-4 text-sm text-stone-400">The facility is closed on this date.</p> : (
             <div>
               <p className="mb-3 text-sm font-medium text-white">Select a starting slot for the existing {durationMinutes / 60}-hour duration. The full booking range will be highlighted.</p>
@@ -196,6 +199,7 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
               <RescheduleConfirmationForm bookingId={booking.id} replacementFacilityId={preview.replacement.facility.id} dateKey={selectedDate} startMinutes={selectedStart!} differenceMinor={preview.priceDifferenceMinor} canOverrideAdjustment={canOverride} />
             </div>
           ) : null}
+          </>}
         </section>
       ) : null}
 
