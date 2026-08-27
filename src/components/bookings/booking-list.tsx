@@ -125,21 +125,23 @@ export function BookingList({ title, items, emptyMessage, footer }: BookingListP
                     Payment hold expires at {formatInTimeZone(item.paymentHoldExpiresAt, item.timezone, "h:mm a")}
                   </p>
                 ) : null}
-                {item.status === BookingStatus.HELD &&
-                item.paymentStatus &&
-                (item.paymentStatus === PaymentStatus.AWAITING_PAYMENT ||
-                  item.paymentStatus === PaymentStatus.ACTION_REQUIRED ||
-                  item.paymentStatus === PaymentStatus.SUBMITTED) ? (
-                  <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href={item.orderId ? `/orders/${item.orderId}/payment` : `/bookings/${item.id}/payment`}>
-                    View payment instructions
-                  </Link>
-                ) : null}
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {item.status === BookingStatus.HELD &&
+                  item.paymentStatus &&
+                  (item.paymentStatus === PaymentStatus.AWAITING_PAYMENT ||
+                    item.paymentStatus === PaymentStatus.ACTION_REQUIRED ||
+                    item.paymentStatus === PaymentStatus.SUBMITTED) ? (
+                    <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href={item.orderId ? `/orders/${item.orderId}/payment` : `/bookings/${item.id}/payment`}>
+                      View payment instructions
+                    </Link>
+                  ) : null}
+                  {item.orderId ? <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href={`/orders/${item.orderId}`}>View order details</Link> : null}
+                </div>
                 {item.paymentReviewNote ? (
                   <p className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm leading-6 text-amber-100">
                     Staff message: {item.paymentReviewNote}
                   </p>
                 ) : null}
-                {item.orderId ? <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href={`/orders/${item.orderId}`}>View order details</Link> : null}
                 {item.reschedules.length ? (
                   <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="text-sm font-medium text-white">Rescheduling history</p>
