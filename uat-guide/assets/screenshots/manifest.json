@@ -1,0 +1,1519 @@
+{
+  "generatedAt": "2026-08-26T16:34:23.393Z",
+  "note": "Placeholder entries only. Capture with synthetic UAT accounts and records; never use real customer or payment data.",
+  "requiredVariables": [
+    "UAT_APP_URL",
+    "UAT_FACILITY_SLUG",
+    "UAT_BOOKING_ID",
+    "UAT_PAYMENT_ID",
+    "UAT_<PERSONA>_EMAIL",
+    "UAT_<PERSONA>_PASSWORD"
+  ],
+  "viewports": {
+    "desktop": {
+      "width": 1440,
+      "height": 1000
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "screenshots": [
+    {
+      "name": "admin-add-facility",
+      "route": "/admin/facilities",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-VAL-001"
+      ]
+    },
+    {
+      "name": "admin-add-facility-validation",
+      "route": "/admin/facilities",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-VAL-001"
+      ]
+    },
+    {
+      "name": "admin-assignment-history",
+      "route": "/admin/admin-users",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-010"
+      ]
+    },
+    {
+      "name": "admin-audit-log",
+      "route": "/admin/audit-logs",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-010"
+      ]
+    },
+    {
+      "name": "admin-block-all-day",
+      "route": "/admin/facilities",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-005"
+      ]
+    },
+    {
+      "name": "admin-calendar-day-detail",
+      "route": "/admin/calendar",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-002"
+      ]
+    },
+    {
+      "name": "admin-calendar-month",
+      "route": "/admin/calendar",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-002"
+      ]
+    },
+    {
+      "name": "admin-effective-permissions",
+      "route": "/admin/admin-users",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-009"
+      ]
+    },
+    {
+      "name": "admin-facility-detail",
+      "route": "/admin/facilities",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-003"
+      ]
+    },
+    {
+      "name": "admin-facility-save-message",
+      "route": "/admin/facilities",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-003"
+      ]
+    },
+    {
+      "name": "admin-holiday-calendar",
+      "route": "/admin/calendar",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-007"
+      ]
+    },
+    {
+      "name": "admin-image-manager",
+      "route": "/admin/facilities",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-004"
+      ]
+    },
+    {
+      "name": "admin-image-validation",
+      "route": "/admin/facilities",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-NEG-001"
+      ]
+    },
+    {
+      "name": "admin-lockout-prevented",
+      "route": "/admin/audit-logs",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-PERM-001"
+      ]
+    },
+    {
+      "name": "admin-lower-price-adjustment",
+      "route": "/",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-EDGE-002"
+      ]
+    },
+    {
+      "name": "admin-mobile-menu",
+      "route": "/admin",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-RESP-001"
+      ]
+    },
+    {
+      "name": "admin-payment-queue",
+      "route": "/admin/payments",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-012"
+      ]
+    },
+    {
+      "name": "admin-payment-review",
+      "route": "/admin/payments/{UAT_PAYMENT_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-012"
+      ]
+    },
+    {
+      "name": "admin-payment-success",
+      "route": "/admin/payments/{UAT_PAYMENT_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-012"
+      ]
+    },
+    {
+      "name": "admin-pricing-diagnostics",
+      "route": "/admin/pricing",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-EDGE-001"
+      ]
+    },
+    {
+      "name": "admin-pricing-midnight",
+      "route": "/admin/pricing",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-EDGE-001"
+      ]
+    },
+    {
+      "name": "admin-pricing-mobile",
+      "route": "/admin/pricing",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-RESP-001"
+      ]
+    },
+    {
+      "name": "admin-pricing-workspace",
+      "route": "/admin/pricing",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-006"
+      ]
+    },
+    {
+      "name": "admin-protected-super-role",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-PERM-001"
+      ]
+    },
+    {
+      "name": "admin-rate-card-preview",
+      "route": "/admin/pricing",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-006"
+      ]
+    },
+    {
+      "name": "admin-reports",
+      "route": "/admin/reports",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-011"
+      ]
+    },
+    {
+      "name": "admin-reschedule-conflict",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-NEG-002"
+      ]
+    },
+    {
+      "name": "admin-reschedule-ineligible",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-NEG-002"
+      ]
+    },
+    {
+      "name": "admin-reschedule-payment-review",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-EDGE-003"
+      ]
+    },
+    {
+      "name": "admin-reschedule-review",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-013"
+      ]
+    },
+    {
+      "name": "admin-reschedule-slots",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-013"
+      ]
+    },
+    {
+      "name": "admin-reschedule-success",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-013"
+      ]
+    },
+    {
+      "name": "admin-reschedule-waiver",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-PERM-002"
+      ]
+    },
+    {
+      "name": "admin-role-editor",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-008"
+      ]
+    },
+    {
+      "name": "admin-role-save-message",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-008"
+      ]
+    },
+    {
+      "name": "admin-user-role-assignment",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-009"
+      ]
+    },
+    {
+      "name": "admin-users-mobile",
+      "route": "/admin/admin-users",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-RESP-001"
+      ]
+    },
+    {
+      "name": "booking-admin-customers",
+      "route": "/",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-HP-003"
+      ]
+    },
+    {
+      "name": "booking-admin-forbidden",
+      "route": "/",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-PERM-001"
+      ]
+    },
+    {
+      "name": "booking-admin-mobile-queue",
+      "route": "/",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-RESP-001"
+      ]
+    },
+    {
+      "name": "booking-admin-navigation",
+      "route": "/admin",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-HP-001"
+      ]
+    },
+    {
+      "name": "booking-admin-payment-queue",
+      "route": "/admin/payments",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-HP-002"
+      ]
+    },
+    {
+      "name": "booking-admin-reports-no-export",
+      "route": "/admin/reports",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-GAP-001"
+      ]
+    },
+    {
+      "name": "booking-admin-reschedule",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-HP-004"
+      ]
+    },
+    {
+      "name": "booking-admin-reschedule-conflict",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-NEG-001"
+      ]
+    },
+    {
+      "name": "booking-admin-reschedule-payment",
+      "route": "/admin/bookings/{UAT_BOOKING_ID}",
+      "auth": "booking-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "BA-HP-002"
+      ]
+    },
+    {
+      "name": "customer-action-required",
+      "route": "/bookings/{UAT_BOOKING_ID}/payment",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-REC-002"
+      ]
+    },
+    {
+      "name": "customer-blocked-dates",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-005"
+      ]
+    },
+    {
+      "name": "customer-booking-window",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-EDGE-003"
+      ]
+    },
+    {
+      "name": "customer-bookings-priority",
+      "route": "/bookings",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-007"
+      ]
+    },
+    {
+      "name": "customer-bookings-signed-out",
+      "route": "/bookings",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-002"
+      ]
+    },
+    {
+      "name": "customer-cancel-confirmation",
+      "route": "/bookings",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-008"
+      ]
+    },
+    {
+      "name": "customer-cancellation-ineligible",
+      "route": "/bookings",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-NEG-003"
+      ]
+    },
+    {
+      "name": "customer-cancelled-history",
+      "route": "/bookings",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-008"
+      ]
+    },
+    {
+      "name": "customer-concurrent-conflict",
+      "route": "/",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-NEG-004"
+      ]
+    },
+    {
+      "name": "customer-concurrent-winner",
+      "route": "/",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-NEG-004"
+      ]
+    },
+    {
+      "name": "customer-email-verification-mobile",
+      "route": "/verify-email",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-001"
+      ]
+    },
+    {
+      "name": "customer-expired-history",
+      "route": "/bookings",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-REC-001"
+      ]
+    },
+    {
+      "name": "customer-history-pagination-mobile",
+      "route": "/bookings",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-007"
+      ]
+    },
+    {
+      "name": "customer-keyboard-focus",
+      "route": "/",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-ACC-001"
+      ]
+    },
+    {
+      "name": "customer-login-desktop",
+      "route": "/login",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-002"
+      ]
+    },
+    {
+      "name": "customer-mixed-slot-statuses",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-EDGE-004"
+      ]
+    },
+    {
+      "name": "customer-mobile-booking",
+      "route": "/",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-RESP-001"
+      ]
+    },
+    {
+      "name": "customer-mobile-menu",
+      "route": "/admin",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-RESP-001"
+      ]
+    },
+    {
+      "name": "customer-mobile-payment-method",
+      "route": "/bookings/{UAT_BOOKING_ID}/payment",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-RESP-001"
+      ]
+    },
+    {
+      "name": "customer-payment-instructions",
+      "route": "/bookings/{UAT_BOOKING_ID}/payment",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-005"
+      ]
+    },
+    {
+      "name": "customer-proof-form",
+      "route": "/bookings/{UAT_BOOKING_ID}/payment",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-006"
+      ]
+    },
+    {
+      "name": "customer-proof-resubmitted",
+      "route": "/bookings/{UAT_BOOKING_ID}/payment",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-REC-002"
+      ]
+    },
+    {
+      "name": "customer-proof-size-error",
+      "route": "/bookings/{UAT_BOOKING_ID}/payment",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-NEG-002"
+      ]
+    },
+    {
+      "name": "customer-proof-submitted",
+      "route": "/bookings/{UAT_BOOKING_ID}/payment",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-006"
+      ]
+    },
+    {
+      "name": "customer-registration-desktop",
+      "route": "/register",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-001"
+      ]
+    },
+    {
+      "name": "customer-registration-validation-mobile",
+      "route": "/register",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-NEG-001"
+      ]
+    },
+    {
+      "name": "customer-released-slot",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-REC-001"
+      ]
+    },
+    {
+      "name": "customer-reschedule-additional-payment",
+      "route": "/bookings/{UAT_BOOKING_ID}/payment",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-EDGE-003"
+      ]
+    },
+    {
+      "name": "customer-reserve-confirmation",
+      "route": "/",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-005"
+      ]
+    },
+    {
+      "name": "customer-segmented-price",
+      "route": "/",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-EDGE-002"
+      ]
+    },
+    {
+      "name": "customer-slot-selection-desktop",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-004"
+      ]
+    },
+    {
+      "name": "customer-slot-selection-mobile",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "customer",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-004"
+      ]
+    },
+    {
+      "name": "customer-verification-expired",
+      "route": "/verify-email",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-EDGE-001"
+      ]
+    },
+    {
+      "name": "facility-detail-mobile",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-003"
+      ]
+    },
+    {
+      "name": "facility-list-desktop",
+      "route": "/facilities",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-003"
+      ]
+    },
+    {
+      "name": "facility-rate-card-desktop",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "CUST-HP-003"
+      ]
+    },
+    {
+      "name": "general-accessibility-focus",
+      "route": "/",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "GEN-ACC-001"
+      ]
+    },
+    {
+      "name": "general-network-failure",
+      "route": "/",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "GEN-EXC-001"
+      ]
+    },
+    {
+      "name": "general-status-language",
+      "route": "/",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "GEN-UX-001"
+      ]
+    },
+    {
+      "name": "public-main-image",
+      "route": "/facilities",
+      "auth": "public",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-004"
+      ]
+    },
+    {
+      "name": "receptionist-calendar",
+      "route": "/admin/calendar",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-HP-001"
+      ]
+    },
+    {
+      "name": "receptionist-existing-customer",
+      "route": "/",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-EDGE-001"
+      ]
+    },
+    {
+      "name": "receptionist-forbidden",
+      "route": "/",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-PERM-001"
+      ]
+    },
+    {
+      "name": "receptionist-navigation",
+      "route": "/admin",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-HP-001"
+      ]
+    },
+    {
+      "name": "receptionist-walkin-payment",
+      "route": "/admin/walk-ins",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-HP-002"
+      ]
+    },
+    {
+      "name": "receptionist-walkin-recovery",
+      "route": "/admin/walk-ins",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-REC-001"
+      ]
+    },
+    {
+      "name": "receptionist-walkin-slots",
+      "route": "/admin/walk-ins",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-HP-002"
+      ]
+    },
+    {
+      "name": "receptionist-walkin-tablet",
+      "route": "/admin/walk-ins",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-RESP-001"
+      ]
+    },
+    {
+      "name": "receptionist-walkin-validation",
+      "route": "/admin/walk-ins",
+      "auth": "receptionist",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "REC-NEG-001"
+      ]
+    },
+    {
+      "name": "responsive-viewport-matrix",
+      "route": "/",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "GEN-RESP-001"
+      ]
+    },
+    {
+      "name": "social-media-facility-content",
+      "route": "/admin/facilities",
+      "auth": "social-media",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SOC-HP-001"
+      ]
+    },
+    {
+      "name": "social-media-forbidden",
+      "route": "/admin/facilities",
+      "auth": "social-media",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SOC-PERM-002"
+      ]
+    },
+    {
+      "name": "social-media-image-manager",
+      "route": "/admin/facilities",
+      "auth": "social-media",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SOC-HP-002"
+      ]
+    },
+    {
+      "name": "social-media-limited-fields",
+      "route": "/admin/facilities",
+      "auth": "social-media",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SOC-PERM-001"
+      ]
+    },
+    {
+      "name": "social-media-mobile-facility",
+      "route": "/admin/facilities",
+      "auth": "social-media",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SOC-RESP-001"
+      ]
+    },
+    {
+      "name": "super-admin-overview",
+      "route": "/admin",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "SA-HP-001"
+      ]
+    },
+    {
+      "name": "xrole-calendar-confirmed",
+      "route": "/admin/calendar",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-HP-001"
+      ]
+    },
+    {
+      "name": "xrole-concurrency-result",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-CONC-001"
+      ]
+    },
+    {
+      "name": "xrole-custom-role",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-PERM-001"
+      ]
+    },
+    {
+      "name": "xrole-custom-role-forbidden",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-PERM-001"
+      ]
+    },
+    {
+      "name": "xrole-hold-expired",
+      "route": "/bookings",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-REC-001"
+      ]
+    },
+    {
+      "name": "xrole-payment-confirmed",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-HP-001"
+      ]
+    },
+    {
+      "name": "xrole-payment-submitted",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-HP-001"
+      ]
+    },
+    {
+      "name": "xrole-pricing-public",
+      "route": "/facilities/{UAT_FACILITY_SLUG}",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-HP-004"
+      ]
+    },
+    {
+      "name": "xrole-pricing-snapshot",
+      "route": "/admin/pricing",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-HP-004"
+      ]
+    },
+    {
+      "name": "xrole-reschedule-calendar",
+      "route": "/admin/calendar",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-HP-003"
+      ]
+    },
+    {
+      "name": "xrole-reschedule-customer",
+      "route": "/bookings",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-HP-003"
+      ]
+    },
+    {
+      "name": "xrole-sensitive-data-denied",
+      "route": "/admin/roles",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-PERM-002"
+      ]
+    },
+    {
+      "name": "xrole-walkin-customer-history",
+      "route": "/bookings",
+      "auth": "super-admin",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "placeholder",
+      "relatedTestCases": [
+        "XROLE-HP-002"
+      ]
+    }
+  ]
+}
