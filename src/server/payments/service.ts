@@ -102,7 +102,7 @@ export async function verifySubmittedPayment(input: {
       include: { booking: true }
     });
 
-    if (!payment || payment.status !== PaymentStatus.SUBMITTED) {
+    if (!payment?.booking || payment.status !== PaymentStatus.SUBMITTED) {
       throw new Error("Only submitted payments can be verified.");
     }
 
@@ -117,7 +117,7 @@ export async function verifySubmittedPayment(input: {
     });
 
     return tx.booking.update({
-      where: { id: payment.bookingId },
+      where: { id: payment.booking.id },
       data: {
         status: BookingStatus.CONFIRMED,
         paymentHoldExpiresAt: null
@@ -139,7 +139,7 @@ export async function rejectSubmittedPayment(input: {
       include: { booking: true }
     });
 
-    if (!payment || payment.status !== PaymentStatus.SUBMITTED) {
+    if (!payment?.booking || payment.status !== PaymentStatus.SUBMITTED) {
       throw new Error("Only submitted payments can be rejected.");
     }
 
@@ -154,7 +154,7 @@ export async function rejectSubmittedPayment(input: {
     });
 
     return tx.booking.update({
-      where: { id: payment.bookingId },
+      where: { id: payment.booking.id },
       data: {
         status: BookingStatus.EXPIRED,
         cancellationReason: "Payment proof rejected by admin",

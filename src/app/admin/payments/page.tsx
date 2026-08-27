@@ -98,22 +98,38 @@ export default async function AdminPaymentsPage({ searchParams }: AdminPaymentsP
     redirect(`/admin/payments?${next.toString()}`);
   }
 
-  const rows: PaymentQueueRow[] = payments.map((payment) => ({
-    id: payment.id,
-    customerName: payment.booking.user.fullName,
-    customerContact: payment.booking.user.phone ?? payment.booking.user.email,
-    schedule: formatDateTimeRange(payment.booking.startAtUtc, payment.booking.endAtUtc, payment.booking.timezone),
-    facilityName: payment.booking.facility.name,
-    amountDue: formatCurrency(payment.amountMinor, "PHP"),
-    bookingReference: payment.providerReference ?? `PAY-${payment.id.slice(0, 6).toUpperCase()}`,
-    transferReference: payment.externalReference,
-    paymentMethod: formatPaymentMethod(payment.method),
-    status: payment.status,
-    statusLabel: paymentLabels[payment.status],
-    statusClassName: paymentTone[payment.status],
-    submitted: payment.submittedAt ? formatInTimeZone(payment.submittedAt, payment.booking.timezone, "MMM d, h:mm a") : "Not submitted",
-    duplicateReference: payment.duplicateReference
-  }));
+  const rows: PaymentQueueRow[] = payments.map((payment) => {
+    const order = payment.bookingOrder;
+    const booking = payment.booking;
+    const customer = order?.user ?? booking?.user;
+    const firstOrderBooking = order?.bookings[0];
+    const timezone = firstOrderBooking?.timezone ?? booking?.timezone ?? "Asia/Manila";
+    const schedule = order
+      ? `${order.bookings.length} bookings in consolidated order`
+      : booking
+        ? formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)
+        : "Booking unavailable";
+    const facilityName = order
+      ? order.bookings.map((item) => item.facility.name).filter((name, index, names) => names.indexOf(name) === index).join(", ")
+      : booking?.facility.name ?? "Unknown facility";
+
+    return {
+      id: payment.id,
+      customerName: customer?.fullName ?? "Unknown customer",
+      customerContact: customer?.phone ?? customer?.email ?? "Contact unavailable",
+      schedule,
+      facilityName,
+      amountDue: formatCurrency(payment.amountMinor, "PHP"),
+      bookingReference: order?.reference ?? payment.providerReference ?? `PAY-${payment.id.slice(0, 6).toUpperCase()}`,
+      transferReference: payment.externalReference,
+      paymentMethod: formatPaymentMethod(payment.method),
+      status: payment.status,
+      statusLabel: paymentLabels[payment.status],
+      statusClassName: paymentTone[payment.status],
+      submitted: payment.submittedAt ? formatInTimeZone(payment.submittedAt, timezone, "MMM d, h:mm a") : "Not submitted",
+      duplicateReference: payment.duplicateReference
+    };
+  });
 
   return (
     <main className="space-y-8 pb-16">

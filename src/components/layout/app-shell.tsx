@@ -8,19 +8,21 @@ import { AdminSessionGuard } from "@/components/layout/admin-session-guard";
 import { siteConfig } from "@/lib/config/site";
 import { getCurrentAdminAuthorization } from "@/lib/auth/authorization";
 import { visibleAdminNavigation } from "@/lib/auth/admin-navigation";
+import { getActiveCartCount } from "@/server/cart/service";
 
 type AppShellProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-const navItems = [
-  { href: "/facilities", label: "Facilities" },
-  { href: "/bookings", label: "My Bookings" }
-] as const;
-
 export async function AppShell({ children }: AppShellProps) {
   const session = await auth();
   const authorization = session?.user ? await getCurrentAdminAuthorization() : null;
+  const cartCount = session?.user?.role === "CUSTOMER" ? await getActiveCartCount(session.user.id) : 0;
+  const navItems = [
+    { href: "/facilities", label: "Facilities" },
+    ...(session?.user?.role === "CUSTOMER" ? [{ href: "/cart", label: `Cart (${cartCount})` }] : []),
+    { href: "/bookings", label: "My Bookings" }
+  ];
   const adminItems = authorization ? visibleAdminNavigation(authorization.permissions) : [];
   const showAdminItems = adminItems.length > 0;
   const displaySession = session?.user?.role === "ADMIN" && !authorization ? null : session;

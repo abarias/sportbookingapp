@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ facilityId?: string; date?: string; start?: string; rescheduled?: string }>;
+  searchParams: Promise<{ facilityId?: string; date?: string; start?: string; rescheduled?: string; walkInCreated?: string }>;
 };
 
 function safeStartMinutes(value: string | undefined) {
@@ -91,8 +91,14 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
   if (!booking) notFound();
 
   const hasReschedulePermission = authorization.permissions.has("bookings.reschedule");
-  const isPastOrCompleted = booking.startAtUtc <= new Date();
-  const canReschedule = hasReschedulePermission && !isPastOrCompleted;
+  const now = new Date();
+  const cutoffHoursSetting = await prisma.appSetting.findUnique({ where: { key: "booking.rescheduleCutoffHours" } });
+  const configuredCutoffHours = typeof cutoffHoursSetting?.value === "number" && cutoffHoursSetting.value > 0
+    ? cutoffHoursSetting.value
+    : Number.parseInt(process.env.RESCHEDULE_CUTOFF_HOURS ?? "24", 10) || 24;
+  const isPastOrCompleted = booking.startAtUtc <= now;
+  const isWithinRescheduleCutoff = booking.startAtUtc.getTime() - now.getTime() < configuredCutoffHours * 60 * 60_000;
+  const canReschedule = hasReschedulePermission && !isPastOrCompleted && !isWithinRescheduleCutoff;
   const canOverride = authorization.permissions.has("bookings.reschedule.override_adjustment");
   const canResolve = authorization.permissions.has("bookings.reschedule.resolve_adjustment");
   const selectedFacility = facilities.find((facility) => facility.id === query.facilityId) ?? facilities.find((facility) => facility.id === booking.facilityId) ?? facilities[0];
@@ -135,14 +141,16 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
     }
   }
 
-  const reference = booking.payment?.providerReference ?? `BOOK-${booking.id.slice(0, 8).toUpperCase()}`;
+  const effectivePayment = booking.payment ?? booking.bookingOrder?.payment ?? null;
+  const reference = booking.reference ?? effectivePayment?.providerReference ?? `BOOK-${booking.id.slice(0, 8).toUpperCase()}`;
   const showRescheduledSuccess = query.rescheduled === "1";
   return (
     <main className="space-y-8 pb-16">
       <SectionHeading eyebrow="Booking administration" title={`Booking ${reference}`} description="Review the active reservation, payment, and complete rescheduling history." />
       {showRescheduledSuccess ? <p aria-live="polite" className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">Rescheduling changes saved successfully. Review the current schedule and adjustment status below.</p> : null}
+      {query.walkInCreated === "1" ? <p aria-live="polite" className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">Walk-in booking created successfully. Review the booking details and payment information below.</p> : null}
       <AdminNav current="calendar" />
-      <div className="flex flex-wrap gap-3"><Link className="text-sm text-amber-200 hover:underline" href="/admin/calendar">Back to calendar</Link><Link className="text-sm text-amber-200 hover:underline" href={`/admin/customers?customerId=${booking.user.id}`}>View customer</Link></div>
+      <div className="flex flex-wrap gap-3"><Link className="text-sm text-amber-200 hover:underline" href="/admin/calendar">Back to calendar</Link><Link className="text-sm text-amber-200 hover:underline" href={`/admin/customers?customerId=${booking.user.id}`}>View customer</Link>{booking.bookingOrder?.payment ? <Link className="text-sm text-amber-200 hover:underline" href={`/admin/payments/${booking.bookingOrder.payment.id}`}>Order {booking.bookingOrder.reference}</Link> : null}</div>
 
       <section className="grid gap-6 rounded-[1.75rem] border border-white/10 bg-white/5 p-6 lg:grid-cols-[1fr_auto]">
         <div>
@@ -153,17 +161,17 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
             <p>Customer: <span className="text-white">{booking.user.fullName}</span></p>
             <p>Duration: <span className="text-white">{durationMinutes / 60} hour{durationMinutes === 60 ? "" : "s"}</span></p>
             <p>Current base amount: <span className="text-white">{formatCurrency(booking.amountMinor, "PHP")}</span></p>
-            <p>Original payment: <span className="text-white">{booking.payment ? formatCurrency(booking.payment.amountMinor, "PHP") : "No payment"}</span></p>
+            <p>Original payment: <span className="text-white">{effectivePayment ? formatCurrency(effectivePayment.amountMinor, "PHP") : "No payment"}</span></p>
             <p>Payment reference: <span className="text-white">{reference}</span></p>
           </div>
         </div>
-        <BookingStatusBadge bookingStatus={booking.status} paymentStatus={booking.payment?.status ?? null} />
+        <BookingStatusBadge bookingStatus={booking.status} paymentStatus={effectivePayment?.status ?? null} />
       </section>
 
       {hasReschedulePermission ? (
         <section className="space-y-6 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
           <div><p className="text-xs uppercase tracking-[0.18em] text-amber-300">Reschedule</p><h2 className="mt-2 text-2xl font-semibold text-white">Choose a replacement slot</h2><p className="mt-2 text-sm text-stone-400">Selecting a slot does not change the booking. Availability and price are checked again only when you explicitly confirm.</p></div>
-          {!canReschedule ? <p className="rounded-2xl border border-white/10 bg-stone-950/50 p-4 text-sm text-stone-300">Completed or past bookings cannot be rescheduled.</p> : <>
+          {!canReschedule ? <p className="rounded-2xl border border-white/10 bg-stone-950/50 p-4 text-sm text-stone-300">{isPastOrCompleted ? "Completed or past bookings cannot be rescheduled." : `Bookings cannot be rescheduled within ${configuredCutoffHours} hours of the current start time.`}</p> : <>
             <RescheduleSlotFilters facilities={facilities} maxDateKey={bookingWindow.maxDateKey} minDateKey={bookingWindow.minDateKey} selectedFacilityId={selectedFacility?.id} selectedDate={selectedDate} />
           {!availability?.openingRange ? <p className="rounded-2xl border border-white/10 bg-stone-950/50 p-4 text-sm text-stone-400">The facility is closed on this date.</p> : (
             <div>
@@ -193,7 +201,7 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
           {preview ? (
             <div className="space-y-5">
               <div className="grid gap-4 lg:grid-cols-2">
-                <article className="rounded-2xl border border-white/10 bg-stone-950/50 p-5"><p className="text-xs uppercase tracking-[0.16em] text-stone-500">Current booking</p><h3 className="mt-2 font-semibold text-white">{booking.facility.name}</h3><p className="mt-2 text-sm text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p><p className="mt-3 text-sm text-stone-400">Original paid base amount</p><p className="text-xl font-semibold text-white">{formatCurrency(preview.originalAmountMinor, "PHP")}</p><p className="mt-2 text-sm text-stone-400">Payment remains {booking.payment?.status.replaceAll("_", " ")}.</p></article>
+                <article className="rounded-2xl border border-white/10 bg-stone-950/50 p-5"><p className="text-xs uppercase tracking-[0.16em] text-stone-500">Current booking</p><h3 className="mt-2 font-semibold text-white">{booking.facility.name}</h3><p className="mt-2 text-sm text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p><p className="mt-3 text-sm text-stone-400">Original paid base amount</p><p className="text-xl font-semibold text-white">{formatCurrency(preview.originalAmountMinor, "PHP")}</p><p className="mt-2 text-sm text-stone-400">Payment remains {effectivePayment?.status.replaceAll("_", " ")}.</p></article>
                 <article className="rounded-2xl border border-amber-300/20 bg-amber-300/5 p-5"><p className="text-xs uppercase tracking-[0.16em] text-amber-300">Replacement booking</p><h3 className="mt-2 font-semibold text-white">{preview.replacement.facility.name}</h3><p className="mt-2 text-sm text-stone-300">{formatDateTimeRange(preview.replacement.startAtUtc, preview.replacement.endAtUtc, preview.replacement.facility.timezone)}</p><p className="mt-3 text-sm text-stone-400">New VAT-exclusive base amount</p><p className="text-xl font-semibold text-white">{formatCurrency(preview.replacementAmountMinor, "PHP")}</p><p className="mt-2 text-sm text-amber-100">{adjustmentMessage(preview.priceDifferenceMinor)}</p></article>
               </div>
               <RescheduleConfirmationForm bookingId={booking.id} replacementFacilityId={preview.replacement.facility.id} dateKey={selectedDate} startMinutes={selectedStart!} differenceMinor={preview.priceDifferenceMinor} canOverrideAdjustment={canOverride} />

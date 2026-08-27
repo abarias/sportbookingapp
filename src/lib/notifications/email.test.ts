@@ -67,7 +67,7 @@ describe("sendVerificationEmail", () => {
       expect.objectContaining({
         from: "Sport Booking PH <bookings@example.com>",
         html: expect.stringContaining("123456"),
-        subject: "Verify your Sport Booking PH account",
+        subject: "Verify your MMG Stellar account",
         text: expect.stringContaining("123456"),
         to: "juan@example.com"
       })

@@ -24,17 +24,17 @@ function getImageExtension(file: File) {
   return extensions[file.type] ?? ".jpg";
 }
 
-export async function storePaymentProof(file: File, bookingId: string) {
+export async function storePaymentProof(file: File, referenceId: string, ownerType: "bookings" | "orders" = "bookings") {
   const config = getStorageConfig();
   const extension = getImageExtension(file);
-  const fileName = `${bookingId}-${Date.now()}-${crypto.randomUUID()}${extension}`;
+  const fileName = `${referenceId}-${Date.now()}-${crypto.randomUUID()}${extension}`;
   const bytes = Buffer.from(await file.arrayBuffer());
 
   if (config) {
     const client = createClient(config.url, config.serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
-    const objectPath = `bookings/${bookingId}/${fileName}`;
+    const objectPath = `${ownerType}/${referenceId}/${fileName}`;
     const { error } = await client.storage.from(config.bucket).upload(objectPath, bytes, {
       contentType: file.type,
       upsert: false

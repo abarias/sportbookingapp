@@ -10,6 +10,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { expirePendingBookings } from "@/server/bookings/expiration";
 import { expirePendingReschedules } from "@/server/bookings/rescheduling";
+import { expirePendingOrders } from "@/server/orders/expiration";
 import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellationWindowHours } from "@/server/bookings/policies";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,15 @@ type CustomerBookingListRecord = Awaited<ReturnType<typeof prisma.booking.findMa
   payment: {
     status: PaymentStatus;
     reviewNote: string | null;
+  } | null;
+  bookingOrder: {
+    id: string;
+    reference: string;
+    status: string;
+    payment: {
+      status: PaymentStatus;
+      reviewNote: string | null;
+    } | null;
   } | null;
   reschedules: Array<{
     id: string;
@@ -53,9 +63,10 @@ type CustomerBookingListRecord = Awaited<ReturnType<typeof prisma.booking.findMa
 };
 
 function needsCustomerPaymentAction(booking: CustomerBookingListRecord) {
+  const paymentStatus = booking.payment?.status ?? booking.bookingOrder?.payment?.status;
   return (
     booking.status === BookingStatus.HELD &&
-    (booking.payment?.status === PaymentStatus.AWAITING_PAYMENT || booking.payment?.status === PaymentStatus.ACTION_REQUIRED)
+    (paymentStatus === PaymentStatus.AWAITING_PAYMENT || paymentStatus === PaymentStatus.ACTION_REQUIRED)
   ) || booking.reschedules.some((reschedule) => reschedule.status === BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED);
 }
 
@@ -68,6 +79,14 @@ function sortUpcomingBookings(left: CustomerBookingListRecord, right: CustomerBo
   }
 
   return left.startAtUtc.getTime() - right.startAtUtc.getTime();
+}
+
+function paymentStatusFor(booking: CustomerBookingListRecord) {
+  return booking.payment?.status ?? booking.bookingOrder?.payment?.status ?? null;
+}
+
+function paymentReviewNoteFor(booking: CustomerBookingListRecord) {
+  return booking.payment?.reviewNote ?? booking.bookingOrder?.payment?.reviewNote ?? null;
 }
 
 const HISTORY_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
@@ -111,7 +130,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   const now = new Date();
   await Promise.all([
     expirePendingBookings({ now }),
-    expirePendingReschedules({ now })
+    expirePendingReschedules({ now }),
+    expirePendingOrders({ now })
   ]);
   const historyPage = parsePositiveInteger(params.historyPage, 1);
   const historyPageSize = parseHistoryPageSize(params.historyPageSize);
@@ -136,6 +156,19 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
       select: {
         status: true,
         reviewNote: true
+      }
+    },
+    bookingOrder: {
+      select: {
+        id: true,
+        reference: true,
+        status: true,
+        payment: {
+          select: {
+            status: true,
+            reviewNote: true
+          }
+        }
       }
     },
     reschedules: {
@@ -171,7 +204,10 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
         userId: session.user.id,
         endAtUtc: { gte: now },
         status: { notIn: [BookingStatus.CANCELLED, BookingStatus.EXPIRED] },
-        payment: { isNot: { status: PaymentStatus.REJECTED } }
+        OR: [
+          { payment: { isNot: { status: PaymentStatus.REJECTED } } },
+          { bookingOrder: { payment: { isNot: { status: PaymentStatus.REJECTED } } } }
+        ]
       },
       orderBy: {
         startAtUtc: "asc"
@@ -196,8 +232,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
     })
   ]);
 
-  const globalCancellationEnabled = cancellationSetting?.value === true;
-  const globalCancellationWindowHours = typeof cancellationWindowSetting?.value === "number" ? cancellationWindowSetting.value : 24;
+  const globalCancellationEnabled = cancellationWindowSetting?.value === true;
+  const globalCancellationWindowHours = typeof cancellationSetting?.value === "number" ? cancellationSetting.value : 24;
 
   const upcoming = upcomingBookings.sort(sortUpcomingBookings);
   const totalHistoryPages = Math.max(1, Math.ceil(historyTotalCount / historyPageSize));
@@ -230,15 +266,17 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
           items={upcoming.map((booking) => ({
             id: booking.id,
             facilityName: booking.facility.name,
+            orderReference: booking.bookingOrder?.reference ?? null,
+            orderId: booking.bookingOrder?.id ?? null,
             status: booking.status,
-            paymentStatus: booking.payment?.status ?? null,
+            paymentStatus: paymentStatusFor(booking),
             amountMinor: booking.amountMinor,
             currency: "PHP",
             startAtUtc: booking.startAtUtc,
             endAtUtc: booking.endAtUtc,
             timezone: booking.timezone,
             paymentHoldExpiresAt: booking.paymentHoldExpiresAt,
-            paymentReviewNote: booking.payment?.reviewNote ?? null,
+            paymentReviewNote: paymentReviewNoteFor(booking),
             isCancellable: !booking.reschedules.some((reschedule) =>
               reschedule.status === BookingRescheduleStatus.ADDITIONAL_PAYMENT_REQUIRED ||
               reschedule.status === BookingRescheduleStatus.PAYMENT_SUBMITTED
@@ -262,15 +300,17 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
           items={history.map((booking) => ({
             id: booking.id,
             facilityName: booking.facility.name,
+            orderReference: booking.bookingOrder?.reference ?? null,
+            orderId: booking.bookingOrder?.id ?? null,
             status: booking.status,
-            paymentStatus: booking.payment?.status ?? null,
+            paymentStatus: paymentStatusFor(booking),
             amountMinor: booking.amountMinor,
             currency: "PHP",
             startAtUtc: booking.startAtUtc,
             endAtUtc: booking.endAtUtc,
             timezone: booking.timezone,
             paymentHoldExpiresAt: booking.paymentHoldExpiresAt,
-            paymentReviewNote: booking.payment?.reviewNote ?? null,
+            paymentReviewNote: paymentReviewNoteFor(booking),
             isCancellable: false,
             reschedules: booking.reschedules
           }))}

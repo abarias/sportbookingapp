@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => ({
     bookingReschedule: {
       findMany: vi.fn()
     },
+    bookingOrder: {
+      findMany: vi.fn()
+    },
     facility: {
       findUnique: vi.fn()
     },
@@ -59,6 +62,7 @@ beforeEach(() => {
   mocks.prisma.$transaction.mockImplementation((callback) => callback(mocks.tx));
   mocks.tx.$queryRaw.mockResolvedValue([]);
   mocks.tx.bookingReschedule.findMany.mockResolvedValue([]);
+  mocks.tx.bookingOrder.findMany.mockResolvedValue([]);
 });
 
 describe("createConfirmedBookingWithMockPayment idempotency", () => {

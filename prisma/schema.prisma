@@ -101,6 +101,27 @@ enum NotificationDeliveryStatus {
   FAILED
 }
 
+enum CartStatus {
+  ACTIVE
+  CHECKED_OUT
+  EXPIRED
+  ABANDONED
+}
+
+enum BookingOrderStatus {
+  PENDING_PAYMENT
+  PROOF_SUBMITTED
+  ACTION_REQUIRED
+  CONFIRMED
+  PAYMENT_REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentAllocationType {
+  CHECKOUT
+}
+
 model User {
   id                         String                   @id @default(cuid())
   email                      String                   @unique
@@ -132,6 +153,8 @@ model User {
   resolvedReschedules        BookingReschedule[]      @relation("RescheduleResolver")
   verifiedReschedulePayments ReschedulePayment[]      @relation("ReschedulePaymentVerifier")
   notificationDeliveries     NotificationDelivery[]
+  carts                      Cart[]
+  bookingOrders              BookingOrder[]
   createdAt                  DateTime                 @default(now())
   updatedAt                  DateTime                 @updatedAt
 
@@ -238,6 +261,7 @@ model Facility {
   holidays                        Holiday[]
   originalReschedules             BookingReschedule[]     @relation("OriginalRescheduleFacility")
   replacementReschedules          BookingReschedule[]     @relation("ReplacementRescheduleFacility")
+  cartItems                       CartItem[]
   createdAt                       DateTime                @default(now())
   updatedAt                       DateTime                @updatedAt
 
@@ -366,8 +390,11 @@ model Holiday {
 
 model Booking {
   id                     String                 @id @default(cuid())
+  reference              String?                @unique
   userId                 String
   facilityId             String
+  bookingOrderId         String?
+  orderItemSequence      Int?
   status                 BookingStatus
   startAtUtc             DateTime
   endAtUtc               DateTime
@@ -381,21 +408,26 @@ model Booking {
   cancellationReason     String?
   cancelledAt            DateTime?
   payment                Payment?
+  paymentAllocations     PaymentAllocation[]
   reschedules            BookingReschedule[]
   notificationDeliveries NotificationDelivery[]
   user                   User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
   facility               Facility               @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  bookingOrder           BookingOrder?          @relation(fields: [bookingOrderId], references: [id], onDelete: Restrict)
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
 
+  @@unique([bookingOrderId, orderItemSequence])
   @@index([facilityId, startAtUtc, endAtUtc])
   @@index([userId, startAtUtc])
   @@index([status, paymentHoldExpiresAt])
+  @@index([bookingOrderId, orderItemSequence])
 }
 
 model Payment {
   id                          String              @id @default(cuid())
-  bookingId                   String              @unique
+  bookingId                   String?             @unique
+  bookingOrderId              String?             @unique
   provider                    PaymentProvider
   providerReference           String?             @unique
   method                      String?
@@ -417,7 +449,9 @@ model Payment {
   reviewNote                  String?
   duplicateReference          Boolean             @default(false)
   rawPayload                  Json?
-  booking                     Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking                     Booking?            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingOrder                BookingOrder?       @relation(fields: [bookingOrderId], references: [id], onDelete: Cascade)
+  allocations                 PaymentAllocation[]
   verifiedBy                  User?               @relation("PaymentVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
   originalForReschedules      BookingReschedule[] @relation("OriginalReschedulePayment")
   createdAt                   DateTime            @default(now())
@@ -425,6 +459,100 @@ model Payment {
 
   @@index([status, expiresAt])
   @@index([normalizedExternalReference, status])
+}
+
+model Cart {
+  id             String        @id @default(cuid())
+  userId         String
+  status         CartStatus    @default(ACTIVE)
+  currency       String        @default("PHP")
+  version        Int           @default(1)
+  lastActivityAt DateTime      @default(now())
+  expiresAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items          CartItem[]
+  bookingOrder   BookingOrder?
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+}
+
+model CartItem {
+  id                 String   @id @default(cuid())
+  cartId             String
+  facilityId         String
+  dateKey            String
+  startAtUtc         DateTime
+  endAtUtc           DateTime
+  timezone           String   @default("Asia/Manila")
+  durationMinutes    Int
+  quotedAmountMinor  Int
+  currency           String   @default("PHP")
+  quotedPricePreview Json
+  quoteCalculatedAt  DateTime
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  cart               Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  facility           Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@unique([cartId, facilityId, startAtUtc, endAtUtc])
+  @@index([cartId, createdAt])
+  @@index([facilityId, startAtUtc, endAtUtc])
+}
+
+model BookingOrder {
+  id                     String                 @id @default(cuid())
+  userId                 String
+  cartId                 String                 @unique
+  reference              String                 @unique
+  status                 BookingOrderStatus     @default(PENDING_PAYMENT)
+  currency               String                 @default("PHP")
+  vatTreatment           String                 @default("VAT_EXCLUSIVE")
+  baseAmountMinor        Int
+  amountPaidMinor        Int?
+  outstandingAmountMinor Int
+  checkoutSnapshot       Json
+  checkoutAt             DateTime               @default(now())
+  paymentDeadline        DateTime?
+  proofSubmittedAt       DateTime?
+  verifiedAt             DateTime?
+  rejectedAt             DateTime?
+  expiredAt              DateTime?
+  cancelledAt            DateTime?
+  idempotencyKey         String                 @unique
+  version                Int                    @default(1)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  cart                   Cart                   @relation(fields: [cartId], references: [id], onDelete: Restrict)
+  bookings               Booking[]
+  payment                Payment?
+  paymentAllocations     PaymentAllocation[]
+  notificationDeliveries NotificationDelivery[]
+
+  @@index([userId, createdAt])
+  @@index([status, paymentDeadline])
+}
+
+model PaymentAllocation {
+  id             String                @id @default(cuid())
+  paymentId      String
+  bookingOrderId String
+  bookingId      String
+  amountMinor    Int
+  currency       String                @default("PHP")
+  type           PaymentAllocationType @default(CHECKOUT)
+  createdAt      DateTime              @default(now())
+  payment        Payment               @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  bookingOrder   BookingOrder          @relation(fields: [bookingOrderId], references: [id], onDelete: Restrict)
+  booking        Booking               @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, bookingId])
+  @@index([bookingOrderId, bookingId])
+  @@index([bookingId])
 }
 
 model BookingReschedule {
@@ -513,25 +641,28 @@ model ReschedulePayment {
 }
 
 model NotificationDelivery {
-  id           String                     @id @default(cuid())
-  dedupeKey    String                     @unique
-  userId       String
-  bookingId    String
-  rescheduleId String?
-  eventType    String
-  payload      Json
-  status       NotificationDeliveryStatus @default(PENDING)
-  attempts     Int                        @default(0)
-  lastError    String?
-  sentAt       DateTime?
-  createdAt    DateTime                   @default(now())
-  updatedAt    DateTime                   @updatedAt
-  user         User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  booking      Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  reschedule   BookingReschedule?         @relation(fields: [rescheduleId], references: [id], onDelete: Cascade)
+  id             String                     @id @default(cuid())
+  dedupeKey      String                     @unique
+  userId         String
+  bookingId      String?
+  bookingOrderId String?
+  rescheduleId   String?
+  eventType      String
+  payload        Json
+  status         NotificationDeliveryStatus @default(PENDING)
+  attempts       Int                        @default(0)
+  lastError      String?
+  sentAt         DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking        Booking?                   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingOrder   BookingOrder?              @relation(fields: [bookingOrderId], references: [id], onDelete: Cascade)
+  reschedule     BookingReschedule?         @relation(fields: [rescheduleId], references: [id], onDelete: Cascade)
 
   @@index([status, createdAt])
   @@index([bookingId, createdAt])
+  @@index([bookingOrderId, createdAt])
 }
 
 model BlockedSchedule {
