@@ -4,11 +4,13 @@ type BookingDateSelectorProps = {
   dateKey: string;
   minDateKey: string;
   maxDateKey: string;
+  replaceCartItemId?: string;
 };
 
-export function BookingDateSelector({ dateKey, minDateKey, maxDateKey }: BookingDateSelectorProps) {
+export function BookingDateSelector({ dateKey, minDateKey, maxDateKey, replaceCartItemId }: BookingDateSelectorProps) {
   return (
     <form className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      {replaceCartItemId ? <input name="replaceCartItem" type="hidden" value={replaceCartItemId} /> : null}
       <div className="flex-1 space-y-2">
         <label className="text-sm font-medium text-stone-200" htmlFor="date">
           Booking date

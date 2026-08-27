@@ -17,6 +17,13 @@ import { prisma } from "@/lib/db/prisma";
 import { storeFacilityImages } from "@/lib/storage/facility-images";
 import { createAdminConfirmedBooking } from "@/server/bookings/service";
 import { rejectSubmittedPayment, requestPaymentAction, verifySubmittedPayment } from "@/server/payments/service";
+import { rejectOrderPayment, requestOrderPaymentAction, verifyOrderPayment } from "@/server/orders/service";
+
+async function paymentBelongsToOrder(paymentId: string) {
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId }, select: { bookingOrderId: true } });
+  if (!payment) throw new Error("Payment was not found.");
+  return Boolean(payment.bookingOrderId);
+}
 
 function parseBoolean(value: FormDataEntryValue | null) {
   return value === "on" || value === "true";
@@ -692,6 +699,8 @@ export async function createWalkInBookingAction(
     }
   });
 
+  let createdBookingId: string;
+
   try {
     const booking = await createAdminConfirmedBooking({
       userId: user.id,
@@ -702,8 +711,13 @@ export async function createWalkInBookingAction(
       paymentMethod: parsed.data.paymentMethod,
       paymentReference: parsed.data.paymentReference
     });
+    createdBookingId = booking.id;
     await writeAuditLog(prisma, { actorUserId: authorization.session.user.id, action: "booking.walk_in_created", entityType: "Booking", entityId: booking.id, after: { facilityId: parsed.data.facilityId, customerUserId: user.id, dateKey: parsed.data.dateKey, startTime: parsed.data.startTime, durationMinutes: parsed.data.durationMinutes, paymentMethod: parsed.data.paymentMethod } });
   } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     return {
       message: error instanceof Error ? error.message : "Booking could not be created."
     };
@@ -715,7 +729,7 @@ export async function createWalkInBookingAction(
   revalidatePath("/bookings");
   revalidatePath("/facilities");
 
-  redirect(`/admin/walk-ins?date=${encodeURIComponent(parsed.data.dateKey)}`);
+  redirect(`/admin/bookings/${createdBookingId}?walkInCreated=1`);
 }
 
 export async function verifyPaymentAction(
@@ -733,18 +747,20 @@ export async function verifyPaymentAction(
       return { error: "Payment could not be verified." };
     }
 
-    await verifySubmittedPayment({
-      paymentId: parsed.data.paymentId,
-      adminUserId: session.user.id,
-      reviewNote: parsed.data.reviewNote
-    });
-    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.verified", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote ?? null } });
+    if (await paymentBelongsToOrder(parsed.data.paymentId)) {
+      await verifyOrderPayment({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+    } else {
+      await verifySubmittedPayment({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+      await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.verified", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote ?? null } });
+    }
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
     revalidatePath("/admin/calendar");
     revalidatePath("/admin/reports");
     revalidatePath("/bookings");
+    revalidatePath("/admin/orders");
+    revalidatePath("/orders", "layout");
 
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=verified`);
   } catch (error) {
@@ -770,18 +786,20 @@ export async function rejectPaymentAction(
       return { error: "Add a rejection reason before rejecting payment." };
     }
 
-    await rejectSubmittedPayment({
-      paymentId: parsed.data.paymentId,
-      adminUserId: session.user.id,
-      reviewNote: parsed.data.reviewNote
-    });
-    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.rejected", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
+    if (await paymentBelongsToOrder(parsed.data.paymentId)) {
+      await rejectOrderPayment({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+    } else {
+      await rejectSubmittedPayment({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+      await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.rejected", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
+    }
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
     revalidatePath("/admin/calendar");
     revalidatePath("/admin/reports");
     revalidatePath("/bookings");
+    revalidatePath("/admin/orders");
+    revalidatePath("/orders", "layout");
 
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=rejected`);
   } catch (error) {
@@ -807,16 +825,18 @@ export async function requestPaymentActionRequiredAction(
       return { error: "Add instructions before requesting more proof." };
     }
 
-    await requestPaymentAction({
-      paymentId: parsed.data.paymentId,
-      adminUserId: session.user.id,
-      reviewNote: parsed.data.reviewNote
-    });
-    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.action_required", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
+    if (await paymentBelongsToOrder(parsed.data.paymentId)) {
+      await requestOrderPaymentAction({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+    } else {
+      await requestPaymentAction({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+      await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.action_required", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
+    }
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
     revalidatePath("/bookings");
+    revalidatePath("/admin/orders");
+    revalidatePath("/orders", "layout");
 
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=action-required`);
   } catch (error) {

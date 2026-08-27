@@ -20,6 +20,9 @@ type FacilityDetailPageProps = {
   }>;
   searchParams: Promise<{
     date?: string;
+    replaceCartItem?: string;
+    start?: string;
+    duration?: string;
   }>;
 };
 
@@ -33,7 +36,12 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
   }
 
   const bookingWindow = getBookingWindow(facility.timezone);
-  const dateKey = normalizeDateKeyWithinBookingWindow((await searchParams).date, facility.timezone);
+  const query = await searchParams;
+  const requestedStart = Number.parseInt(query.start ?? "", 10);
+  const requestedDuration = Number.parseInt(query.duration ?? "", 10);
+  const editStartMinutes = Number.isInteger(requestedStart) && requestedStart >= 0 && requestedStart < 1440 && requestedStart % 60 === 0 ? requestedStart : undefined;
+  const editDurationMinutes = Number.isInteger(requestedDuration) && requestedDuration >= 60 && requestedDuration <= 240 && requestedDuration % 60 === 0 ? requestedDuration : undefined;
+  const dateKey = normalizeDateKeyWithinBookingWindow(query.date, facility.timezone);
   const availability = await getFacilityDayAvailability(facility, dateKey);
   const pricingView = await getFacilityPricingView(facility, dateKey);
   const primaryPrice = facility.pricingRules.find((rule) => rule.dayType === "DEFAULT");
@@ -60,7 +68,7 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
           </div>
 
           <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 sm:p-6">
-            <BookingDateSelector dateKey={dateKey} maxDateKey={bookingWindow.maxDateKey} minDateKey={bookingWindow.minDateKey} />
+            <BookingDateSelector dateKey={dateKey} maxDateKey={bookingWindow.maxDateKey} minDateKey={bookingWindow.minDateKey} replaceCartItemId={query.replaceCartItem} />
             <p className="mt-4 text-sm text-stone-400">
               Showing hourly booking slots for {dateLabel} in {facility.timezone}. Bookings are open through {formatDateLabel(bookingWindow.maxDateKey, facility.timezone)}.
             </p>
@@ -73,6 +81,9 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
             isAuthenticated={Boolean(session?.user)}
             dateLabel={dateLabel}
             priceQuotes={pricingView.quotes}
+            replaceCartItemId={query.replaceCartItem}
+            initialStartMinutes={editStartMinutes}
+            initialDurationMinutes={editDurationMinutes}
             slotIntervalMinutes={availability.slotIntervalMinutes}
             slots={availability.slots}
           />
@@ -141,7 +152,7 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
               <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Booking rules</p>
               <ul className="mt-3 space-y-2">
                 <li>Hourly booking increments only</li>
-                <li>Slots are held after Reserve & Pay</li>
+                <li>Cart items do not hold slots; checkout secures all schedules together</li>
                 <li>Final confirmation requires staff payment verification</li>
               </ul>
             </aside>

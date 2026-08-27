@@ -85,6 +85,7 @@ async function loadEligibleBooking(tx: Prisma.TransactionClient, bookingId: stri
     where: { id: bookingId },
     include: {
       payment: true,
+      bookingOrder: { include: { payment: true } },
       facility: true,
       reschedules: {
         where: { status: { in: [...ACTIVE_RESCHEDULE_STATUSES] } },
@@ -96,9 +97,10 @@ async function loadEligibleBooking(tx: Prisma.TransactionClient, bookingId: stri
   if (!booking) throw new Error("Booking was not found.");
   const cutoffSetting = await tx.appSetting.findUnique({ where: { key: "booking.rescheduleCutoffHours" } });
   const cutoffHours = integerSetting(cutoffSetting?.value, process.env.RESCHEDULE_CUTOFF_HOURS, 24);
+  const originalPayment = booking.payment ?? booking.bookingOrder?.payment ?? null;
   assertRescheduleEligibility({
     bookingStatus: booking.status,
-    paymentStatus: booking.payment?.status ?? null,
+    paymentStatus: originalPayment?.status ?? null,
     startAtUtc: booking.startAtUtc,
     now,
     cutoffHours,
@@ -240,12 +242,13 @@ export async function initiateBookingReschedule(input: InitiateRescheduleInput) 
       const holdSetting = requiresAdditionalPayment ? await tx.appSetting.findUnique({ where: { key: "booking.rescheduleHoldMinutes" } }) : null;
       const holdMinutes = integerSetting(holdSetting?.value, process.env.RESCHEDULE_PAYMENT_HOLD_MINUTES, 15);
       const holdExpiresAt = requiresAdditionalPayment ? new Date(now.getTime() + holdMinutes * 60_000) : null;
-      const originalBookingReference = booking.payment?.providerReference ?? `BOOK-${booking.id.slice(0, 8).toUpperCase()}`;
+      const originalPayment = booking.payment ?? booking.bookingOrder?.payment ?? null;
+      const originalBookingReference = booking.reference ?? originalPayment?.providerReference ?? `BOOK-${booking.id.slice(0, 8).toUpperCase()}`;
 
       const reschedule = await tx.bookingReschedule.create({
         data: {
           bookingId: booking.id,
-          originalPaymentId: booking.payment?.id,
+          originalPaymentId: originalPayment?.id,
           originalBookingReference,
           originalFacilityId: booking.facilityId,
           originalStartAtUtc: booking.startAtUtc,

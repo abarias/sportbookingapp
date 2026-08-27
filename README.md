@@ -218,6 +218,7 @@ Defined in `.env.example`:
 - `PAYMONGO_WEBHOOK_SECRET`
 - `APP_TIMEZONE`
 - `PAYMENT_HOLD_MINUTES`
+- `CART_EXPIRY_DAYS` — lifetime of an inactive authenticated customer cart, defaults to 7 days
 - `RESCHEDULE_PAYMENT_HOLD_MINUTES` — replacement-slot hold while an additional amount is awaiting proof, defaults to 15 minutes
 - `RESCHEDULE_CUTOFF_HOURS` — minimum notice before the current booking start, defaults to 24 hours
 - `PAYMENT_MODE`
@@ -284,9 +285,11 @@ For the current demo deployment, use mock payments only if the client understand
 
 ## Scheduled Maintenance
 
-Pending unpaid bookings are expired by `GET /api/cron/expire-bookings`.
+Pending unpaid bookings and consolidated booking orders are expired by `GET /api/cron/expire-bookings`.
 
 The same route expires unpaid reschedule replacement holds and retries pending rescheduling notification emails. Expired unpaid replacement holds are also ignored by availability reads and transitioned under a database row lock before any competing booking write, so inventory does not depend on cron timing. Proof submission removes the deadline and keeps the replacement blocked for payment review.
+
+Consolidated checkout uses a server-side cart. Adding a schedule never holds inventory. Checkout revalidates and prices every item in one serializable transaction, creates one `BookingOrder`, creates individually traceable child `Booking` records, and establishes one payment deadline. One unavailable item rolls back the complete checkout. Verification creates per-booking payment allocations and confirms every initial child booking atomically; expiration releases every child hold while preserving the order history.
 
 - Vercel Hobby runs this route once daily from `vercel.json`; Vercel Pro or an equivalent scheduler can run it more frequently.
 - Production requests require `Authorization: Bearer <CRON_SECRET>`.
@@ -324,6 +327,8 @@ npx prisma migrate deploy
 5. Deploy the Next.js app to Vercel.
 
 For the rescheduling release, deploy `20260824110000_add_booking_rescheduling` before deploying the application build. The migration is additive: it preserves existing bookings, payment records, references, and price snapshots. After deployment, verify the Super Admin and Booking Admin permission assignments, then smoke-test one same-price, lower-price, and higher-price move using non-production booking data.
+
+For the multi-booking checkout release, deploy `20260827090000_add_booking_cart_and_orders` and then `20260827100000_fix_payment_allocation_trigger` before the application build. These additive migrations leave legacy booking-level payments intact and do not recalculate historical prices. After deploying the app, confirm that `/api/cron/expire-bookings` is scheduled, then smoke-test one two-facility checkout, one consolidated proof review, payment verification, child-booking rescheduling, and order expiration using synthetic data. Roll back the application build if needed; retain the additive tables and columns rather than attempting a destructive production down migration.
 
 For payment-proof uploads, create a **private** Supabase Storage bucket named
 `payment-proofs`, and for facility uploads create a **public** bucket named

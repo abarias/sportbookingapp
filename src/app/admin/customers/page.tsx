@@ -68,10 +68,15 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
     redirect(`/admin/customers?customerId=${selectedCustomer.id}&bookingPage=${bookingTotalPages}&bookingPageSize=${bookingPageSize}&page=${page}&pageSize=${pageSize}${search ? `&search=${encodeURIComponent(search)}` : ""}`);
   }
 
-  const bookings = selectedCustomer ? await Promise.all(selectedCustomer.bookings.map(async (booking) => ({
-    ...booking,
-    proofUrl: booking.payment ? await getPaymentProofUrl(booking.payment.proofImageUrl) : null
-  }))) : [];
+  const bookings = selectedCustomer ? await Promise.all(selectedCustomer.bookings.map(async (booking) => {
+    const payment = booking.payment ?? booking.bookingOrder?.payment ?? null;
+    return {
+      ...booking,
+      payment,
+      orderReference: booking.bookingOrder?.reference ?? null,
+      proofUrl: payment ? await getPaymentProofUrl(payment.proofImageUrl) : null
+    };
+  })) : [];
 
   return (
     <main className="space-y-8 pb-16">
@@ -158,7 +163,8 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
                             <BookingStatusBadge bookingStatus={booking.status} paymentStatus={booking.payment?.status ?? null} />
                           </div>
                           <p className="mt-2 text-sm text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p>
-                          <p className="mt-1 text-xs text-stone-500">Booking reference: {booking.payment?.providerReference ?? `BOOK-${booking.id.slice(0, 8).toUpperCase()}`}</p>
+                          <p className="mt-1 text-xs text-stone-500">Booking reference: {booking.reference ?? booking.payment?.providerReference ?? `BOOK-${booking.id.slice(0, 8).toUpperCase()}`}</p>
+                          {booking.orderReference ? <p className="mt-1 text-xs text-amber-200">Consolidated order: {booking.orderReference}</p> : null}
                           {authorization.permissions.has("bookings.reschedule") ? <Link className="mt-2 inline-flex text-sm text-amber-200 hover:underline" href={`/admin/bookings/${booking.id}`}>View booking details</Link> : null}
                         </div>
                         <div className="text-left lg:text-right">

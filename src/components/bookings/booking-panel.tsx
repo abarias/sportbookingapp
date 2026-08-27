@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { addToCartAction, type CartActionState } from "@/features/cart/actions";
 import { createBookingAction, type BookingActionState } from "@/features/bookings/actions";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatting/currency";
@@ -20,6 +21,9 @@ type BookingPanelProps = {
   slots: DaySlot[];
   isAuthenticated: boolean;
   priceQuotes: PriceCalculation[];
+  replaceCartItemId?: string;
+  initialStartMinutes?: number;
+  initialDurationMinutes?: number;
 };
 
 type HourBlock = {
@@ -29,15 +33,25 @@ type HourBlock = {
   reason: "AVAILABLE" | "BOOKED" | "BLOCKED";
 };
 
-const initialState: BookingActionState = {};
+const initialState: CartActionState = {};
 const CUSTOMER_BOOKING_INCREMENT_MINUTES = 60;
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
+function SubmitButton({ disabled, replacing }: { disabled: boolean; replacing: boolean }) {
   const { pending } = useFormStatus();
 
   return (
     <Button className="w-full sm:w-auto" disabled={disabled || pending} type="submit">
-      {pending ? "Creating hold..." : "Reserve & Pay"}
+      {pending ? "Saving schedule..." : replacing ? "Update cart item" : "Add to cart"}
+    </Button>
+  );
+}
+
+function BookNowButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button className="w-full sm:w-auto" disabled={disabled || pending} type="submit">
+      {pending ? "Preparing booking..." : "Book now"}
     </Button>
   );
 }
@@ -127,12 +141,16 @@ export function BookingPanel({
   slotIntervalMinutes,
   slots,
   isAuthenticated,
-  priceQuotes
+  priceQuotes,
+  replaceCartItemId,
+  initialStartMinutes,
+  initialDurationMinutes
 }: BookingPanelProps) {
+  const [selectionStart, setSelectionStart] = useState<number | null>(initialStartMinutes ?? null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(initialStartMinutes !== undefined && initialDurationMinutes !== undefined ? initialStartMinutes + initialDurationMinutes : null);
+  const [state, action] = useActionState(addToCartAction, initialState);
+  const [bookingState, bookingAction] = useActionState<BookingActionState, FormData>(createBookingAction, {});
   const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const [selectionStart, setSelectionStart] = useState<number | null>(null);
-  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
-  const [state, action] = useActionState(createBookingAction, initialState);
 
   const hourBlocks = useMemo(() => buildHourBlocks(slots, slotIntervalMinutes), [slotIntervalMinutes, slots]);
   const selectedBlocks = useMemo(
@@ -147,8 +165,8 @@ export function BookingPanel({
   const isSelectionValid = selectedBlocks.length > 0 && selectedQuotes.length === selectedBlocks.length && areContiguousAvailableBlocks(selectedBlocks);
   const confirmationMessage =
     isSelectionValid && selectionStart !== null && selectionEnd !== null
-      ? `Reserve ${minutesToTimeLabel(selectionStart)} - ${minutesToTimeLabel(selectionEnd)} on ${dateLabel} for a VAT-exclusive base price of ${formatCurrency(amountMinor, "PHP")}?`
-      : "Reserve this selected booking?";
+      ? `Add ${minutesToTimeLabel(selectionStart)} - ${minutesToTimeLabel(selectionEnd)} on ${dateLabel} to your cart for a current VAT-exclusive base price of ${formatCurrency(amountMinor, "PHP")}?`
+      : "Add this selected schedule to your cart?";
 
   function selectBlock(block: HourBlock) {
     if (!block.isAvailable) {
@@ -212,29 +230,14 @@ export function BookingPanel({
   }
 
   return (
-    <form
-      action={action}
-      className="w-full max-w-full min-w-0 overflow-hidden rounded-[2rem] border border-amber-300/25 bg-stone-950/70 shadow-[0_24px_90px_rgba(251,191,36,0.10)]"
-      onSubmit={(event) => {
-        if (!window.confirm(confirmationMessage)) {
-          event.preventDefault();
-        }
-      }}
-    >
-      <input name="facilityId" type="hidden" value={facilityId} />
-      <input name="facilitySlug" type="hidden" value={facilitySlug} />
-      <input name="dateKey" type="hidden" value={dateKey} />
-      <input name="idempotencyKey" type="hidden" value={idempotencyKey} />
-      <input name="startMinutes" type="hidden" value={selectionStart ?? ""} />
-      <input name="durationMinutes" type="hidden" value={durationMinutes || ""} />
-
+    <div className="w-full max-w-full min-w-0 overflow-hidden rounded-[2rem] border border-amber-300/25 bg-stone-950/70 shadow-[0_24px_90px_rgba(251,191,36,0.10)]">
       <div className="border-b border-white/10 bg-amber-300/10 p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm uppercase tracking-[0.22em] text-amber-200">Book this facility</p>
             <h2 className="mt-2 font-serif text-3xl text-white">Choose hourly slots</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-300">
-              Select one or more consecutive available hourly slots for {dateLabel}. Your slot is held only after you click Reserve & Pay.
+              Select one or more consecutive available hourly slots for {dateLabel}. Adding a schedule to your cart does not reserve it; availability is confirmed at checkout.
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-stone-950/60 px-4 py-3 text-sm text-stone-300">
@@ -287,6 +290,9 @@ export function BookingPanel({
         {state.fieldErrors?.startMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.startMinutes}</p> : null}
         {state.fieldErrors?.durationMinutes ? <p className="text-sm text-rose-300">{state.fieldErrors.durationMinutes}</p> : null}
         {state.error ? <p className="text-sm text-rose-300">{state.error}</p> : null}
+        {bookingState.fieldErrors?.startMinutes ? <p className="text-sm text-rose-300">{bookingState.fieldErrors.startMinutes}</p> : null}
+        {bookingState.fieldErrors?.durationMinutes ? <p className="text-sm text-rose-300">{bookingState.fieldErrors.durationMinutes}</p> : null}
+        {bookingState.error ? <p className="text-sm text-rose-300">{bookingState.error}</p> : null}
       </div>
 
       <div className="sticky bottom-0 border-t border-white/10 bg-stone-950/95 p-5 backdrop-blur sm:p-6">
@@ -317,9 +323,42 @@ export function BookingPanel({
               <p className="mt-1 text-sm text-stone-300">Select at least one available hourly slot.</p>
             )}
           </div>
-          <SubmitButton disabled={!isSelectionValid} />
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+            <form
+              action={bookingAction}
+              onSubmit={(event) => {
+                if (!window.confirm(`Book ${minutesToTimeLabel(selectionStart ?? 0)} - ${minutesToTimeLabel(selectionEnd ?? 0)} on ${dateLabel} now? This will start the payment hold.`)) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              <input name="facilityId" type="hidden" value={facilityId} />
+              <input name="facilitySlug" type="hidden" value={facilitySlug} />
+              <input name="dateKey" type="hidden" value={dateKey} />
+              <input name="idempotencyKey" type="hidden" value={idempotencyKey} />
+              <input name="startMinutes" type="hidden" value={selectionStart ?? ""} />
+              <input name="durationMinutes" type="hidden" value={durationMinutes || ""} />
+              <BookNowButton disabled={!isSelectionValid} />
+            </form>
+            <form
+              action={action}
+              onSubmit={(event) => {
+                if (!window.confirm(confirmationMessage)) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              <input name="facilityId" type="hidden" value={facilityId} />
+              <input name="facilitySlug" type="hidden" value={facilitySlug} />
+              <input name="dateKey" type="hidden" value={dateKey} />
+              <input name="startMinutes" type="hidden" value={selectionStart ?? ""} />
+              <input name="durationMinutes" type="hidden" value={durationMinutes || ""} />
+              <input name="replaceCartItemId" type="hidden" value={replaceCartItemId ?? ""} />
+              <SubmitButton disabled={!isSelectionValid} replacing={Boolean(replaceCartItemId)} />
+            </form>
+          </div>
         </div>
       </div>
-    </form>
+    </div>
   );
 }

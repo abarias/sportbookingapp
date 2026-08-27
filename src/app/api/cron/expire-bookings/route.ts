@@ -6,6 +6,7 @@ import { isStrictProductionEnvironment } from "@/lib/config/env";
 import { deliverPendingRescheduleNotifications } from "@/lib/notifications/rescheduling";
 import { expirePendingBookings } from "@/server/bookings/expiration";
 import { expirePendingReschedules } from "@/server/bookings/rescheduling";
+import { expirePendingOrders } from "@/server/orders/expiration";
 
 export const runtime = "nodejs";
 
@@ -38,9 +39,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [result, reschedules] = await Promise.all([
+  const [result, reschedules, orders] = await Promise.all([
     expirePendingBookings(),
-    expirePendingReschedules()
+    expirePendingReschedules(),
+    expirePendingOrders()
   ]);
   const notifications = await deliverPendingRescheduleNotifications();
 
@@ -49,6 +51,8 @@ export async function GET(request: NextRequest) {
     expiredBookingCount: result.expiredBookingCount,
     expiredPaymentCount: result.expiredPaymentCount,
     expiredRescheduleCount: reschedules.expiredCount,
+    expiredOrderCount: orders.expiredOrderCount,
+    expiredOrderBookingCount: orders.expiredBookingCount,
     notificationSentCount: notifications.sentCount,
     notificationFailedCount: notifications.failedCount
   });

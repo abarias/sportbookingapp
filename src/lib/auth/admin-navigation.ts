@@ -4,6 +4,7 @@ export const adminNavigationItems = [
   { key: "overview", href: "/admin", label: "Overview", permissions: ["bookings.view"] },
   { key: "calendar", href: "/admin/calendar", label: "Calendar", permissions: ["availability.view"] },
   { key: "walk-ins", href: "/admin/walk-ins", label: "Walk-ins", permissions: ["bookings.create"] },
+  { key: "orders", href: "/admin/orders", label: "Orders", permissions: ["bookings.view"] },
   { key: "facilities", href: "/admin/facilities", label: "Facilities", permissions: ["facilities.manage", "facility_content.edit", "facility_photos.manage", "pricing.manage"] },
   { key: "pricing", href: "/admin/pricing", label: "Pricing", permissions: ["pricing.view"] },
   { key: "holidays", href: "/admin/holidays", label: "Holidays", permissions: ["holidays.manage"] },
