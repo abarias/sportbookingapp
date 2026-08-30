@@ -33,7 +33,12 @@ test.describe("release smoke", () => {
     await page.goto("/facilities/center-court");
     await expect(page.getByText(/Sign in to select available hourly slots|Choose hourly slots/i)).toBeVisible();
 
-    const availableSlot = page.getByRole("button", { name: /Available/i }).first();
+    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await page.getByLabel("Booking date").fill(futureDate);
+    await page.getByRole("button", { name: "Check availability" }).click();
+    await page.waitForURL(new RegExp(`date=${futureDate}`));
+
+    const availableSlot = page.locator('button:not([disabled])').filter({ hasText: "Available" }).first();
     await expect(availableSlot).toBeVisible();
     await availableSlot.click();
     page.once("dialog", (dialog) => dialog.accept());
