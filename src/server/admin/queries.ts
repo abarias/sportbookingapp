@@ -27,7 +27,8 @@ export async function getAdminOverviewData(options: { fullCustomerAccess: boolea
         include: {
           facility: { select: { name: true } },
           user: { select: { fullName: true, email: true } },
-          payment: { select: { status: true, provider: true } }
+          payment: { select: { status: true, provider: true } },
+          bookingOrder: { select: { payment: { select: { status: true, provider: true } } } }
         }
       })
     : prisma.booking.findMany({
@@ -36,7 +37,8 @@ export async function getAdminOverviewData(options: { fullCustomerAccess: boolea
         include: {
           facility: { select: { name: true } },
           user: { select: { fullName: true } },
-          payment: { select: { status: true } }
+          payment: { select: { status: true } },
+          bookingOrder: { select: { payment: { select: { status: true } } } }
         }
       });
   const [recentBookings, paidPayments, enabledFacilities, cancellationEnabled, cancellationWindowHours] = await Promise.all([
@@ -68,17 +70,19 @@ export async function getAdminOverviewData(options: { fullCustomerAccess: boolea
       paidRevenueMinor,
       enabledFacilities
     },
-    recentBookings: recentBookings.map((booking) => ({
+    recentBookings: recentBookings.map((booking) => {
+      const effectivePayment = booking.payment ?? booking.bookingOrder?.payment ?? null;
+      return {
       id: booking.id,
       status: booking.status,
       facility: booking.facility,
       customerName: booking.user.fullName,
       customerContact: "email" in booking.user ? booking.user.email : null,
-      payment: booking.payment ? {
-        status: booking.payment.status,
-        provider: options.includePaymentDetails && "provider" in booking.payment ? String(booking.payment.provider) : null
+      payment: effectivePayment ? {
+        status: effectivePayment.status,
+        provider: options.includePaymentDetails && "provider" in effectivePayment ? String(effectivePayment.provider) : null
       } : null
-    })),
+    };}),
     cancellationEnabled,
     cancellationWindowHours
   };
@@ -109,6 +113,15 @@ export async function getAdminPaymentQueueData({ page, pageSize }: AdminPaymentQ
             user: { select: { fullName: true, email: true, phone: true } }
           }
         },
+        bookingOrder: {
+          include: {
+            user: { select: { fullName: true, email: true, phone: true } },
+            bookings: {
+              orderBy: { orderItemSequence: "asc" },
+              include: { facility: { select: { name: true, timezone: true } } }
+            }
+          }
+        },
         verifiedBy: { select: { fullName: true, email: true } }
       }
     }),
@@ -131,9 +144,55 @@ export async function getAdminPaymentDetailData(paymentId: string) {
           user: { select: { fullName: true, email: true, phone: true } }
         }
       },
+      bookingOrder: {
+        include: {
+          user: { select: { fullName: true, email: true, phone: true } },
+          bookings: {
+            orderBy: { orderItemSequence: "asc" },
+            include: { facility: { select: { name: true, timezone: true } } }
+          },
+          paymentAllocations: true
+        }
+      },
       verifiedBy: { select: { fullName: true, email: true } }
     }
   });
+}
+
+export async function getAdminBookingOrdersData(options: { page: number; pageSize: number; search?: string; includeFullCustomer: boolean }) {
+  const search = options.search?.trim();
+  const customerSearch: Prisma.UserWhereInput[] = options.includeFullCustomer && search
+    ? [{ fullName: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }, { phone: { contains: search } }]
+    : search ? [{ fullName: { contains: search, mode: "insensitive" } }] : [];
+  const where: Prisma.BookingOrderWhereInput = search ? {
+    OR: [
+      { reference: { contains: search, mode: "insensitive" } },
+      { bookings: { some: { reference: { contains: search, mode: "insensitive" } } } },
+      { bookings: { some: { facility: { name: { contains: search, mode: "insensitive" } } } } },
+      ...customerSearch.map((condition) => ({ user: condition }))
+    ]
+  } : {};
+  const [orders, totalCount] = await prisma.$transaction([
+    prisma.bookingOrder.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (options.page - 1) * options.pageSize,
+      take: options.pageSize,
+      include: {
+        user: { select: options.includeFullCustomer ? { fullName: true, email: true, phone: true } : { fullName: true } },
+        payment: { select: { id: true, status: true, amountMinor: true, verifiedAt: true } },
+        bookings: { orderBy: { orderItemSequence: "asc" }, include: { facility: { select: { name: true } } } }
+      }
+    }),
+    prisma.bookingOrder.count({ where })
+  ]);
+  return {
+    orders: orders.map((order) => ({
+      ...order,
+      customerContact: "email" in order.user && typeof order.user.email === "string" ? order.user.email : null
+    })),
+    totalCount
+  };
 }
 
 export async function getAdminBookingDetailData(bookingId: string) {
@@ -143,6 +202,12 @@ export async function getAdminBookingDetailData(bookingId: string) {
       user: { select: { id: true, fullName: true } },
       facility: true,
       payment: { include: { verifiedBy: { select: { fullName: true } } } },
+      bookingOrder: {
+        include: {
+          payment: { include: { verifiedBy: { select: { fullName: true } } } },
+          paymentAllocations: true
+        }
+      },
       reschedules: {
         orderBy: { createdAt: "desc" },
         include: {
@@ -287,6 +352,28 @@ export async function getAdminCustomersData(options: AdminCustomersOptions) {
               verifiedAt: true,
               reviewNote: true
             }
+          },
+          bookingOrder: {
+            select: {
+              reference: true,
+              payment: {
+                select: {
+                  provider: true,
+                  providerReference: true,
+                  method: true,
+                  externalReference: true,
+                  amountMinor: true,
+                  amountPaidMinor: true,
+                  currency: true,
+                  status: true,
+                  proofImageUrl: true,
+                  submittedAt: true,
+                  paidAt: true,
+                  verifiedAt: true,
+                  reviewNote: true
+                }
+              }
+            }
           }
         }
       }
@@ -319,7 +406,7 @@ export async function getAdminCustomersData(options: AdminCustomersOptions) {
 export async function getAdminReportsData() {
   const reportStart = subDays(new Date(), 30);
 
-  const [bookings, facilities, additionalPayments, reschedules] = await Promise.all([
+  const [bookings, facilities, orderPayments, additionalPayments, reschedules] = await Promise.all([
     prisma.booking.findMany({
       where: {
         startAtUtc: {
@@ -341,6 +428,10 @@ export async function getAdminReportsData() {
         operatingHours: true
       }
     }),
+    prisma.payment.findMany({
+      where: { bookingOrderId: { not: null }, status: { in: [PaymentStatus.PAID, PaymentStatus.VERIFIED] }, verifiedAt: { gte: reportStart } },
+      select: { amountMinor: true }
+    }),
     prisma.reschedulePayment.findMany({
       where: { status: PaymentStatus.VERIFIED, verifiedAt: { gte: reportStart } },
       select: { amountMinor: true }
@@ -360,6 +451,7 @@ export async function getAdminReportsData() {
   return {
     bookings,
     facilities,
+    orderPayments,
     additionalPayments,
     reschedules,
     reportStart

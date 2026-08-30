@@ -17,6 +17,8 @@ import {
   submitReschedulePaymentProof,
   verifyReschedulePayment
 } from "@/server/bookings/rescheduling";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
 
 export type RescheduleActionState = {
   error?: string;
@@ -75,6 +77,7 @@ function scheduleNotificationDelivery() {
 
 export async function initiateRescheduleAction(_state: RescheduleActionState, formData: FormData): Promise<RescheduleActionState> {
   const authorization = await requirePermission("bookings.reschedule");
+  await enforceRequestRateLimit({ action: "admin.reschedule.initiate", userId: authorization.session.user.id, policy: rateLimitPolicies.adminMutation() });
   const parsed = initiateSchema.safeParse({
     bookingId: formData.get("bookingId"),
     replacementFacilityId: formData.get("replacementFacilityId"),
@@ -105,6 +108,7 @@ export async function initiateRescheduleAction(_state: RescheduleActionState, fo
 
 export async function submitReschedulePaymentProofAction(_state: RescheduleActionState, formData: FormData): Promise<RescheduleActionState> {
   const session = await requireUserSession();
+  await enforceRequestRateLimit({ action: "reschedule-payment-proof.submit", userId: session.user.id, policy: rateLimitPolicies.paymentProof() });
   const parsed = z.object({
     rescheduleId: z.string().min(1),
     method: z.enum(["manual_gcash", "manual_bank_transfer"]),
@@ -119,8 +123,6 @@ export async function submitReschedulePaymentProofAction(_state: RescheduleActio
   const file = formData.get("proofImage");
   if (!(file instanceof File) || file.size === 0) return { error: "Upload a payment proof image." };
   if (file.size > 5 * 1024 * 1024) return { error: "Payment proof image must be 5MB or smaller." };
-  if (!file.type.startsWith("image/")) return { error: "Payment proof must be an image file." };
-
   try {
     const proofImageUrl = await storePaymentProof(file, `reschedule-${parsed.data.rescheduleId}`);
     const reschedule = await submitReschedulePaymentProof({ ...parsed.data, userId: session.user.id, proofImageUrl });
@@ -134,6 +136,7 @@ export async function submitReschedulePaymentProofAction(_state: RescheduleActio
 
 export async function verifyReschedulePaymentAction(_state: RescheduleActionState, formData: FormData): Promise<RescheduleActionState> {
   const authorization = await requirePermission("payments.verify");
+  await enforceRequestRateLimit({ action: "admin.reschedule-payment.verify", userId: authorization.session.user.id, policy: rateLimitPolicies.adminMutation() });
   const parsed = reviewSchema.safeParse({ reschedulePaymentId: formData.get("reschedulePaymentId"), reviewNote: formData.get("reviewNote") });
   if (!parsed.success) return { error: "Invalid payment review." };
   try {
@@ -148,6 +151,7 @@ export async function verifyReschedulePaymentAction(_state: RescheduleActionStat
 
 export async function rejectReschedulePaymentAction(_state: RescheduleActionState, formData: FormData): Promise<RescheduleActionState> {
   const authorization = await requirePermission("payments.verify");
+  await enforceRequestRateLimit({ action: "admin.reschedule-payment.reject", userId: authorization.session.user.id, policy: rateLimitPolicies.adminMutation() });
   const parsed = rejectSchema.safeParse({ reschedulePaymentId: formData.get("reschedulePaymentId"), reviewNote: formData.get("reviewNote") });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a rejection reason." };
   try {
@@ -162,6 +166,7 @@ export async function rejectReschedulePaymentAction(_state: RescheduleActionStat
 
 export async function resolveRescheduleAdjustmentAction(_state: RescheduleActionState, formData: FormData): Promise<RescheduleActionState> {
   const authorization = await requirePermission("bookings.reschedule.resolve_adjustment");
+  await enforceRequestRateLimit({ action: "admin.reschedule-adjustment.resolve", userId: authorization.session.user.id, policy: rateLimitPolicies.adminMutation() });
   const parsed = resolutionSchema.safeParse({
     rescheduleId: formData.get("rescheduleId"),
     method: formData.get("method"),

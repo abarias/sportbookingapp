@@ -11,12 +11,13 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminReportsPage() {
   await requirePermission("reports.view");
-  const { bookings, facilities, additionalPayments, reschedules, reportStart } = await getAdminReportsData();
+  const { bookings, facilities, orderPayments, additionalPayments, reschedules, reportStart } = await getAdminReportsData();
 
   const confirmedBookings = bookings.filter((booking) => booking.status === "CONFIRMED");
   const paidRevenueMinor = bookings
     .filter((booking) => booking.payment?.status === "PAID" || booking.payment?.status === "VERIFIED")
     .reduce((sum, booking) => sum + (booking.payment?.amountMinor ?? 0), 0);
+  const consolidatedRevenueMinor = orderPayments.reduce((sum, payment) => sum + payment.amountMinor, 0);
   const additionalRevenueMinor = additionalPayments.reduce((sum, payment) => sum + payment.amountMinor, 0);
   const unresolvedAdjustments = reschedules.filter((item) => item.adjustmentStatus === "UNRESOLVED");
   const waivedAmountMinor = reschedules.reduce((sum, item) => sum + item.waivedAmountMinor, 0);
@@ -61,7 +62,7 @@ export default async function AdminReportsPage() {
         <DashboardStat label="Reporting Window" value="30 days" hint={`Since ${formatInTimeZone(reportStart, "Asia/Manila", "MMM d")}`} />
         <DashboardStat label="Bookings" value={String(bookings.length)} hint="All booking states" />
         <DashboardStat label="Confirmed" value={String(confirmedBookings.length)} hint="Reserved inventory" />
-        <DashboardStat label="Paid Base Revenue" value={formatCurrency(paidRevenueMinor + additionalRevenueMinor, "PHP")} hint={`${formatCurrency(additionalRevenueMinor, "PHP")} from verified reschedule adjustments`} />
+        <DashboardStat label="Paid Base Revenue" value={formatCurrency(paidRevenueMinor + consolidatedRevenueMinor + additionalRevenueMinor, "PHP")} hint={`${formatCurrency(consolidatedRevenueMinor, "PHP")} from consolidated orders; ${formatCurrency(additionalRevenueMinor, "PHP")} from verified reschedule adjustments`} />
       </div>
       <div className="grid gap-4 md:grid-cols-3"><DashboardStat label="Reschedules" value={String(reschedules.length)} hint="Created in reporting window" /><DashboardStat label="Unresolved adjustments" value={String(unresolvedAdjustments.length)} hint="Manual refund or credit decision needed" /><DashboardStat label="Waived adjustments" value={formatCurrency(waivedAmountMinor, "PHP")} hint="Not counted as revenue" /></div>
       <section className="grid gap-6 xl:grid-cols-2">

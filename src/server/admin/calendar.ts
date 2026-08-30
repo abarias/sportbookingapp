@@ -1,10 +1,11 @@
-import { BookingRescheduleStatus, BookingStatus, PaymentStatus, Prisma, type Facility, type FacilityOperatingHour } from "@prisma/client";
+import { BookingRescheduleStatus, BookingStatus, Prisma, type Facility, type FacilityOperatingHour } from "@prisma/client";
 import { addDays, subDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import { prisma } from "@/lib/db/prisma";
 import { formatDateLabel, getDayOfWeek, getLocalMinutesForDate, minutesToTimeLabel } from "@/lib/time/slots";
 import { buildDaySlots, type DaySlot, type MinuteInterval } from "@/server/bookings/core";
+import { activeBookingWhere } from "@/server/bookings/service";
 
 type CalendarFacility = Pick<Facility, "id" | "name" | "timezone" | "slotIntervalMinutes" | "isEnabled"> & {
   operatingHours: Array<Pick<FacilityOperatingHour, "dayOfWeek" | "opensAtMinutes" | "closesAtMinutes" | "isClosed">>;
@@ -274,11 +275,7 @@ export async function getAdminCalendarData(params: {
   const now = new Date();
 
   const bookingWhere: Prisma.BookingWhereInput = {
-    OR: [
-      { status: BookingStatus.CONFIRMED },
-      { status: BookingStatus.HELD, OR: [{ paymentHoldExpiresAt: { gt: now }, payment: { status: PaymentStatus.AWAITING_PAYMENT } }, { payment: { status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED] } } }] },
-      { status: BookingStatus.PENDING_PAYMENT, paymentHoldExpiresAt: { gt: now } }
-    ],
+    ...activeBookingWhere(now),
     startAtUtc: { lt: gridEndExclusiveUtc },
     endAtUtc: { gt: gridStartUtc }
   };

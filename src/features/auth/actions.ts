@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
 import { getAuthConfig, minutesToMilliseconds } from "@/lib/config/auth";
+import { isLocalMockOtpAllowed } from "@/lib/config/env";
 import { sendVerificationEmail } from "@/lib/notifications/email";
 import { getRequestIpHash } from "@/lib/security/request";
 import { registerSchema, resendVerificationEmailSchema, verifyEmailSchema } from "@/features/auth/schemas";
@@ -262,7 +263,7 @@ export async function registerUserAction(
       return {
         message: "If this email needs verification, we sent the next step to that inbox.",
         pendingEmail: email,
-        devVerificationCode: process.env.NODE_ENV === "production" ? undefined : verificationCode
+        devVerificationCode: isLocalMockOtpAllowed() ? verificationCode : undefined
       };
     }
 
@@ -284,7 +285,7 @@ export async function registerUserAction(
   return {
     message: "Account created. Check your email for the verification code.",
     pendingEmail: email,
-    devVerificationCode: process.env.NODE_ENV === "production" ? undefined : verificationCode
+    devVerificationCode: isLocalMockOtpAllowed() ? verificationCode : undefined
   };
 }
 

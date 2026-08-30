@@ -11,6 +11,8 @@ import { formatInTimeZone } from "date-fns-tz";
 type BookingListItem = {
   id: string;
   facilityName: string;
+  orderReference: string | null;
+  orderId: string | null;
   status: BookingStatus;
   paymentStatus: PaymentStatus | null;
   amountMinor: number;
@@ -105,6 +107,7 @@ export function BookingList({ title, items, emptyMessage, footer }: BookingListP
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-2">
                 <p className="text-base font-semibold text-white">{item.facilityName}</p>
+                {item.orderReference ? <p className="text-xs uppercase tracking-[0.14em] text-stone-500">Part of order {item.orderReference}</p> : null}
                 <p className="text-sm text-stone-300">{formatDateTimeRange(item.startAtUtc, item.endAtUtc, item.timezone)}</p>
                 <p className="text-sm text-stone-400">Base amount: {formatCurrency(item.amountMinor, item.currency)} <span className="text-stone-500">(VAT exclusive)</span></p>
                 {item.paymentStatus ? (
@@ -122,15 +125,18 @@ export function BookingList({ title, items, emptyMessage, footer }: BookingListP
                     Payment hold expires at {formatInTimeZone(item.paymentHoldExpiresAt, item.timezone, "h:mm a")}
                   </p>
                 ) : null}
-                {item.status === BookingStatus.HELD &&
-                item.paymentStatus &&
-                (item.paymentStatus === PaymentStatus.AWAITING_PAYMENT ||
-                  item.paymentStatus === PaymentStatus.ACTION_REQUIRED ||
-                  item.paymentStatus === PaymentStatus.SUBMITTED) ? (
-                  <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href={`/bookings/${item.id}/payment`}>
-                    View payment instructions
-                  </Link>
-                ) : null}
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {item.status === BookingStatus.HELD &&
+                  item.paymentStatus &&
+                  (item.paymentStatus === PaymentStatus.AWAITING_PAYMENT ||
+                    item.paymentStatus === PaymentStatus.ACTION_REQUIRED ||
+                    item.paymentStatus === PaymentStatus.SUBMITTED) ? (
+                    <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href={item.orderId ? `/orders/${item.orderId}/payment` : `/bookings/${item.id}/payment`}>
+                      View payment instructions
+                    </Link>
+                  ) : null}
+                  {item.orderId ? <Link className="inline-flex text-sm font-medium text-amber-200 underline-offset-4 hover:underline" href={`/orders/${item.orderId}`}>View order details</Link> : null}
+                </div>
                 {item.paymentReviewNote ? (
                   <p className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm leading-6 text-amber-100">
                     Staff message: {item.paymentReviewNote}

@@ -8,6 +8,8 @@ const defaultAdminEmail = "admin@sportbooking.local";
 const defaultAdminPassword = "Admin12345!";
 const defaultCustomerEmail = "player@sportbooking.local";
 const defaultCustomerPassword = "Player12345!";
+const concurrencyCustomerEmail = "player-two@sportbooking.local";
+const concurrencyCustomerPassword = "Player12345!";
 const defaultOperatingHours = [
   { dayOfWeek: 0, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
   { dayOfWeek: 1, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
@@ -201,6 +203,18 @@ async function main() {
     role: UserRole.CUSTOMER
   });
 
+  if (isLocalDatabaseUrl(process.env.DATABASE_URL)) {
+    await upsertUser({
+      email: concurrencyCustomerEmail,
+      password: concurrencyCustomerPassword,
+      fullName: "Sample Player Two",
+      phone: "+639181112223",
+      emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
+      role: UserRole.CUSTOMER
+    });
+  }
+
   const facilityRecords = await Promise.all(
     facilities.map(async (facility) =>
       prisma.facility.upsert({
@@ -292,8 +306,7 @@ async function main() {
     data: [
       { facilityId: centerCourt.id, name: "Weekday daytime", customerLabel: "Weekday daytime base rate", dayType: PricingDayType.WEEKDAY, startMinutes: 480, endMinutes: 1020, currency: "PHP", amountMinor: 150000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 10, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
       { facilityId: centerCourt.id, name: "Weekday evening", customerLabel: "Weekday evening base rate", dayType: PricingDayType.WEEKDAY, startMinutes: 1020, endMinutes: 1440, currency: "PHP", amountMinor: 200000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 20, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
-      { facilityId: centerCourt.id, name: "Weekend daytime", customerLabel: "Weekend daytime base rate", dayType: PricingDayType.WEEKEND, startMinutes: 480, endMinutes: 1020, currency: "PHP", amountMinor: 180000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 30, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
-      { facilityId: centerCourt.id, name: "Weekend evening", customerLabel: "Weekend evening base rate", dayType: PricingDayType.WEEKEND, startMinutes: 1020, endMinutes: 1440, currency: "PHP", amountMinor: 220000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 40, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
+      { facilityId: centerCourt.id, name: "Weekend rate", customerLabel: "Weekend base rate", dayType: PricingDayType.WEEKEND, startMinutes: 0, endMinutes: 1440, currency: "PHP", amountMinor: 200000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 30, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
       { facilityId: centerCourt.id, name: "Holiday rate", customerLabel: "Holiday base rate", dayType: PricingDayType.HOLIDAY, startMinutes: 0, endMinutes: 1440, currency: "PHP", amountMinor: 230000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 50, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id }
     ]
   });

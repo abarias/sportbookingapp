@@ -17,6 +17,19 @@ import { prisma } from "@/lib/db/prisma";
 import { storeFacilityImages } from "@/lib/storage/facility-images";
 import { createAdminConfirmedBooking } from "@/server/bookings/service";
 import { rejectSubmittedPayment, requestPaymentAction, verifySubmittedPayment } from "@/server/payments/service";
+import { rejectOrderPayment, requestOrderPaymentAction, verifyOrderPayment } from "@/server/orders/service";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+
+async function enforceAdminMutation(userId: string, action: string) {
+  await enforceRequestRateLimit({ action: `admin.${action}`, userId, policy: rateLimitPolicies.adminMutation() });
+}
+
+async function paymentBelongsToOrder(paymentId: string) {
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId }, select: { bookingOrderId: true } });
+  if (!payment) throw new Error("Payment was not found.");
+  return Boolean(payment.bookingOrderId);
+}
 
 function parseBoolean(value: FormDataEntryValue | null) {
   return value === "on" || value === "true";
@@ -74,8 +87,6 @@ async function persistFacilityUploads(formData: FormData, slugSeed: string) {
   }
 
   const slug = slugify(slugSeed) || "facility";
-  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-
   if (files.length > 12) {
     throw new Error("Upload a maximum of 12 facility images at a time.");
   }
@@ -85,9 +96,6 @@ async function persistFacilityUploads(formData: FormData, slugSeed: string) {
       throw new Error("Each facility image must be 5MB or smaller.");
     }
 
-    if (!allowedTypes.has(file.type)) {
-      throw new Error("Facility images must be JPG, PNG, WEBP, or GIF files.");
-    }
   }
 
   return storeFacilityImages(files, slug);
@@ -164,6 +172,7 @@ const paymentReviewSchema = z.object({
 
 export async function updateCancellationSettingAction(formData: FormData) {
   const authorization = await requirePermission("facilities.manage");
+  await enforceAdminMutation(authorization.session.user.id, "cancellation-policy.update");
   const cancellationWindowHours = parseNullablePositiveInteger(formData.get("cancellationWindowHours"));
 
   if (cancellationWindowHours === null || !Number.isFinite(cancellationWindowHours) || cancellationWindowHours < 1) {
@@ -215,6 +224,7 @@ export async function updateFacilityAction(
   const canManageFacilities = capabilities.operations;
   const canManagePricing = capabilities.pricing;
   const session = authorization.session;
+  await enforceAdminMutation(session.user.id, `facility.${section}.update`);
 
   const existing = await prisma.facility.findUnique({
     where: { id: facilityId },
@@ -353,6 +363,7 @@ export async function createFacilityAction(
   formData: FormData
 ): Promise<FacilityActionState> {
   const { session } = await requireAllPermissions(["facilities.manage", "facility_content.edit", "pricing.manage", "facility_photos.manage"]);
+  await enforceAdminMutation(session.user.id, "facility.create");
 
   const imageUrls = String(formData.get("imageUrls") ?? "")
     .split("\n")
@@ -466,6 +477,7 @@ export async function createBlockedScheduleAction(
   formData: FormData
 ): Promise<BlockScheduleActionState> {
   const { session } = await requirePermission("facilities.manage");
+  await enforceAdminMutation(session.user.id, "blocked-schedule.create");
 
   const parsed = blockedScheduleSchema.safeParse({
     facilityId: String(formData.get("facilityId") ?? ""),
@@ -529,6 +541,7 @@ export async function deleteBlockedScheduleAction(
   formData: FormData
 ): Promise<DeleteBlockScheduleActionState> {
   const authorization = await requirePermission("facilities.manage");
+  await enforceAdminMutation(authorization.session.user.id, "blocked-schedule.delete");
 
   const parsed = deleteBlockScheduleSchema.safeParse({
     blockId: String(formData.get("blockId") ?? "")
@@ -582,7 +595,8 @@ export async function checkWalkInCustomerAction(
   _prevState: WalkInBookingActionState,
   formData: FormData
 ): Promise<WalkInBookingActionState> {
-  await requirePermission("bookings.create");
+  const authorization = await requirePermission("bookings.create");
+  await enforceAdminMutation(authorization.session.user.id, "walk-in-customer.check");
 
   const parsed = walkInCustomerSchema.safeParse(getWalkInCustomerValues(formData));
 
@@ -625,6 +639,7 @@ export async function createWalkInBookingAction(
   formData: FormData
 ): Promise<WalkInBookingActionState> {
   const authorization = await requirePermission("bookings.create");
+  await enforceAdminMutation(authorization.session.user.id, "walk-in-booking.create");
 
   const parsed = adminWalkInBookingSchema.safeParse({
     fullName: String(formData.get("fullName") ?? ""),
@@ -692,6 +707,8 @@ export async function createWalkInBookingAction(
     }
   });
 
+  let createdBookingId: string;
+
   try {
     const booking = await createAdminConfirmedBooking({
       userId: user.id,
@@ -702,8 +719,13 @@ export async function createWalkInBookingAction(
       paymentMethod: parsed.data.paymentMethod,
       paymentReference: parsed.data.paymentReference
     });
+    createdBookingId = booking.id;
     await writeAuditLog(prisma, { actorUserId: authorization.session.user.id, action: "booking.walk_in_created", entityType: "Booking", entityId: booking.id, after: { facilityId: parsed.data.facilityId, customerUserId: user.id, dateKey: parsed.data.dateKey, startTime: parsed.data.startTime, durationMinutes: parsed.data.durationMinutes, paymentMethod: parsed.data.paymentMethod } });
   } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     return {
       message: error instanceof Error ? error.message : "Booking could not be created."
     };
@@ -715,7 +737,7 @@ export async function createWalkInBookingAction(
   revalidatePath("/bookings");
   revalidatePath("/facilities");
 
-  redirect(`/admin/walk-ins?date=${encodeURIComponent(parsed.data.dateKey)}`);
+  redirect(`/admin/bookings/${createdBookingId}?walkInCreated=1`);
 }
 
 export async function verifyPaymentAction(
@@ -724,6 +746,7 @@ export async function verifyPaymentAction(
 ): Promise<PaymentReviewActionState> {
   try {
     const { session } = await requirePermission("payments.verify");
+    await enforceAdminMutation(session.user.id, "payment.verify");
     const parsed = paymentReviewSchema.safeParse({
       paymentId: String(formData.get("paymentId") ?? ""),
       reviewNote: String(formData.get("reviewNote") ?? "")
@@ -733,18 +756,20 @@ export async function verifyPaymentAction(
       return { error: "Payment could not be verified." };
     }
 
-    await verifySubmittedPayment({
-      paymentId: parsed.data.paymentId,
-      adminUserId: session.user.id,
-      reviewNote: parsed.data.reviewNote
-    });
-    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.verified", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote ?? null } });
+    if (await paymentBelongsToOrder(parsed.data.paymentId)) {
+      await verifyOrderPayment({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+    } else {
+      await verifySubmittedPayment({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+      await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.verified", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote ?? null } });
+    }
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
     revalidatePath("/admin/calendar");
     revalidatePath("/admin/reports");
     revalidatePath("/bookings");
+    revalidatePath("/admin/orders");
+    revalidatePath("/orders", "layout");
 
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=verified`);
   } catch (error) {
@@ -759,6 +784,7 @@ export async function rejectPaymentAction(
 ): Promise<PaymentReviewActionState> {
   try {
     const { session } = await requirePermission("payments.verify");
+    await enforceAdminMutation(session.user.id, "payment.reject");
     const parsed = paymentReviewSchema.extend({
       reviewNote: z.string().trim().min(3, "Add a rejection reason.").max(500)
     }).safeParse({
@@ -770,18 +796,20 @@ export async function rejectPaymentAction(
       return { error: "Add a rejection reason before rejecting payment." };
     }
 
-    await rejectSubmittedPayment({
-      paymentId: parsed.data.paymentId,
-      adminUserId: session.user.id,
-      reviewNote: parsed.data.reviewNote
-    });
-    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.rejected", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
+    if (await paymentBelongsToOrder(parsed.data.paymentId)) {
+      await rejectOrderPayment({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+    } else {
+      await rejectSubmittedPayment({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+      await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.rejected", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
+    }
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
     revalidatePath("/admin/calendar");
     revalidatePath("/admin/reports");
     revalidatePath("/bookings");
+    revalidatePath("/admin/orders");
+    revalidatePath("/orders", "layout");
 
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=rejected`);
   } catch (error) {
@@ -796,6 +824,7 @@ export async function requestPaymentActionRequiredAction(
 ): Promise<PaymentReviewActionState> {
   try {
     const { session } = await requirePermission("payments.verify");
+    await enforceAdminMutation(session.user.id, "payment.request-action");
     const parsed = paymentReviewSchema.extend({
       reviewNote: z.string().trim().min(3, "Add instructions for the customer.").max(500)
     }).safeParse({
@@ -807,16 +836,18 @@ export async function requestPaymentActionRequiredAction(
       return { error: "Add instructions before requesting more proof." };
     }
 
-    await requestPaymentAction({
-      paymentId: parsed.data.paymentId,
-      adminUserId: session.user.id,
-      reviewNote: parsed.data.reviewNote
-    });
-    await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.action_required", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
+    if (await paymentBelongsToOrder(parsed.data.paymentId)) {
+      await requestOrderPaymentAction({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+    } else {
+      await requestPaymentAction({ paymentId: parsed.data.paymentId, adminUserId: session.user.id, reviewNote: parsed.data.reviewNote });
+      await writeAuditLog(prisma, { actorUserId: session.user.id, action: "payment.action_required", entityType: "Payment", entityId: parsed.data.paymentId, metadata: { reviewNote: parsed.data.reviewNote } });
+    }
 
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
     revalidatePath("/bookings");
+    revalidatePath("/admin/orders");
+    revalidatePath("/orders", "layout");
 
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=action-required`);
   } catch (error) {

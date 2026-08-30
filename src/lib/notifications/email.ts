@@ -1,5 +1,7 @@
 import { Resend } from "resend";
 
+import { isLocalMockOtpAllowed } from "@/lib/config/env";
+
 type VerificationEmailParams = {
   to: string;
   fullName: string;
@@ -51,7 +53,7 @@ export async function sendVerificationEmail(params: VerificationEmailParams) {
   const resendConfig = getResendConfig();
 
   if (!resendConfig) {
-    if (process.env.NODE_ENV === "production") {
+    if (!isLocalMockOtpAllowed()) {
       throw new Error("Email delivery is not configured. Set RESEND_API_KEY and EMAIL_FROM.");
     }
 

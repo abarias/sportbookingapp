@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { BookingRescheduleStatus, BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingDayType, type Facility, type PricingRule } from "@prisma/client";
+import { BookingOrderStatus, BookingRescheduleStatus, BookingStatus, PaymentProvider, PaymentStatus, Prisma, PricingDayType, type Facility, type PricingRule } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { getPaymentMode, isProductionMockPaymentAllowed, isStrictProductionEnvironment } from "@/lib/config/env";
@@ -10,6 +10,7 @@ import { expireStaleRescheduleHolds } from "@/server/bookings/reschedule-expirat
 import { buildDaySlots, canFitDuration, rangesOverlapByMinute, rangesOverlap, type DaySlot, type MinuteInterval } from "@/server/bookings/core";
 import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellationWindowHours } from "@/server/bookings/policies";
 import { calculatePrice } from "@/server/pricing/engine";
+import { expireStaleOrdersInTransaction } from "@/server/orders/expiration";
 
 export type FacilityDayAvailability = {
   dateKey: string;
@@ -85,6 +86,21 @@ export function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
                 ]
               }
             }
+          },
+          {
+            bookingOrder: {
+              OR: [
+                {
+                  status: BookingOrderStatus.PENDING_PAYMENT,
+                  paymentDeadline: { gt: now },
+                  payment: { status: PaymentStatus.AWAITING_PAYMENT }
+                },
+                {
+                  status: { in: [BookingOrderStatus.PROOF_SUBMITTED, BookingOrderStatus.ACTION_REQUIRED] },
+                  payment: { status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED, PaymentStatus.VERIFIED, PaymentStatus.PAID, PaymentStatus.PENDING] } }
+                }
+              ]
+            }
           }
         ]
       },
@@ -92,7 +108,15 @@ export function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
         status: BookingStatus.PENDING_PAYMENT,
         OR: [
           { paymentHoldExpiresAt: { gt: now } },
-          { payment: { status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED, PaymentStatus.VERIFIED, PaymentStatus.PAID, PaymentStatus.PENDING] } } }
+          { payment: { status: { in: [PaymentStatus.SUBMITTED, PaymentStatus.ACTION_REQUIRED, PaymentStatus.VERIFIED, PaymentStatus.PAID, PaymentStatus.PENDING] } } },
+          {
+            bookingOrder: {
+              OR: [
+                { status: BookingOrderStatus.PENDING_PAYMENT, paymentDeadline: { gt: now } },
+                { status: { in: [BookingOrderStatus.PROOF_SUBMITTED, BookingOrderStatus.ACTION_REQUIRED] } }
+              ]
+            }
+          }
         ]
       }
     ]
@@ -128,6 +152,7 @@ function createBookingReference() {
 }
 
 async function expireStaleAwaitingPaymentHolds(tx: Prisma.TransactionClient, now: Date) {
+  await expireStaleOrdersInTransaction(tx, { now });
   const expiredBookings = await tx.booking.findMany({
     where: {
       status: BookingStatus.HELD,
@@ -521,9 +546,11 @@ export async function createBookingHold(input: BookingCreationInput) {
       });
       const amountMinor = price.amountMinor;
       const paymentHoldExpiresAt = new Date(now.getTime() + paymentHoldMinutes * 60_000);
+      const bookingReference = createBookingReference();
 
       return tx.booking.create({
         data: {
+          reference: bookingReference,
           userId: input.userId,
           facilityId: facility.id,
           status: BookingStatus.HELD,
@@ -539,7 +566,7 @@ export async function createBookingHold(input: BookingCreationInput) {
           payment: {
             create: {
               provider: PaymentProvider.MANUAL,
-              providerReference: createBookingReference(),
+              providerReference: bookingReference,
               method: "manual_gcash",
               status: PaymentStatus.AWAITING_PAYMENT,
               amountMinor,
@@ -554,7 +581,7 @@ export async function createBookingHold(input: BookingCreationInput) {
       });
       },
       {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted
       }
     );
   } catch (error) {
@@ -724,9 +751,11 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
         calculatedAt: now
       });
       const amountMinor = price.amountMinor;
+      const bookingReference = createBookingReference();
 
       return tx.booking.create({
         data: {
+          reference: bookingReference,
           userId: input.userId,
           facilityId: facility.id,
           status: BookingStatus.CONFIRMED,
@@ -742,7 +771,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
           payment: {
             create: {
               provider: PaymentProvider.MOCK,
-              providerReference: `mock_${input.idempotencyKey ?? crypto.randomUUID()}`,
+              providerReference: bookingReference,
               status: PaymentStatus.PAID,
               amountMinor,
               currency: price.currency,
@@ -756,7 +785,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
       });
       },
       {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted
       }
     );
   } catch (error) {
@@ -898,9 +927,11 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
         calculatedAt: now
       });
       const amountMinor = price.amountMinor;
+      const bookingReference = createBookingReference();
 
       return tx.booking.create({
         data: {
+          reference: bookingReference,
           userId: input.userId,
           facilityId: facility.id,
           status: BookingStatus.CONFIRMED,
@@ -915,7 +946,7 @@ export async function createAdminConfirmedBooking(input: BookingCreationInput) {
           payment: {
             create: {
               provider: PaymentProvider.MANUAL,
-              providerReference: createBookingReference(),
+              providerReference: bookingReference,
               method: input.paymentMethod ?? "walk_in",
               externalReference: input.paymentReference?.trim() || null,
               status: PaymentStatus.VERIFIED,
