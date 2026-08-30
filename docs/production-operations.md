@@ -14,7 +14,7 @@ Before promoting a release:
 
 Run `npm run test:concurrency` against a local seeded database before promoting booking, cart, or rescheduling changes. The script is intentionally restricted to localhost and creates then removes only `uat-concurrency-*` test bookings.
 
-Run `npm run test:e2e` with a seeded local database and the app running locally. The Playwright smoke suite covers public facility browsing, customer booking checkout, admin workspace access, and customer denial of admin access. Use synthetic seeded accounts only.
+Run `npm run test:e2e` with a seeded local database and the app running locally. The Playwright smoke suite covers public facility browsing, customer booking checkout, adding a schedule to the cart, consolidated checkout and proof submission, the customer booking timeline, admin payment-queue/walk-in workspace access, and customer denial of admin access. Use synthetic seeded accounts only.
 
 ## Health and Monitoring
 

@@ -462,8 +462,8 @@ Areas that are reasonably mature for a controlled pilot include booking/payment 
 
   * **Priority:** P2
   * **Category:** Testing
-  * **Evidence:** `e2e/smoke.spec.ts` and `playwright.config.ts` now cover public facility browsing, seeded customer booking checkout, admin payment/walk-in workspace access, and customer denial of `/admin`; `.github/workflows/quality-gates.yml` provisions a disposable database and runs the suite.
-  * **Problem:** The release smoke baseline is automated, but registration/email verification, proof submission and verification, consolidated cart checkout, completed walk-in flow, cancellation, and rescheduling journeys remain unautomated.
+  * **Evidence:** `e2e/smoke.spec.ts` and `playwright.config.ts` now cover public facility browsing, seeded customer booking checkout, adding a schedule to the cart, consolidated checkout, consolidated proof submission, customer booking timeline access, admin payment-queue/walk-in workspace access, and customer denial of `/admin`; `.github/workflows/quality-gates.yml` provisions a disposable database and runs the suite.
+  * **Problem:** Release-critical registration/email verification, admin proof verification, completed walk-in flow, cancellation, and rescheduling journeys remain unautomated.
   * **Production impact:** Login, booking, admin management, or cancellation regressions can ship.
   * **Recommended action:** Extend the Playwright suite with the remaining high-risk customer, payment, cart, walk-in, cancellation, and rescheduling journeys using isolated synthetic fixtures.
   * **Acceptance criteria:** E2E suite runs in CI against seeded test DB and blocks release on failures.
