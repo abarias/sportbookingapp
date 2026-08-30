@@ -18,6 +18,12 @@ import { storeFacilityImages } from "@/lib/storage/facility-images";
 import { createAdminConfirmedBooking } from "@/server/bookings/service";
 import { rejectSubmittedPayment, requestPaymentAction, verifySubmittedPayment } from "@/server/payments/service";
 import { rejectOrderPayment, requestOrderPaymentAction, verifyOrderPayment } from "@/server/orders/service";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+
+async function enforceAdminMutation(userId: string, action: string) {
+  await enforceRequestRateLimit({ action: `admin.${action}`, userId, policy: rateLimitPolicies.adminMutation() });
+}
 
 async function paymentBelongsToOrder(paymentId: string) {
   const payment = await prisma.payment.findUnique({ where: { id: paymentId }, select: { bookingOrderId: true } });
@@ -81,8 +87,6 @@ async function persistFacilityUploads(formData: FormData, slugSeed: string) {
   }
 
   const slug = slugify(slugSeed) || "facility";
-  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-
   if (files.length > 12) {
     throw new Error("Upload a maximum of 12 facility images at a time.");
   }
@@ -92,9 +96,6 @@ async function persistFacilityUploads(formData: FormData, slugSeed: string) {
       throw new Error("Each facility image must be 5MB or smaller.");
     }
 
-    if (!allowedTypes.has(file.type)) {
-      throw new Error("Facility images must be JPG, PNG, WEBP, or GIF files.");
-    }
   }
 
   return storeFacilityImages(files, slug);
@@ -171,6 +172,7 @@ const paymentReviewSchema = z.object({
 
 export async function updateCancellationSettingAction(formData: FormData) {
   const authorization = await requirePermission("facilities.manage");
+  await enforceAdminMutation(authorization.session.user.id, "cancellation-policy.update");
   const cancellationWindowHours = parseNullablePositiveInteger(formData.get("cancellationWindowHours"));
 
   if (cancellationWindowHours === null || !Number.isFinite(cancellationWindowHours) || cancellationWindowHours < 1) {
@@ -222,6 +224,7 @@ export async function updateFacilityAction(
   const canManageFacilities = capabilities.operations;
   const canManagePricing = capabilities.pricing;
   const session = authorization.session;
+  await enforceAdminMutation(session.user.id, `facility.${section}.update`);
 
   const existing = await prisma.facility.findUnique({
     where: { id: facilityId },
@@ -360,6 +363,7 @@ export async function createFacilityAction(
   formData: FormData
 ): Promise<FacilityActionState> {
   const { session } = await requireAllPermissions(["facilities.manage", "facility_content.edit", "pricing.manage", "facility_photos.manage"]);
+  await enforceAdminMutation(session.user.id, "facility.create");
 
   const imageUrls = String(formData.get("imageUrls") ?? "")
     .split("\n")
@@ -473,6 +477,7 @@ export async function createBlockedScheduleAction(
   formData: FormData
 ): Promise<BlockScheduleActionState> {
   const { session } = await requirePermission("facilities.manage");
+  await enforceAdminMutation(session.user.id, "blocked-schedule.create");
 
   const parsed = blockedScheduleSchema.safeParse({
     facilityId: String(formData.get("facilityId") ?? ""),
@@ -536,6 +541,7 @@ export async function deleteBlockedScheduleAction(
   formData: FormData
 ): Promise<DeleteBlockScheduleActionState> {
   const authorization = await requirePermission("facilities.manage");
+  await enforceAdminMutation(authorization.session.user.id, "blocked-schedule.delete");
 
   const parsed = deleteBlockScheduleSchema.safeParse({
     blockId: String(formData.get("blockId") ?? "")
@@ -589,7 +595,8 @@ export async function checkWalkInCustomerAction(
   _prevState: WalkInBookingActionState,
   formData: FormData
 ): Promise<WalkInBookingActionState> {
-  await requirePermission("bookings.create");
+  const authorization = await requirePermission("bookings.create");
+  await enforceAdminMutation(authorization.session.user.id, "walk-in-customer.check");
 
   const parsed = walkInCustomerSchema.safeParse(getWalkInCustomerValues(formData));
 
@@ -632,6 +639,7 @@ export async function createWalkInBookingAction(
   formData: FormData
 ): Promise<WalkInBookingActionState> {
   const authorization = await requirePermission("bookings.create");
+  await enforceAdminMutation(authorization.session.user.id, "walk-in-booking.create");
 
   const parsed = adminWalkInBookingSchema.safeParse({
     fullName: String(formData.get("fullName") ?? ""),
@@ -738,6 +746,7 @@ export async function verifyPaymentAction(
 ): Promise<PaymentReviewActionState> {
   try {
     const { session } = await requirePermission("payments.verify");
+    await enforceAdminMutation(session.user.id, "payment.verify");
     const parsed = paymentReviewSchema.safeParse({
       paymentId: String(formData.get("paymentId") ?? ""),
       reviewNote: String(formData.get("reviewNote") ?? "")
@@ -775,6 +784,7 @@ export async function rejectPaymentAction(
 ): Promise<PaymentReviewActionState> {
   try {
     const { session } = await requirePermission("payments.verify");
+    await enforceAdminMutation(session.user.id, "payment.reject");
     const parsed = paymentReviewSchema.extend({
       reviewNote: z.string().trim().min(3, "Add a rejection reason.").max(500)
     }).safeParse({
@@ -814,6 +824,7 @@ export async function requestPaymentActionRequiredAction(
 ): Promise<PaymentReviewActionState> {
   try {
     const { session } = await requirePermission("payments.verify");
+    await enforceAdminMutation(session.user.id, "payment.request-action");
     const parsed = paymentReviewSchema.extend({
       reviewNote: z.string().trim().min(3, "Add instructions for the customer.").max(500)
     }).safeParse({

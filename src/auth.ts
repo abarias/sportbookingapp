@@ -5,6 +5,8 @@ import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
 import { loginSchema } from "@/features/auth/schemas";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit, RateLimitExceededError } from "@/lib/security/rate-limit";
 
 const authConfig: NextAuthConfig = {
   session: {
@@ -25,6 +27,17 @@ const authConfig: NextAuthConfig = {
 
         if (!parsed.success) {
           return null;
+        }
+
+        try {
+          await enforceRequestRateLimit({
+            action: "auth.login",
+            anonymousKey: parsed.data.email,
+            policy: rateLimitPolicies.login()
+          });
+        } catch (error) {
+          if (error instanceof RateLimitExceededError) return null;
+          throw error;
         }
 
         const user = await prisma.user.findUnique({

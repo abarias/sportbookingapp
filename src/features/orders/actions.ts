@@ -7,6 +7,8 @@ import { z } from "zod";
 import { requireUserSession } from "@/lib/auth/session";
 import { storePaymentProof } from "@/lib/storage/payment-proofs";
 import { submitOrderPaymentProof } from "@/server/orders/service";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
 
 export type OrderPaymentProofActionState = {
   success?: string;
@@ -26,6 +28,7 @@ export async function submitOrderPaymentProofAction(
 ): Promise<OrderPaymentProofActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "order-payment-proof.submit", userId: session.user.id, policy: rateLimitPolicies.paymentProof() });
     const parsed = schema.safeParse({
       bookingOrderId: String(formData.get("bookingOrderId") ?? ""),
       method: String(formData.get("method") ?? ""),
@@ -38,8 +41,6 @@ export async function submitOrderPaymentProofAction(
     const file = formData.get("proofImage");
     if (!(file instanceof File) || file.size === 0) return { error: "Upload a payment proof image.", fieldErrors: { proofImage: "Choose an image file." } };
     if (file.size > 5 * 1024 * 1024) return { error: "Payment proof image must be 5MB or smaller.", fieldErrors: { proofImage: "Choose an image up to 5MB." } };
-    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) return { error: "Payment proof must be a JPEG, PNG, WebP, or GIF image.", fieldErrors: { proofImage: "Unsupported image type." } };
-
     const proofImageUrl = await storePaymentProof(file, parsed.data.bookingOrderId, "orders");
     await submitOrderPaymentProof({ ...parsed.data, userId: session.user.id, proofImageUrl });
     revalidatePath(`/orders/${parsed.data.bookingOrderId}`);

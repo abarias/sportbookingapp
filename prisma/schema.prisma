@@ -312,6 +312,20 @@ model RegistrationAttempt {
   @@index([outcome, createdAt])
 }
 
+model RateLimitBucket {
+  id           String   @id @default(cuid())
+  action       String
+  subjectHash  String
+  windowStart  DateTime
+  attempts     Int      @default(1)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([action, subjectHash, windowStart])
+  @@index([expiresAt])
+}
+
 model FacilityImage {
   id         String   @id @default(cuid())
   facilityId String

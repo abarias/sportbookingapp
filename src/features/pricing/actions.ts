@@ -8,6 +8,12 @@ import { requirePermission } from "@/lib/auth/authorization";
 import { writeAuditLog } from "@/lib/audit/log";
 import { prisma } from "@/lib/db/prisma";
 import { analyzePricingRules } from "@/server/pricing/engine";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+
+async function enforcePricingMutation(userId: string, action: string) {
+  await enforceRequestRateLimit({ action: `admin.${action}`, userId, policy: rateLimitPolicies.adminMutation() });
+}
 
 export type PricingActionState = {
   success?: string;
@@ -46,6 +52,7 @@ function revalidatePricing(facilitySlug?: string) {
 
 export async function savePricingRuleAction(_state: PricingActionState, formData: FormData): Promise<PricingActionState> {
   const { session } = await requirePermission("pricing.manage");
+  await enforcePricingMutation(session.user.id, "pricing-rule.save");
   const dayType = String(formData.get("dayType") ?? "");
   const isAllDay = dayType === "WEEKEND" || dayType === "HOLIDAY";
   const parsed = pricingRuleSchema.safeParse({
@@ -133,6 +140,7 @@ export async function savePricingRuleAction(_state: PricingActionState, formData
 
 export async function togglePricingRuleAction(formData: FormData) {
   const { session } = await requirePermission("pricing.manage");
+  await enforcePricingMutation(session.user.id, "pricing-rule.toggle");
   const ruleId = String(formData.get("ruleId") ?? "");
   const rule = await prisma.pricingRule.findFirst({ where: { id: ruleId, dayType: { not: PricingDayType.DEFAULT } }, include: { facility: true } });
   if (!rule) throw new Error("Pricing rule not found.");
@@ -148,6 +156,7 @@ export async function togglePricingRuleAction(formData: FormData) {
 
 export async function deletePricingRuleAction(formData: FormData) {
   const { session } = await requirePermission("pricing.manage");
+  await enforcePricingMutation(session.user.id, "pricing-rule.delete");
   const ruleId = String(formData.get("ruleId") ?? "");
   const rule = await prisma.pricingRule.findFirst({
     where: { id: ruleId, dayType: { not: PricingDayType.DEFAULT } },
@@ -165,6 +174,7 @@ export async function deletePricingRuleAction(formData: FormData) {
 
 export async function saveHolidayAction(_state: PricingActionState, formData: FormData): Promise<PricingActionState> {
   const { session } = await requirePermission("holidays.manage");
+  await enforcePricingMutation(session.user.id, "holiday.save");
   const parsed = holidaySchema.safeParse({
     holidayId: String(formData.get("holidayId") ?? "") || undefined,
     facilityId: String(formData.get("facilityId") ?? ""),
@@ -213,6 +223,7 @@ export async function saveHolidayAction(_state: PricingActionState, formData: Fo
 
 export async function toggleHolidayAction(formData: FormData) {
   const { session } = await requirePermission("holidays.manage");
+  await enforcePricingMutation(session.user.id, "holiday.toggle");
   const holidayId = String(formData.get("holidayId") ?? "");
   const holiday = await prisma.holiday.findUnique({ where: { id: holidayId } });
   if (!holiday) throw new Error("Holiday not found.");
@@ -223,6 +234,7 @@ export async function toggleHolidayAction(formData: FormData) {
 
 export async function copyPricingScheduleAction(_state: PricingActionState, formData: FormData): Promise<PricingActionState> {
   const { session } = await requirePermission("pricing.manage");
+  await enforcePricingMutation(session.user.id, "pricing-schedule.copy");
   const sourceFacilityId = String(formData.get("sourceFacilityId") ?? "");
   const targetFacilityId = String(formData.get("targetFacilityId") ?? "");
   if (!sourceFacilityId || !targetFacilityId || sourceFacilityId === targetFacilityId) return { error: "Choose a different target facility." };
