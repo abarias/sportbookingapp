@@ -8,6 +8,8 @@ const defaultAdminEmail = "admin@sportbooking.local";
 const defaultAdminPassword = "Admin12345!";
 const defaultCustomerEmail = "player@sportbooking.local";
 const defaultCustomerPassword = "Player12345!";
+const concurrencyCustomerEmail = "player-two@sportbooking.local";
+const concurrencyCustomerPassword = "Player12345!";
 const defaultOperatingHours = [
   { dayOfWeek: 0, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
   { dayOfWeek: 1, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
@@ -200,6 +202,18 @@ async function main() {
     phoneVerifiedAt: new Date(),
     role: UserRole.CUSTOMER
   });
+
+  if (isLocalDatabaseUrl(process.env.DATABASE_URL)) {
+    await upsertUser({
+      email: concurrencyCustomerEmail,
+      password: concurrencyCustomerPassword,
+      fullName: "Sample Player Two",
+      phone: "+639181112223",
+      emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
+      role: UserRole.CUSTOMER
+    });
+  }
 
   const facilityRecords = await Promise.all(
     facilities.map(async (facility) =>
