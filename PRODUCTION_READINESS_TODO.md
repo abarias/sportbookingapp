@@ -462,11 +462,11 @@ Areas that are reasonably mature for a controlled pilot include booking/payment 
 
   * **Priority:** P2
   * **Category:** Testing
-  * **Evidence:** `e2e/smoke.spec.ts` and `playwright.config.ts` now cover public facility browsing, seeded customer booking checkout, adding a schedule to the cart, consolidated checkout, consolidated proof submission, customer booking timeline access, admin payment-queue/walk-in workspace access, and customer denial of `/admin`; `.github/workflows/quality-gates.yml` provisions a disposable database and runs the suite.
-  * **Problem:** Release-critical registration/email verification, admin proof verification, completed walk-in flow, cancellation, and rescheduling journeys remain unautomated.
+  * **Evidence:** `e2e/smoke.spec.ts` and `playwright.config.ts` cover public facility browsing, seeded customer booking checkout, adding a schedule to the cart, consolidated checkout, consolidated proof submission, customer booking timeline access, a customer-to-admin payment verification handoff using a unique synthetic transfer reference, a 390px customer booking-page overflow check, a completed new-customer cash walk-in booking, admin payment-queue/walk-in workspace access, and customer denial of `/admin`; `.github/workflows/quality-gates.yml` provisions a disposable database and runs the suite. Local execution on 2026-08-31 passed all 9 tests.
+  * **Problem:** Release-critical registration/email verification, cancellation, rescheduling, broader permission journeys, and failure-path coverage remain unautomated. The new tests cover only the happy path for payment verification and walk-in creation plus one representative mobile viewport.
   * **Production impact:** Login, booking, admin management, or cancellation regressions can ship.
-  * **Recommended action:** Extend the Playwright suite with the remaining high-risk customer, payment, cart, walk-in, cancellation, and rescheduling journeys using isolated synthetic fixtures.
-  * **Acceptance criteria:** E2E suite runs in CI against seeded test DB and blocks release on failures.
+  * **Recommended action:** Extend the Playwright suite with isolated synthetic fixtures for registration/email verification, completed walk-ins, cancellation, rescheduling, permission matrix checks, conflict handling, expiry, and failed submissions. Add desktop/mobile coverage for the most important pages.
+  * **Acceptance criteria:** CI runs the complete agreed release journey matrix against a seeded test DB, blocks release on failures, and reports each required persona/workflow explicitly.
   * **Dependencies:** CI and test DB.
   * **Estimated effort:** L
   * **Release blocker:** No

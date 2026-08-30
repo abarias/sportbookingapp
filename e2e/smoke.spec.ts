@@ -85,6 +85,84 @@ test.describe("release smoke", () => {
     await expect(page.getByText(/Payment proof submitted successfully/i)).toBeVisible();
   });
 
+  test("admin can verify a submitted consolidated payment", async ({ browser }) => {
+    const customerContext = await browser.newContext();
+    const customerPage = await customerContext.newPage();
+    await signIn(customerPage, customer);
+    await customerPage.goto("/facilities/badminton-court-1");
+
+    const futureDate = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await customerPage.getByLabel("Booking date").fill(futureDate);
+    await customerPage.getByRole("button", { name: "Check availability" }).click();
+    await customerPage.waitForURL(new RegExp(`date=${futureDate}`));
+    await customerPage.locator('button:not([disabled])').filter({ hasText: "Available" }).first().click();
+    customerPage.once("dialog", (dialog) => dialog.accept());
+    await customerPage.getByRole("button", { name: "Add to cart" }).click();
+    await expect(customerPage).toHaveURL(/\/cart\?added=1/);
+    customerPage.once("dialog", (dialog) => dialog.accept());
+    await customerPage.getByRole("button", { name: "Confirm consolidated checkout" }).click();
+    await expect(customerPage).toHaveURL(/\/orders\/[^/]+\/payment\?created=1/);
+    const orderHeading = customerPage.getByRole("heading", { name: /^Order / });
+    const orderReference = (await orderHeading.textContent())?.replace(/^Order\s+/, "").trim();
+    expect(orderReference).toBeTruthy();
+
+    const transferReference = `UAT-VERIFY-${Date.now()}`;
+    await customerPage.locator('input[name="externalReference"]').fill(transferReference);
+    await customerPage.locator('input[name="proofImage"]').setInputFiles(path.resolve("public/MMG_STELLAR_logo.png"));
+    await customerPage.getByRole("button", { name: "Submit consolidated proof" }).click();
+    await expect(customerPage).toHaveURL(/submitted=1/);
+
+    const adminContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+    await signIn(adminPage, admin);
+    await adminPage.goto(`/admin/orders?search=${encodeURIComponent(orderReference ?? "")}`);
+    const orderRow = adminPage.locator("tr").filter({ hasText: orderReference ?? "" });
+    await expect(orderRow).toBeVisible();
+    await orderRow.getByRole("link").first().click();
+    const paymentRow = adminPage.locator("body");
+    await expect(paymentRow).toBeVisible();
+    await expect(adminPage.getByRole("heading", { name: "Payment review" })).toBeVisible();
+    await expect(adminPage.getByText(transferReference, { exact: false })).toBeVisible();
+    await adminPage.getByRole("button", { name: "Confirm payment" }).click();
+    await expect(adminPage).toHaveURL(/outcome=verified/);
+    await expect(adminPage.getByText(/Payment confirmed successfully/i)).toBeVisible();
+
+    await adminContext.close();
+    await customerContext.close();
+  });
+
+  test("customer booking page fits a mobile viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signIn(page, customer);
+    await page.goto("/facilities/center-court");
+    await expect(page.getByRole("heading", { name: "Center Court" })).toBeVisible();
+    const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    expect(hasHorizontalOverflow).toBe(false);
+  });
+
+  test("admin can complete a new-customer cash walk-in booking", async ({ page }) => {
+    await signIn(page, admin);
+    await page.goto("/admin/walk-ins");
+
+    const futureDate = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await page.getByLabel("Booking date").fill(futureDate);
+    await page.getByRole("button", { name: "Check availability" }).click();
+    await page.waitForURL(new RegExp(`date=${futureDate}`));
+    await page.getByRole("button", { name: /Available/i }).first().click();
+
+    const suffix = Date.now();
+    await page.getByLabel("Customer name").fill(`UAT Walk-in ${suffix}`);
+    await page.getByLabel("Mobile number").fill(`0917${String(suffix).slice(-7)}`);
+    await page.getByLabel("Email address").fill(`uat-walkin-${suffix}@example.com`);
+    await page.getByRole("button", { name: "Check customer details" }).click();
+    await expect(page.getByRole("heading", { name: "Capture payment and confirm" })).toBeVisible();
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Create confirmed walk-in booking" }).click();
+    await expect(page).toHaveURL(/\/admin\/bookings\/[^?]+\?walkInCreated=1/);
+    await expect(page.getByText(/Walk-in booking created successfully/i)).toBeVisible();
+  });
+
   test("customer can view the booking timeline", async ({ page }) => {
     await signIn(page, customer);
     await page.goto("/bookings");
