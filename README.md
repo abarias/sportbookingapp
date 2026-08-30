@@ -219,6 +219,7 @@ Defined in `.env.example`:
 - `PAYMONGO_PUBLIC_KEY`
 - `PAYMONGO_WEBHOOK_SECRET`
 - `APP_TIMEZONE`
+- `APP_ENV` — browser title environment label (`local`, `dev`, `qa`, `stage`, or `prod`); production intentionally has no suffix
 - `PAYMENT_HOLD_MINUTES`
 - `CART_EXPIRY_DAYS` — lifetime of an inactive authenticated customer cart, defaults to 7 days
 - `RESCHEDULE_PAYMENT_HOLD_MINUTES` — replacement-slot hold while an additional amount is awaiting proof, defaults to 15 minutes
