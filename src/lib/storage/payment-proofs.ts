@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { validateAndNormalizeImage } from "@/lib/storage/validated-image";
 
 const DEFAULT_BUCKET = "payment-proofs";
 const SIGNED_URL_SECONDS = 60 * 60;
@@ -13,30 +14,18 @@ function getStorageConfig() {
   return url && serviceRoleKey ? { url, serviceRoleKey, bucket } : null;
 }
 
-function getImageExtension(file: File) {
-  const extensions: Record<string, string> = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif"
-  };
-
-  return extensions[file.type] ?? ".jpg";
-}
-
 export async function storePaymentProof(file: File, referenceId: string, ownerType: "bookings" | "orders" = "bookings") {
   const config = getStorageConfig();
-  const extension = getImageExtension(file);
-  const fileName = `${referenceId}-${Date.now()}-${crypto.randomUUID()}${extension}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
+  const image = await validateAndNormalizeImage(file);
+  const fileName = `${referenceId}-${Date.now()}-${crypto.randomUUID()}${image.extension}`;
 
   if (config) {
     const client = createClient(config.url, config.serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
     const objectPath = `${ownerType}/${referenceId}/${fileName}`;
-    const { error } = await client.storage.from(config.bucket).upload(objectPath, bytes, {
-      contentType: file.type,
+    const { error } = await client.storage.from(config.bucket).upload(objectPath, image.bytes, {
+      contentType: image.contentType,
       upsert: false
     });
 
@@ -53,7 +42,7 @@ export async function storePaymentProof(file: File, referenceId: string, ownerTy
 
   const uploadDir = path.join(process.cwd(), "public", "uploads", "payment-proofs");
   await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, fileName), bytes);
+  await writeFile(path.join(uploadDir, fileName), image.bytes);
 
   return `/uploads/payment-proofs/${fileName}`;
 }

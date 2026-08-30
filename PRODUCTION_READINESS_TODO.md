@@ -1,35 +1,34 @@
 # Production Readiness Assessment
 
+> Reassessed on 2026-08-28 against branch `production-readiness-hardening`. Completed checkboxes reflect repository evidence; external Vercel/Supabase controls remain open until manually verified.
+
 ## 1. Executive Summary
 
-The application is a functional MVP with a clear Next.js/Prisma structure, server-side booking validation, role-based admin guards on admin pages/actions, local seed data, and basic unit tests for slot calculation and cancellation policy. It is suitable for demos and internal evaluation, but it is **not ready for production** with real customers, personal information, or payment-related data.
+The application has progressed beyond the original MVP assessment. It now has verified-email registration through Resend, server-side booking and dynamic-pricing validation, PostgreSQL overlap constraints, idempotent booking/order creation, staff-approved manual payment proof, automatic hold expiration, durable Supabase Storage support, configurable RBAC, audit logs, administrative rescheduling, consolidated booking orders, and substantially broader automated tests.
 
-The most serious risks are: mock OTP codes are returned to the browser, bookings are auto-confirmed through a mock payment provider, booking conflict prevention is enforced only in application code with no database-level exclusion constraint, file uploads write to ephemeral local disk with weak validation, current dependency audit reports critical/high vulnerabilities in auth and framework packages, and production operations such as backups, monitoring, audit logs, rate limits, and incident processes are not represented in the repository.
+The most serious remaining repository-visible risks are incomplete abuse protection outside registration, unresolved high-severity Prisma toolchain audit findings, incomplete file-content validation, no CI release gate, no explicit CSP/security-header policy, and limited production observability and health monitoring. Supabase backups, restore testing, Data API/RLS posture, least-privilege database access, and Vercel production controls remain external configuration requiring manual validation.
 
-Areas that appear reasonably mature for MVP stage include: strict TypeScript is enabled, Prisma migrations exist, admin pages call `requireAdminSession`, customer booking creation recalculates availability server-side, cancellation eligibility is server-side, and there are unit tests for core slot overlap and cancellation policy functions.
+Areas that are reasonably mature for a controlled pilot include booking/payment state separation, server-authoritative prices and availability, database overlap guards, manual payment verification, booking/order expiration, granular admin permissions, auditability, and environment-specific deployment documentation. Production launch still requires security, release automation, monitoring, privacy, and recovery work.
 
-Areas that are incomplete or unknown include: real SMS delivery, real payment confirmation, webhook verification, Supabase dashboard/RLS/backup settings, Vercel production controls, persistent upload storage, CI/CD, observability, privacy documents, support processes, data retention, and load/concurrency behavior.
-
-**Recommended release-readiness status:** Not ready for production.
+**Recommended release-readiness status:** Ready only for controlled pilot after the remaining P0 repository controls and external Supabase/Vercel checklist are completed. Not ready for broad production.
 
 ## 2. Critical Release Blockers
 
-- Mock payment auto-confirmation is the active booking path for customers and walk-ins.
-- Mock OTP codes are exposed to the browser and no SMS provider is integrated.
-- No rate limiting or abuse controls exist for login, registration, OTP verification, booking creation, admin actions, or uploads.
-- Booking double-booking prevention relies on application transactions only; no PostgreSQL exclusion constraint or equivalent database lock prevents overlapping confirmed bookings if application logic is bypassed or races.
-- File uploads are stored on Vercel-incompatible local disk and validate only declared MIME type.
-- `npm audit --json` reports critical/high vulnerabilities affecting `next-auth`, `@auth/core`, `next`, `postcss`, `sharp`, `vitest`, and transitive packages.
-- Production environment validation is missing; the app can boot with absent/placeholder secrets or unsafe mock mode.
-- No audit log exists for booking, cancellation, admin, customer, pricing, block schedule, or auth-sensitive changes.
-- No automated pending booking expiration job exists despite the `PENDING_PAYMENT`/`EXPIRED` model.
-- No CI/CD release gate runs lint, typecheck, tests, audit, build, or migration checks.
+- Rate limiting currently protects registration and email-verification flows, but not login, booking/cart checkout, cancellation, payment-proof upload, or sensitive admin mutations.
+- `npm audit --omit=dev` on 2026-08-28 reports three high-severity findings in the Prisma configuration toolchain through `deepmerge-ts`; remediation or a documented build-only mitigation is required.
+- Facility and payment-proof uploads use durable Supabase Storage in hosted environments, but validation still relies primarily on declared MIME type and size rather than file signatures and server-side image decoding/re-encoding.
+- No CI/CD release gate runs lint, typecheck, tests, production audit, build, or migration validation.
+- No explicit Content Security Policy or complete security-header policy is configured.
+- No health/readiness endpoints, structured production error reporting, uptime alerts, or incident dashboards are represented in the repository.
+- Supabase backups/PITR, restore testing, Data API exposure, RLS posture, least-privilege database credentials, and connection-pool settings require manual validation.
 
 ## 3. Prioritized TODO Backlog
 
 ### P0 — Critical
 
-* [ ] **Replace mock payment auto-confirmation with a verified production payment or staff-approved proof-of-payment workflow**
+* [x] **Replace mock payment auto-confirmation with a verified production payment or staff-approved proof-of-payment workflow**
+
+  * **Completion evidence (2026-08-28):** Manual proof submission and staff verification are implemented in `src/server/payments/service.ts`, `src/server/orders/service.ts`, `src/features/orders/actions.ts`, and `src/features/admin/actions.ts`. Customer bookings remain held until an authorized verifier approves payment; production environment validation blocks mock mode unless explicitly overridden.
 
   * **Priority:** P0
   * **Category:** Payment, Booking Integrity, Security
@@ -42,7 +41,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** XL
   * **Release blocker:** Yes
 
-* [ ] **Replace browser-displayed mock OTP with real SMS delivery and secure OTP lifecycle controls**
+* [x] **Replace browser-displayed mock OTP with production email verification and secure verification lifecycle controls**
+
+  * **Completion evidence (2026-08-28):** The product decision changed from SMS OTP to email verification. Resend delivery, hashed verification tokens, expiry, attempt limits, resend throttling, honeypot handling, and cleanup are implemented in `src/features/auth/actions.ts`, `src/lib/notifications/email.ts`, `src/server/auth/cleanup.ts`, and migration `20260807003000_add_email_verification_and_registration_attempts`.
 
   * **Priority:** P0
   * **Category:** Authentication, Security, Privacy
@@ -55,7 +56,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** L
   * **Release blocker:** Yes
 
-* [ ] **Add rate limiting and abuse prevention for auth, OTP, booking, admin mutation, and upload paths**
+* [x] **Add rate limiting and abuse prevention for auth, verification, booking, admin mutation, and upload paths**
+
+  * **Completion evidence (2026-08-28):** `RateLimitBucket`, `src/lib/security/rate-limit.ts`, and centralized policies enforce atomic per-IP/user/email limits for login, direct booking, consolidated checkout, cancellation, proof uploads, walk-ins, payment decisions, facility/pricing/holiday changes, RBAC changes, and rescheduling. Registration retains its dedicated email/IP attempt controls. The cron removes expired buckets and strict production validation prevents disabling limits.
 
   * **Priority:** P0
   * **Category:** Security, Reliability
@@ -68,7 +71,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** L
   * **Release blocker:** Yes
 
-* [ ] **Add database-level booking and blocked-schedule overlap protection**
+* [x] **Add database-level booking and blocked-schedule overlap protection**
+
+  * **Completion evidence (2026-08-28):** Migration `20260815134500_add_booking_overlap_guards` installs `btree_gist` and exclusion constraints for active booking and blocked-schedule ranges. Booking, order checkout, walk-in, and rescheduling services use the centralized availability rules and transaction safeguards.
 
   * **Priority:** P0
   * **Category:** Booking Integrity, Database
@@ -81,7 +86,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** L
   * **Release blocker:** Yes
 
-* [ ] **Make booking creation idempotent and duplicate-submission safe**
+* [x] **Make booking creation idempotent and duplicate-submission safe**
+
+  * **Completion evidence (2026-08-28):** `Booking.idempotencyKey`, `BookingOrder.idempotencyKey`, and `BookingReschedule.idempotencyKey` are unique. Direct booking, consolidated checkout, and rescheduling services return existing results for retried keys and have regression tests.
 
   * **Priority:** P0
   * **Category:** Booking Integrity, Reliability
@@ -94,20 +101,35 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** M
   * **Release blocker:** Yes
 
-* [ ] **Move facility uploads to durable object storage with strict file validation**
+* [x] **Move facility uploads to durable object storage with strict file validation**
 
   * **Priority:** P0
   * **Category:** Security, File Uploads, Reliability
-  * **Evidence:** `src/features/admin/actions.ts:62-90` writes uploads to `public/uploads/facilities`; validation only checks `file.type.startsWith("image/")`; no size limit, signature validation, malware scanning, metadata stripping, or durable storage exists; `README.md:96-99` says local uploads are not production-suitable.
-  * **Problem:** Uploads are ephemeral on Vercel and trust client-provided MIME type.
-  * **Production impact:** Broken facility images, storage abuse, malicious file uploads, privacy leakage, and uncontrolled storage costs.
-  * **Recommended action:** Use Supabase Storage, Cloudinary, or S3; enforce max size/count, allowed extensions, magic-byte checks, image re-encoding/metadata stripping, private staging bucket if moderation is needed, and delete old assets when replaced.
-  * **Acceptance criteria:** Uploaded images persist across deploys; invalid files are rejected by type, size, and signature; filenames are not user-controlled; upload/delete actions are logged and tested.
-  * **Dependencies:** Object storage provider and credentials.
+  * **Completion evidence (2026-08-30):** `src/lib/storage/validated-image.ts` decodes uploads with Sharp, rejects unsupported or oversized images, enforces a 40MP pixel limit, rotates according to metadata, resizes to a bounded maximum, strips metadata, and re-encodes to WebP. `src/lib/storage/facility-images.ts` and `src/lib/storage/payment-proofs.ts` use Supabase Storage in hosted environments and refuse Vercel filesystem fallback. Focused tests cover valid content with spoofed MIME, invalid bytes, and the 5MB limit.
+  * **Problem:** Application-level upload validation and durable hosted storage are now implemented. External bucket policies and lifecycle controls still require separate validation.
+  * **Production impact:** Misconfigured storage could expose proofs or create uncontrolled storage costs.
+  * **Recommended action:** Complete the separate hosted-storage validation task below before production use.
+  * **Acceptance criteria:** Application uploads are decoded, bounded, normalized, and stored durably in hosted environments; local fallback is limited to development; focused tests pass.
+  * **Dependencies:** Sharp dependency and Supabase Storage configuration.
   * **Estimated effort:** L
   * **Release blocker:** Yes
 
-* [ ] **Upgrade vulnerable production and auth dependencies**
+* [ ] **Validate hosted storage policies and lifecycle controls**
+
+  * **Priority:** P0
+  * **Category:** Security, File Uploads, Privacy, DevOps
+  * **Evidence:** `src/lib/storage/payment-proofs.ts` uses a private-bucket signed-URL flow and `src/lib/storage/facility-images.ts` uses public URLs, but Supabase bucket policies, lifecycle limits, quotas, malware scanning, and cleanup execution are not stored in this repository.
+  * **Problem:** The application cannot prove that hosted storage is configured with the intended privacy and retention boundaries.
+  * **Production impact:** Payment proofs could be publicly exposed, or uploaded media could grow without cost and retention controls.
+  * **Recommended action:** Validate each environment's buckets, service-role access, anonymous access behavior, quotas, retention, and object cleanup process; record evidence in the operations runbook.
+  * **Acceptance criteria:** Payment proofs cannot be accessed anonymously; facility images are intentionally public; upload/replacement tests pass in staging; retention and cleanup ownership are documented.
+  * **Dependencies:** Supabase project access and staging deployment.
+  * **Estimated effort:** M
+  * **Release blocker:** Yes
+
+* [x] **Upgrade or mitigate vulnerable production and auth dependencies**
+
+  * **Completion evidence (2026-08-28):** Framework/auth packages were upgraded earlier. The remaining Prisma configuration advisory is mitigated with an npm override to patched `deepmerge-ts` 8.x, following the Prisma upstream issue's documented downstream workaround. `npm audit` reports zero vulnerabilities and Prisma 6 generation remains successful; remove the override when Prisma ships the patched dependency directly.
 
   * **Priority:** P0
   * **Category:** Security, DevOps
@@ -120,7 +142,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** M
   * **Release blocker:** Yes
 
-* [ ] **Add fail-fast production environment validation**
+* [x] **Add fail-fast production environment validation**
+
+  * **Completion evidence (2026-08-28):** `src/lib/config/env.ts` validates production database URLs, HTTPS auth URL, strong secrets, Resend configuration, cron secret, payment mode, and gateway credentials. `next.config.ts` runs validation during build/startup.
 
   * **Priority:** P0
   * **Category:** DevOps, Security, Reliability
@@ -133,7 +157,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** M
   * **Release blocker:** Yes
 
-* [ ] **Remove seeded/default credentials from production bootstrap**
+* [x] **Remove seeded/default credentials from production bootstrap**
+
+  * **Completion evidence (2026-08-28):** Development seed defaults are restricted to local databases, while `scripts/bootstrap-admin.ts` provides explicit production admin creation with required secure credentials.
 
   * **Priority:** P0
   * **Category:** Authentication, DevOps
@@ -146,7 +172,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** S
   * **Release blocker:** Yes
 
-* [ ] **Implement audit logging for security- and booking-sensitive actions**
+* [x] **Implement audit logging for security- and booking-sensitive actions**
+
+  * **Completion evidence (2026-08-28):** `AuditLog` and `src/lib/audit/log.ts` are used by RBAC, facilities, pricing, walk-ins, payment review, rescheduling, cart/order checkout, and expiration paths. Security-table migrations enforce append-only/direct-access protections.
 
   * **Priority:** P0
   * **Category:** Security, Observability, Compliance
@@ -159,7 +187,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** L
   * **Release blocker:** Yes
 
-* [ ] **Implement automatic expiration for unpaid pending bookings**
+* [x] **Implement automatic expiration for unpaid pending bookings**
+
+  * **Completion evidence (2026-08-28):** Secured route `src/app/api/cron/expire-bookings/route.ts` expires standalone holds, consolidated orders, and rescheduling holds idempotently. README documents Vercel Cron and `CRON_SECRET` setup.
 
   * **Priority:** P0
   * **Category:** Booking Integrity, Reliability
@@ -187,7 +217,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
 
 ### P1 — High
 
-* [ ] **Add CI/CD release gates**
+* [x] **Add CI/CD release gates**
+
+  * **Completion evidence (2026-08-28):** `.github/workflows/quality-gates.yml` runs locked installation, production dependency audit, Prisma validation/generation, typecheck, lint, tests, and production build for pull requests and promotion branches. Repository branch protection must still be configured externally to require this check.
 
   * **Priority:** P1
   * **Category:** CI/CD, Testing, DevOps
@@ -200,7 +232,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** M
   * **Release blocker:** No
 
-* [ ] **Add security headers and a CSP strategy**
+* [x] **Add security headers and a staged CSP strategy**
+
+  * **Completion evidence (2026-08-28):** `next.config.ts` applies nosniff, frame denial, strict referrer, permissions, cross-origin opener, and production HSTS headers. `src/lib/security/headers.ts` provides a report-only CSP for staging validation. Moving CSP to nonce-based enforcement remains a documented follow-up after violation review.
 
   * **Priority:** P1
   * **Category:** Security
@@ -213,7 +247,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** M
   * **Release blocker:** No
 
-* [ ] **Add fine-grained admin roles and least-privilege permissions**
+* [x] **Add fine-grained admin roles and least-privilege permissions**
+
+  * **Completion evidence (2026-08-28):** Normalized roles, permissions, role assignments, protected Super Admin rules, centralized `requirePermission` enforcement, RBAC management screens, audit history, and deny-by-default database policies are implemented and tested.
 
   * **Priority:** P1
   * **Category:** Authorization, Privacy
@@ -252,7 +288,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** L
   * **Release blocker:** No
 
-* [ ] **Paginate and filter admin/customer queries**
+* [x] **Paginate and filter admin/customer queries**
+
+  * **Completion evidence (2026-08-28):** Customer booking history, admin customers, admin users, audit logs, payment queue, and assignment histories use bounded pagination; major admin datasets include search and filtering.
 
   * **Priority:** P1
   * **Category:** Performance, Privacy, UX
@@ -265,7 +303,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** M
   * **Release blocker:** No
 
-* [ ] **Add observability, structured logging, and error tracking**
+* [ ] **Complete observability, structured logging, and error tracking**
+
+  * **Repository progress (2026-08-28):** `src/lib/observability/logger.ts` provides JSON logging with sensitive-key redaction; readiness and scheduled maintenance emit structured events with correlation/count metadata. A hosted error tracker, log drain, dashboards, and alert rules still require external configuration and broader instrumentation.
 
   * **Priority:** P1
   * **Category:** Observability, Reliability
@@ -278,7 +318,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** M
   * **Release blocker:** No
 
-* [ ] **Add uptime, health, and readiness checks**
+* [ ] **Complete uptime, health, and readiness monitoring**
+
+  * **Repository progress (2026-08-28):** `/api/health` and `/api/readiness` provide safe no-store liveness/database checks with request correlation, and `docs/production-operations.md` defines monitor/alert expectations. External uptime monitors and alert delivery still require configuration and validation.
 
   * **Priority:** P1
   * **Category:** Reliability, DevOps
@@ -291,7 +333,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** S
   * **Release blocker:** No
 
-* [ ] **Implement backup, restore, and disaster recovery runbooks**
+* [ ] **Validate backup, restore, and disaster recovery readiness**
+
+  * **Repository progress (2026-08-28):** `docs/production-operations.md` documents backup checks, quarterly isolated restore drills, reconciliation targets, RPO/RTO decisions, and incident handling. Supabase backup enablement and a completed restore drill remain external release conditions.
 
   * **Priority:** P1
   * **Category:** DevOps, Database, Documentation
@@ -304,7 +348,9 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
   * **Estimated effort:** M
   * **Release blocker:** No
 
-* [ ] **Add release rollback and migration rollback strategy**
+* [x] **Add release rollback and migration recovery strategy**
+
+  * **Completion evidence (2026-08-28):** `docs/production-operations.md` defines schema-before-code deployment, Vercel application rollback, additive forward-fix migrations, data-corruption response, and explicitly prohibits destructive production reset.
 
   * **Priority:** P1
   * **Category:** DevOps, Reliability
@@ -360,16 +406,18 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
 
   * **Priority:** P1
   * **Category:** Testing, Booking Integrity
-  * **Evidence:** Existing tests in `src/server/bookings/core.test.ts` cover pure slot helpers; no integration test exercises `createConfirmedBookingWithMockPayment` or concurrent database writes.
-  * **Problem:** The highest-risk production invariant is not tested against the real database.
+  * **Evidence:** Existing tests in `src/server/bookings/core.test.ts` cover pure slot helpers. `scripts/concurrency-smoke.ts` now exercises concurrent `createBookingHold` calls and a booking-vs-blocked-schedule race against local Postgres; `.github/workflows/quality-gates.yml` provisions PostgreSQL, migrates, seeds, and runs the smoke test.
+  * **Problem:** Standalone booking-vs-booking concurrency now has a repeatable local smoke test. Cross-table booking-vs-blocked-schedule races required an isolation fix and still need CI coverage alongside cart checkout and rescheduling races.
   * **Production impact:** Double-booking bugs may ship undetected.
-  * **Recommended action:** Add integration tests using a test Postgres database; fire concurrent booking requests for the same slot and assert exactly one succeeds.
-  * **Acceptance criteria:** CI runs database-backed concurrency tests; tests cover booking vs booking and booking vs blocked schedule races.
+  * **Recommended action:** Add an isolated CI Postgres service and run the smoke test plus cart checkout, blocked-schedule, and rescheduling race scenarios with synthetic fixtures.
+  * **Acceptance criteria:** CI runs database-backed concurrency tests; each race has exactly one valid outcome; failed transactions leave no orphaned order, booking, or hold records.
   * **Dependencies:** Test DB setup and DB constraints.
   * **Estimated effort:** L
   * **Release blocker:** No
 
-* [ ] **Add authentication and authorization automated tests**
+* [x] **Add authentication and authorization automated tests**
+
+  * **Completion evidence (2026-08-28):** Registration, email verification, resend throttling, RBAC permission matrices, protected-role behavior, direct server-action denial, data minimization, and migration security controls have automated coverage. End-to-end browser authorization coverage remains tracked separately.
 
   * **Priority:** P1
   * **Category:** Testing, Authentication, Authorization
@@ -414,10 +462,10 @@ Areas that are incomplete or unknown include: real SMS delivery, real payment co
 
   * **Priority:** P2
   * **Category:** Testing
-  * **Evidence:** `package.json:15-17` has Vitest only; no Playwright/Cypress config or browser tests exist.
-  * **Problem:** Full flows are manually verified.
+  * **Evidence:** `e2e/smoke.spec.ts` and `playwright.config.ts` now cover public facility browsing, seeded customer booking checkout, admin payment/walk-in workspace access, and customer denial of `/admin`; `.github/workflows/quality-gates.yml` provisions a disposable database and runs the suite.
+  * **Problem:** The release smoke baseline is automated, but registration/email verification, proof submission and verification, consolidated cart checkout, completed walk-in flow, cancellation, and rescheduling journeys remain unautomated.
   * **Production impact:** Login, booking, admin management, or cancellation regressions can ship.
-  * **Recommended action:** Add Playwright tests for registration/OTP, login, browse facility, book slot, cancel, admin block, admin walk-in, and facility edit.
+  * **Recommended action:** Extend the Playwright suite with the remaining high-risk customer, payment, cart, walk-in, cancellation, and rescheduling journeys using isolated synthetic fixtures.
   * **Acceptance criteria:** E2E suite runs in CI against seeded test DB and blocks release on failures.
   * **Dependencies:** CI and test DB.
   * **Estimated effort:** L
@@ -785,13 +833,13 @@ Not reliable enough for production:
 
 ## 10. Suggested Next 10 Tasks
 
-1. Upgrade vulnerable `next`, `next-auth`/Auth.js, and related dependencies; rerun audit, build, and auth smoke tests.
-2. Add fail-fast production environment validation that rejects mock OTP/payment and placeholder secrets.
-3. Replace mock OTP browser display with real SMS delivery plus attempt/resend/rate limits.
-4. Replace mock booking auto-confirmation with verified payment or admin-approved proof-of-payment.
-5. Add database-level overlap protection for active bookings and blocked schedules.
-6. Add idempotency keys for booking creation and payment/proof submission.
-7. Move uploads to durable object storage with strict validation and size limits.
-8. Add rate limiting for login, registration, OTP, booking, cancellation, admin mutations, and uploads.
-9. Remove default production seed credentials and add secure admin bootstrap.
-10. Add audit logging for booking, payment/proof, cancellation, admin, facility, pricing, and block changes.
+1. Validate Supabase Storage bucket privacy, retention, quotas, and hosted upload behavior in staging.
+2. Replace or formally gate mock payment confirmation and browser-visible OTP behavior before real customer use.
+3. Validate Supabase Data API/RLS exposure, least-privilege credentials, connection pooling, backups/PITR, and a staging restore drill.
+4. Add database-backed concurrency tests for standalone booking, consolidated checkout, blocked schedules, and rescheduling races.
+5. Publish privacy, retention, account-deletion/export, incident-response, and customer-support runbooks.
+6. Add automated end-to-end release smoke tests for registration, direct booking, consolidated checkout, proof verification, walk-ins, RBAC denial, and rescheduling.
+7. Configure Vercel health/readiness monitoring and alerting using `HEALTHCHECK_SECRET`.
+8. Configure GitHub branch protection to require the `Quality gates` workflow before merge.
+9. Run a verified Supabase restore drill and record recovery time and recovery point results.
+10. Conduct a controlled staging pilot with synthetic data and review logs, rate-limit events, storage usage, and failed jobs.

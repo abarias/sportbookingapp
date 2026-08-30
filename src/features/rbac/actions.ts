@@ -8,6 +8,12 @@ import { requirePermission } from "@/lib/auth/authorization";
 import { expandPermissionDependencies, isPermissionKey, protectedSuperAdminPermissions } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/log";
 import { prisma } from "@/lib/db/prisma";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+
+async function enforceRbacMutation(userId: string, action: string) {
+  await enforceRequestRateLimit({ action: `admin.rbac.${action}`, userId, policy: rateLimitPolicies.adminMutation() });
+}
 
 export type RbacActionState = { success?: string; error?: string };
 
@@ -25,6 +31,7 @@ function permissionKeysFrom(formData: FormData) {
 
 export async function saveRoleAction(_state: RbacActionState, formData: FormData): Promise<RbacActionState> {
   const authorization = await requirePermission("roles.manage");
+  await enforceRbacMutation(authorization.session.user.id, "role.save");
   const parsed = roleFormSchema.safeParse({
     roleId: String(formData.get("roleId") ?? "") || undefined,
     name: String(formData.get("name") ?? ""),
@@ -111,6 +118,7 @@ export async function saveRoleAction(_state: RbacActionState, formData: FormData
 
 export async function cloneRoleAction(_state: RbacActionState, formData: FormData): Promise<RbacActionState> {
   const authorization = await requirePermission("roles.manage");
+  await enforceRbacMutation(authorization.session.user.id, "role.clone");
   const parsed = roleIdSchema.safeParse({ roleId: String(formData.get("roleId") ?? "") });
   if (!parsed.success) return { error: "Select a role to clone." };
   const source = await prisma.role.findUnique({
@@ -150,6 +158,7 @@ export async function cloneRoleAction(_state: RbacActionState, formData: FormDat
 
 export async function deleteRoleAction(_state: RbacActionState, formData: FormData): Promise<RbacActionState> {
   const authorization = await requirePermission("roles.manage");
+  await enforceRbacMutation(authorization.session.user.id, "role.delete");
   const parsed = roleIdSchema.safeParse({ roleId: String(formData.get("roleId") ?? "") });
   if (!parsed.success) return { error: "Select a role to delete." };
 
@@ -177,6 +186,7 @@ export async function deleteRoleAction(_state: RbacActionState, formData: FormDa
 
 export async function saveAdminUserRolesAction(_state: RbacActionState, formData: FormData): Promise<RbacActionState> {
   const authorization = await requirePermission("admin_users.manage");
+  await enforceRbacMutation(authorization.session.user.id, "admin-user.save");
   const parsed = adminUserRoleSchema.safeParse({
     userId: String(formData.get("userId") ?? ""),
     roleIds: formData.getAll("roleIds").map(String),

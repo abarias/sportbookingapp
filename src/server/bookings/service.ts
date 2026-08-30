@@ -581,7 +581,7 @@ export async function createBookingHold(input: BookingCreationInput) {
       });
       },
       {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted
       }
     );
   } catch (error) {
@@ -785,7 +785,7 @@ export async function createConfirmedBookingWithMockPayment(input: BookingCreati
       });
       },
       {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted
       }
     );
   } catch (error) {

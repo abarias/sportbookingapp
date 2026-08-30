@@ -9,6 +9,8 @@ import { requireUserSession } from "@/lib/auth/session";
 import { storePaymentProof } from "@/lib/storage/payment-proofs";
 import { cancelBookingByCustomer, createBookingHold } from "@/server/bookings/service";
 import { submitManualPaymentProof } from "@/server/payments/service";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
 
 export type BookingActionState = {
   error?: string;
@@ -66,10 +68,6 @@ async function persistPaymentProofUpload(formData: FormData, bookingId: string) 
     throw new Error("Payment proof image must be 5MB or smaller.");
   }
 
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Payment proof must be an image file.");
-  }
-
   return storePaymentProof(file, bookingId);
 }
 
@@ -79,6 +77,7 @@ export async function createBookingAction(
 ): Promise<BookingActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "booking.create", userId: session.user.id, policy: rateLimitPolicies.booking() });
     const parsed = createBookingSchema.safeParse({
       facilityId: String(formData.get("facilityId") ?? ""),
       facilitySlug: String(formData.get("facilitySlug") ?? ""),
@@ -133,6 +132,7 @@ export async function submitPaymentProofAction(
 ): Promise<PaymentProofActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "payment-proof.submit", userId: session.user.id, policy: rateLimitPolicies.paymentProof() });
     const parsed = paymentProofSchema.safeParse({
       bookingId: String(formData.get("bookingId") ?? ""),
       method: String(formData.get("method") ?? ""),
@@ -184,6 +184,7 @@ export async function cancelBookingAction(
 ): Promise<CancelBookingActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "booking.cancel", userId: session.user.id, policy: rateLimitPolicies.booking() });
     const parsed = cancelBookingSchema.safeParse({
       bookingId: String(formData.get("bookingId") ?? "")
     });

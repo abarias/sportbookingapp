@@ -10,7 +10,15 @@ const POSITIVE_INTEGER_KEYS = [
     "PAYMENT_HOLD_MINUTES",
     "CART_EXPIRY_DAYS",
   "RESCHEDULE_CUTOFF_HOURS",
-  "RESCHEDULE_PAYMENT_HOLD_MINUTES"
+  "RESCHEDULE_PAYMENT_HOLD_MINUTES",
+  "RATE_LIMIT_LOGIN_MAX",
+  "RATE_LIMIT_LOGIN_WINDOW_SECONDS",
+  "RATE_LIMIT_BOOKING_MAX",
+  "RATE_LIMIT_BOOKING_WINDOW_SECONDS",
+  "RATE_LIMIT_PAYMENT_PROOF_MAX",
+  "RATE_LIMIT_PAYMENT_PROOF_WINDOW_SECONDS",
+  "RATE_LIMIT_ADMIN_MUTATION_MAX",
+  "RATE_LIMIT_ADMIN_MUTATION_WINDOW_SECONDS"
 ] as const;
 
 const PLACEHOLDER_PATTERNS = [/replace/i, /change[-_ ]?me/i, /dev-only/i, /placeholder/i, /test_replace/i];
@@ -76,6 +84,10 @@ export function isProductionMockPaymentAllowed(env: EnvSource = process.env) {
   return env.ALLOW_PRODUCTION_MOCK_PAYMENTS === "true";
 }
 
+export function isLocalMockOtpAllowed(env: EnvSource = process.env) {
+  return !isStrictProductionEnvironment(env) && !env.VERCEL_ENV && env.NODE_ENV !== "production" && env.AUTH_ALLOW_MOCK_OTP !== "false";
+}
+
 export function validateServerEnvironment(env: EnvSource = process.env): EnvironmentValidationResult {
   const errors: string[] = [];
   const isStrictProduction = isStrictProductionEnvironment(env);
@@ -88,6 +100,14 @@ export function validateServerEnvironment(env: EnvSource = process.env): Environ
 
   if (!isStrictProduction) {
     return { isStrictProduction, errors };
+  }
+
+  if (env.RATE_LIMIT_DISABLED === "true") {
+    errors.push("RATE_LIMIT_DISABLED=true is not allowed in production.");
+  }
+
+  if (env.AUTH_ALLOW_MOCK_OTP === "true") {
+    errors.push("AUTH_ALLOW_MOCK_OTP=true is only allowed in local development.");
   }
 
   if (!isPostgresUrl(env.DATABASE_URL)) {
@@ -122,6 +142,10 @@ export function validateServerEnvironment(env: EnvSource = process.env): Environ
 
   if (isPlaceholder(env.CRON_SECRET) || (env.CRON_SECRET?.length ?? 0) < 32) {
     errors.push("CRON_SECRET must be a strong non-placeholder value with at least 32 characters.");
+  }
+
+  if (isPlaceholder(env.HEALTHCHECK_SECRET) || (env.HEALTHCHECK_SECRET?.length ?? 0) < 32) {
+    errors.push("HEALTHCHECK_SECRET must be a strong non-placeholder value with at least 32 characters.");
   }
 
   const paymentMode = env.PAYMENT_MODE;

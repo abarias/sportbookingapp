@@ -13,6 +13,8 @@ import {
   removeCartItem,
   replaceCartItem
 } from "@/server/cart/service";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
 
 export type CartActionState = {
   success?: string;
@@ -96,6 +98,7 @@ export async function acknowledgeCartPricesAction(state: CartActionState, formDa
 export async function checkoutCartAction(_state: CartActionState, formData: FormData): Promise<CartActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "cart.checkout", userId: session.user.id, policy: rateLimitPolicies.booking() });
     const idempotencyKey = checkoutSchema.parse(formData.get("idempotencyKey"));
     const order = await checkoutActiveCart({ userId: session.user.id, idempotencyKey });
     revalidatePath("/cart");

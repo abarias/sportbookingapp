@@ -1,0 +1,93 @@
+name: Quality gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - staging
+      - qa
+      - dev
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci_placeholder
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ci_placeholder"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci_placeholder
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ci_placeholder
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-only-secret-not-used-outside-the-build
+      PAYMENT_MODE: manual
+      RATE_LIMIT_DISABLED: "true"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Validate Prisma schema
+        run: npm run db:validate
+
+      - name: Verify generated Prisma client
+        run: npm run db:generate
+
+      - name: Apply migrations to CI database
+        run: npm run db:deploy
+
+      - name: Seed CI database
+        run: npm run db:seed
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run automated tests
+        run: npm test
+
+      - name: Run database concurrency smoke test
+        run: npm run test:concurrency
+
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser smoke tests
+        run: npm run test:e2e
+
+      - name: Build production application
+        run: npm run build
