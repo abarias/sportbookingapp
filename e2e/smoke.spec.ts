@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import path from "node:path";
 
 const customer = {
   email: "player@sportbooking.local",
@@ -47,6 +48,52 @@ test.describe("release smoke", () => {
     await expect(page.getByText(/payment/i).first()).toBeVisible();
   });
 
+  test("customer can add another facility schedule to the cart", async ({ page }) => {
+    await signIn(page, customer);
+    await page.goto("/cart");
+    const clearCart = page.getByRole("button", { name: "Clear cart" });
+    if (await clearCart.isVisible().catch(() => false)) {
+      page.once("dialog", (dialog) => dialog.accept());
+      await clearCart.click();
+      await expect(page.getByText("Your cart is empty")).toBeVisible();
+    }
+    await page.goto("/facilities/pickleball-court-1");
+
+    const futureDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await page.getByLabel("Booking date").fill(futureDate);
+    await page.getByRole("button", { name: "Check availability" }).click();
+    await page.waitForURL(new RegExp(`date=${futureDate}`));
+
+    const availableSlot = page.locator('button:not([disabled])').filter({ hasText: "Available" }).first();
+    await expect(availableSlot).toBeVisible();
+    await availableSlot.click();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Add to cart" }).click();
+    await expect(page).toHaveURL(/\/cart\?added=1/);
+    await expect(page.getByText("Consolidated checkout", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Pickleball Court 1" })).toBeVisible();
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Confirm consolidated checkout" }).click();
+    await expect(page).toHaveURL(/\/orders\/[^/]+\/payment\?created=1/);
+    await expect(page.getByText(/Checkout completed/i)).toBeVisible();
+
+    await page.locator('input[name="externalReference"]').fill(`UAT-${Date.now()}`);
+    await page.locator('input[name="proofImage"]').setInputFiles(path.resolve("public/MMG_STELLAR_logo.png"));
+    await page.getByRole("button", { name: "Submit consolidated proof" }).click();
+    await expect(page).toHaveURL(/submitted=1/);
+    await expect(page.getByText(/Payment proof submitted successfully/i)).toBeVisible();
+  });
+
+  test("customer can view the booking timeline", async ({ page }) => {
+    await signIn(page, customer);
+    await page.goto("/bookings");
+    await expect(page.getByRole("heading", { name: "My bookings" })).toBeVisible();
+    await expect(page.getByText(/Signed in as/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Upcoming" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+  });
+
   test("admin can access operational workspaces", async ({ page }) => {
     await signIn(page, admin);
     await page.goto("/admin");
@@ -54,6 +101,7 @@ test.describe("release smoke", () => {
     await expect(page.getByRole("heading").first()).toBeVisible();
     await page.goto("/admin/payments");
     await expect(page.getByRole("heading", { name: "Payment verification" })).toBeVisible();
+    await expect(page.getByText("Payment queue", { exact: true })).toBeVisible();
     await page.goto("/admin/walk-ins");
     await expect(page.getByRole("heading", { name: /walk-in bookings/i })).toBeVisible();
   });
