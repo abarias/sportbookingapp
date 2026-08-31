@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 
 import { requireUserSession } from "@/lib/auth/session";
+import { storePaymentProof } from "@/lib/storage/payment-proofs";
 import { cancelBookingByCustomer, createBookingHold } from "@/server/bookings/service";
 import { submitManualPaymentProof } from "@/server/payments/service";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
 
 export type BookingActionState = {
   error?: string;
@@ -24,7 +25,7 @@ export type CancelBookingActionState = {
 export type PaymentProofActionState = {
   error?: string;
   success?: string;
-  fieldErrors?: Partial<Record<"method" | "amountPaid" | "externalReference" | "paidAt" | "proofImage", string>>;
+  fieldErrors?: Partial<Record<"method" | "externalReference" | "proofImage", string>>;
 };
 
 const createBookingSchema = z.object({
@@ -53,15 +54,8 @@ const cancelBookingSchema = z.object({
 const paymentProofSchema = z.object({
   bookingId: z.string().min(1),
   method: z.enum(["manual_gcash", "manual_bank_transfer"]),
-  amountPaidMinor: z.number().int().positive("Enter the amount paid."),
-  externalReference: z.string().trim().min(4, "Enter the transfer reference number.").max(120),
-  paidAt: z.coerce.date()
+  externalReference: z.string().trim().min(4, "Enter the transfer reference number.").max(120)
 });
-
-function parseAmountMinor(value: FormDataEntryValue | null) {
-  const amount = Number.parseFloat(String(value ?? ""));
-  return Math.round(amount * 100);
-}
 
 async function persistPaymentProofUpload(formData: FormData, bookingId: string) {
   const file = formData.get("proofImage");
@@ -74,20 +68,7 @@ async function persistPaymentProofUpload(formData: FormData, bookingId: string) 
     throw new Error("Payment proof image must be 5MB or smaller.");
   }
 
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Payment proof must be an image file.");
-  }
-
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "payment-proofs");
-  await mkdir(uploadDir, { recursive: true });
-
-  const extension = path.extname(file.name) || ".jpg";
-  const fileName = `${bookingId}-${Date.now()}${extension}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
-
-  await writeFile(path.join(uploadDir, fileName), bytes);
-
-  return `/uploads/payment-proofs/${fileName}`;
+  return storePaymentProof(file, bookingId);
 }
 
 export async function createBookingAction(
@@ -96,6 +77,7 @@ export async function createBookingAction(
 ): Promise<BookingActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "booking.create", userId: session.user.id, policy: rateLimitPolicies.booking() });
     const parsed = createBookingSchema.safeParse({
       facilityId: String(formData.get("facilityId") ?? ""),
       facilitySlug: String(formData.get("facilitySlug") ?? ""),
@@ -150,12 +132,11 @@ export async function submitPaymentProofAction(
 ): Promise<PaymentProofActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "payment-proof.submit", userId: session.user.id, policy: rateLimitPolicies.paymentProof() });
     const parsed = paymentProofSchema.safeParse({
       bookingId: String(formData.get("bookingId") ?? ""),
       method: String(formData.get("method") ?? ""),
-      amountPaidMinor: parseAmountMinor(formData.get("amountPaid")),
-      externalReference: String(formData.get("externalReference") ?? ""),
-      paidAt: String(formData.get("paidAt") ?? "")
+      externalReference: String(formData.get("externalReference") ?? "")
     });
 
     if (!parsed.success) {
@@ -165,9 +146,7 @@ export async function submitPaymentProofAction(
         error: "Please correct the payment proof details.",
         fieldErrors: {
           method: flattened.method?.[0],
-          amountPaid: flattened.amountPaidMinor?.[0],
-          externalReference: flattened.externalReference?.[0],
-          paidAt: flattened.paidAt?.[0]
+          externalReference: flattened.externalReference?.[0]
         }
       };
     }
@@ -178,9 +157,7 @@ export async function submitPaymentProofAction(
       bookingId: parsed.data.bookingId,
       userId: session.user.id,
       method: parsed.data.method,
-      amountPaidMinor: parsed.data.amountPaidMinor,
       externalReference: parsed.data.externalReference,
-      paidAt: parsed.data.paidAt,
       proofImageUrl
     });
 
@@ -189,10 +166,12 @@ export async function submitPaymentProofAction(
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
 
-    return {
-      success: "Payment proof submitted. Staff will verify your payment before confirming the booking."
-    };
+    redirect(`/bookings/${parsed.data.bookingId}/payment?submitted=1`);
   } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     return {
       error: error instanceof Error ? error.message : "Payment proof could not be submitted."
     };
@@ -205,6 +184,7 @@ export async function cancelBookingAction(
 ): Promise<CancelBookingActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "booking.cancel", userId: session.user.id, policy: rateLimitPolicies.booking() });
     const parsed = cancelBookingSchema.safeParse({
       bookingId: String(formData.get("bookingId") ?? "")
     });

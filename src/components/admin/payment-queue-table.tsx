@@ -9,7 +9,6 @@ export type PaymentQueueRow = {
   schedule: string;
   facilityName: string;
   amountDue: string;
-  amountClaimed: string | null;
   bookingReference: string;
   transferReference: string | null;
   paymentMethod: string;
@@ -67,7 +66,6 @@ export function PaymentQueueTable({ rows }: PaymentQueueTableProps) {
               <td className="px-5 py-4 text-white">{row.facilityName}</td>
               <td className="px-5 py-4">
                 <p>{row.amountDue}</p>
-                {row.amountClaimed ? <p className="text-xs text-stone-500">Claimed {row.amountClaimed}</p> : null}
               </td>
               <td className="px-5 py-4">
                 <p className="font-medium text-white">{row.bookingReference}</p>

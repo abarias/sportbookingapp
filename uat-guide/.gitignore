@@ -1,0 +1,5 @@
+dist/
+tmp/
+assets/screenshots/captured/*.png
+output/pdf/*.pdf
+node_modules/

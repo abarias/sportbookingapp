@@ -2,6 +2,11 @@ import { z } from "zod";
 
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date.");
 const timeKeySchema = z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid time.");
+const blockedTimeKeySchema = z.string().regex(/^(?:[01]\d|2[0-4]):00$/, "Use an hourly time value.");
+const facilityImageUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => value.startsWith("/") || /^https?:\/\//i.test(value), "Use a local image path or an HTTP(S) image URL.");
 
 const operatingHourSchema = z
   .object({
@@ -24,20 +29,8 @@ export const facilityUpdateSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters.").max(120),
   description: z.string().trim().min(10, "Description must be at least 10 characters.").max(1000),
   isEnabled: z.boolean(),
-  slotIntervalMinutes: z
-    .number()
-    .int()
-    .min(30, "Slot interval must be at least 30 minutes.")
-    .max(240, "Slot interval is too large.")
-    .refine((value) => value % 30 === 0, "Slot interval must be in 30-minute increments."),
-  amountMinor: z.number().int().min(0, "Price must be zero or greater."),
-  minimumMinutes: z
-    .number()
-    .int()
-    .min(60, "Minimum duration must be at least 1 hour.")
-    .max(480, "Minimum duration is too large.")
-    .refine((value) => value % 60 === 0, "Minimum duration must be in hourly increments."),
-  imageUrls: z.array(z.string().url("Each image must be a valid URL.")).min(1, "Add at least one image URL."),
+  amountMinor: z.number().int().positive("Default price must be greater than zero."),
+  imageUrls: z.array(facilityImageUrlSchema).min(1, "Add at least one image URL."),
   cancellationEnabledOverride: z.enum(["inherit", "enabled", "disabled"]),
   operatingHours: z.array(operatingHourSchema).length(7)
 });
@@ -49,7 +42,7 @@ export const facilityCreateSchema = facilityUpdateSchema.omit({ facilityId: true
     .min(2, "Slug must be at least 2 characters.")
     .max(120)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens only."),
-  type: z.enum(["BASKETBALL_WHOLE", "BASKETBALL_HALF", "PICKLEBALL", "BADMINTON"])
+  type: z.enum(["BASKETBALL_WHOLE", "BASKETBALL_HALF", "PICKLEBALL", "BADMINTON", "OTHER"])
 });
 
 export const blockedScheduleSchema = z
@@ -59,14 +52,15 @@ export const blockedScheduleSchema = z
     reason: z.string().trim().max(300).optional(),
     startDate: dateKeySchema,
     endDate: dateKeySchema,
-    startTime: timeKeySchema,
-    endTime: timeKeySchema
+    startTime: blockedTimeKeySchema,
+    endTime: blockedTimeKeySchema,
+    allDay: z.boolean()
   })
   .superRefine((value, ctx) => {
     const start = `${value.startDate}T${value.startTime}`;
     const end = `${value.endDate}T${value.endTime}`;
 
-    if (start >= end) {
+    if (!value.allDay && start >= end) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "End date and time must be after the start date and time.",
@@ -75,10 +69,13 @@ export const blockedScheduleSchema = z
     }
   });
 
-export const adminWalkInBookingSchema = z.object({
+export const walkInCustomerSchema = z.object({
   fullName: z.string().trim().min(2, "Customer name is required.").max(120),
-  email: z.string().trim().email("Enter a valid email.").max(255).optional().or(z.literal("")),
+  email: z.string().trim().email("Enter a valid email.").max(255),
   phone: z.string().trim().regex(/^(\+63|0)9\d{9}$/, "Enter a valid Philippine mobile number."),
+});
+
+export const adminWalkInBookingSchema = walkInCustomerSchema.extend({
   facilityId: z.string().min(1, "Facility is required."),
   dateKey: dateKeySchema,
   startTime: timeKeySchema,
@@ -87,10 +84,21 @@ export const adminWalkInBookingSchema = z.object({
     .int()
     .min(60, "Duration must be at least 1 hour.")
     .max(240, "Duration is too long.")
-    .refine((value) => value % 60 === 0, "Duration must be in hourly increments.")
+    .refine((value) => value % 60 === 0, "Duration must be in hourly increments."),
+  paymentMethod: z.enum(["cash", "manual_gcash", "manual_bank_transfer"]),
+  paymentReference: z.string().trim().max(120, "Reference is too long.").optional().or(z.literal(""))
+}).superRefine((data, ctx) => {
+  if (data.paymentMethod !== "cash" && !data.paymentReference) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Enter the payment transaction reference.",
+      path: ["paymentReference"]
+    });
+  }
 });
 
 export type FacilityUpdateInput = z.infer<typeof facilityUpdateSchema>;
 export type FacilityCreateInput = z.infer<typeof facilityCreateSchema>;
 export type BlockedScheduleInput = z.infer<typeof blockedScheduleSchema>;
+export type WalkInCustomerInput = z.infer<typeof walkInCustomerSchema>;
 export type AdminWalkInBookingInput = z.infer<typeof adminWalkInBookingSchema>;

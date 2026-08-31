@@ -12,9 +12,7 @@ export async function submitManualPaymentProof(input: {
   bookingId: string;
   userId: string;
   method: ManualPaymentMethod;
-  amountPaidMinor: number;
   externalReference: string;
-  paidAt: Date;
   proofImageUrl: string;
 }) {
   const now = new Date();
@@ -68,9 +66,9 @@ export async function submitManualPaymentProof(input: {
         method: input.method,
         externalReference: input.externalReference.trim(),
         normalizedExternalReference: normalizedReference,
-        amountPaidMinor: input.amountPaidMinor,
+        amountPaidMinor: booking.amountMinor,
         proofImageUrl: input.proofImageUrl,
-        paidAt: input.paidAt,
+        paidAt: now,
         submittedAt: now,
         status: PaymentStatus.SUBMITTED,
         duplicateReference: Boolean(duplicatePayment),
@@ -104,7 +102,7 @@ export async function verifySubmittedPayment(input: {
       include: { booking: true }
     });
 
-    if (!payment || payment.status !== PaymentStatus.SUBMITTED) {
+    if (!payment?.booking || payment.status !== PaymentStatus.SUBMITTED) {
       throw new Error("Only submitted payments can be verified.");
     }
 
@@ -119,7 +117,7 @@ export async function verifySubmittedPayment(input: {
     });
 
     return tx.booking.update({
-      where: { id: payment.bookingId },
+      where: { id: payment.booking.id },
       data: {
         status: BookingStatus.CONFIRMED,
         paymentHoldExpiresAt: null
@@ -141,7 +139,7 @@ export async function rejectSubmittedPayment(input: {
       include: { booking: true }
     });
 
-    if (!payment || payment.status !== PaymentStatus.SUBMITTED) {
+    if (!payment?.booking || payment.status !== PaymentStatus.SUBMITTED) {
       throw new Error("Only submitted payments can be rejected.");
     }
 
@@ -156,7 +154,7 @@ export async function rejectSubmittedPayment(input: {
     });
 
     return tx.booking.update({
-      where: { id: payment.bookingId },
+      where: { id: payment.booking.id },
       data: {
         status: BookingStatus.EXPIRED,
         cancellationReason: "Payment proof rejected by admin",

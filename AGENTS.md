@@ -25,6 +25,7 @@ This repository contains an MVP sports facility booking app for the Philippines.
 - Keep functions small and readable
 - Avoid overengineering
 - Reuse components where sensible
+- Add server-side pagination by default for lists expected to grow to hundreds or thousands of records, especially transaction, audit, booking, payment, and history lists
 - Use UTC in storage and Asia/Manila in display
 - Prevent double booking through backend validation and transactional logic
 

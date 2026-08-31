@@ -15,17 +15,3 @@ export async function requireUserSession() {
 
   return session;
 }
-
-export async function requireAdminSession() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    redirect("/login?callbackUrl=/admin");
-  }
-
-  if (session.user.role !== "ADMIN") {
-    redirect("/forbidden");
-  }
-
-  return session;
-}

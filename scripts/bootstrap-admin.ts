@@ -53,7 +53,7 @@ async function main() {
     throw new Error("A non-admin user already exists with ADMIN_BOOTSTRAP_EMAIL.");
   }
 
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: input.email },
     update: {
       fullName: input.fullName,
@@ -61,7 +61,8 @@ async function main() {
       phone: input.phone,
       emailVerifiedAt: new Date(),
       phoneVerifiedAt: input.phone ? new Date() : null,
-      role: UserRole.ADMIN
+      role: UserRole.ADMIN,
+      adminAccessActive: true
     },
     create: {
       email: input.email,
@@ -70,8 +71,17 @@ async function main() {
       phone: input.phone,
       emailVerifiedAt: new Date(),
       phoneVerifiedAt: input.phone ? new Date() : null,
-      role: UserRole.ADMIN
+      role: UserRole.ADMIN,
+      adminAccessActive: true
     }
+  });
+
+  const superAdminRole = await prisma.role.findUnique({ where: { systemKey: "SUPER_ADMIN" }, select: { id: true } });
+  if (!superAdminRole) throw new Error("RBAC migration is not deployed: Super Admin role is missing.");
+  await prisma.userRoleAssignment.upsert({
+    where: { userId_roleId: { userId: admin.id, roleId: superAdminRole.id } },
+    update: {},
+    create: { userId: admin.id, roleId: superAdminRole.id, assignedByUserId: admin.id }
   });
 
   console.log(`Admin bootstrap complete for ${input.email}.`);

@@ -7,7 +7,8 @@ const facilityTypeLabels: Record<FacilityType, string> = {
   BASKETBALL_WHOLE: "Whole Basketball Court",
   BASKETBALL_HALF: "Half Basketball Court",
   PICKLEBALL: "Pickleball Court",
-  BADMINTON: "Badminton Court"
+  BADMINTON: "Badminton Court",
+  OTHER: "Other Facility"
 };
 
 export async function getFacilityCards(): Promise<FacilityCardViewModel[]> {
@@ -19,7 +20,7 @@ export async function getFacilityCards(): Promise<FacilityCardViewModel[]> {
         orderBy: { sortOrder: "asc" }
       },
       pricingRules: {
-        where: { isActive: true },
+        where: { isActive: true, dayType: "DEFAULT" },
         orderBy: { createdAt: "desc" },
         take: 1
       }
@@ -53,7 +54,7 @@ export async function getFacilityBySlug(slug: string) {
       },
       pricingRules: {
         where: { isActive: true },
-        orderBy: { createdAt: "desc" }
+        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }]
       },
       operatingHours: {
         orderBy: { dayOfWeek: "asc" }

@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { submitPaymentProofAction, type PaymentProofActionState } from "@/features/bookings/actions";
 import { Button } from "@/components/ui/button";
+import { PaymentMethodMenu } from "@/components/bookings/payment-method-menu";
 
 const initialState: PaymentProofActionState = {};
 const maxProofFileSizeBytes = 5 * 1024 * 1024;
@@ -15,9 +16,10 @@ function SubmitButton() {
   return <Button disabled={pending} type="submit">{pending ? "Submitting proof..." : "Submit proof for verification"}</Button>;
 }
 
-export function PaymentProofForm({ bookingId, amountDue }: { bookingId: string; amountDue: number }) {
+export function PaymentProofForm({ bookingId }: { bookingId: string }) {
   const [state, action] = useActionState(submitPaymentProofAction, initialState);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [method, setMethod] = useState("manual_gcash");
 
   return (
     <form
@@ -45,36 +47,15 @@ export function PaymentProofForm({ bookingId, amountDue }: { bookingId: string; 
         <p className="mt-1 text-sm text-stone-400">Uploading a receipt does not confirm your booking yet. Staff will verify the payment first.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2 text-sm text-stone-200">
-          <span>Payment method</span>
-          <select className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="method" required>
-            <option value="manual_gcash">GCash transfer</option>
-            <option value="manual_bank_transfer">Bank transfer</option>
-          </select>
+        <fieldset className="space-y-2 text-sm text-stone-200">
+          <legend>Payment method</legend>
+          <PaymentMethodMenu name="method" onChange={setMethod} value={method} />
           {state.fieldErrors?.method ? <p className="text-sm text-rose-300">{state.fieldErrors.method}</p> : null}
-        </label>
-        <label className="space-y-2 text-sm text-stone-200">
-          <span>Amount paid</span>
-          <input
-            className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white"
-            defaultValue={(amountDue / 100).toFixed(2)}
-            min="1"
-            name="amountPaid"
-            required
-            step="0.01"
-            type="number"
-          />
-          {state.fieldErrors?.amountPaid ? <p className="text-sm text-rose-300">{state.fieldErrors.amountPaid}</p> : null}
-        </label>
+        </fieldset>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Transfer reference number</span>
           <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="externalReference" required />
           {state.fieldErrors?.externalReference ? <p className="text-sm text-rose-300">{state.fieldErrors.externalReference}</p> : null}
-        </label>
-        <label className="space-y-2 text-sm text-stone-200">
-          <span>Payment date and time</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="paidAt" required type="datetime-local" />
-          {state.fieldErrors?.paidAt ? <p className="text-sm text-rose-300">{state.fieldErrors.paidAt}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200 md:col-span-2">
           <span>Receipt screenshot or image</span>
@@ -94,9 +75,11 @@ export function PaymentProofForm({ bookingId, amountDue }: { bookingId: string; 
           {state.fieldErrors?.proofImage ? <p className="text-sm text-rose-300">{state.fieldErrors.proofImage}</p> : null}
         </label>
       </div>
-      {state.error ? <p className="text-sm text-rose-300">{state.error}</p> : null}
-      {state.success ? <p className="text-sm text-emerald-300">{state.success}</p> : null}
-      <SubmitButton />
+      <div aria-live="polite">
+        {state.error ? <p className="rounded-2xl border border-rose-300/30 bg-rose-300/10 p-4 text-sm text-rose-100">{state.error}</p> : null}
+        {state.success ? <p className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">{state.success}</p> : null}
+      </div>
+      {!state.success ? <SubmitButton /> : null}
     </form>
   );
 }

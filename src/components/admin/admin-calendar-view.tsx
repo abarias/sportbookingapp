@@ -26,7 +26,7 @@ type DaySchedule = {
     endAtUtc: Date;
     user: {
       fullName: string;
-      email: string;
+      email: string | null;
     };
   }>;
   blockedSchedules: Array<{
@@ -45,6 +45,56 @@ type DaySchedule = {
     hasBookings: boolean;
   };
 };
+
+type HourBlock = {
+  startMinutes: number;
+  endMinutes: number;
+  reason: "AVAILABLE" | "BOOKED" | "BLOCKED";
+};
+
+function buildHourBlocks(slots: DaySchedule["slots"], slotIntervalMinutes: number): HourBlock[] {
+  const slotsPerHour = 60 / slotIntervalMinutes;
+
+  if (!Number.isInteger(slotsPerHour) || slotsPerHour < 1) {
+    return [];
+  }
+
+  const blocks: HourBlock[] = [];
+
+  for (let index = 0; index + slotsPerHour <= slots.length; index += slotsPerHour) {
+    const candidateSlots = slots.slice(index, index + slotsPerHour);
+    const firstSlot = candidateSlots[0];
+    const lastSlot = candidateSlots[candidateSlots.length - 1];
+
+    if (!firstSlot || !lastSlot) {
+      continue;
+    }
+
+    blocks.push({
+      startMinutes: firstSlot.startMinutes,
+      endMinutes: lastSlot.endMinutes,
+      reason: candidateSlots.every((slot) => slot.reason === "AVAILABLE")
+        ? "AVAILABLE"
+        : candidateSlots.some((slot) => slot.reason === "BOOKED")
+          ? "BOOKED"
+          : "BLOCKED"
+    });
+  }
+
+  return blocks;
+}
+
+function getHourSlotTone(reason: HourBlock["reason"]) {
+  if (reason === "AVAILABLE") {
+    return "border-emerald-300/70 bg-emerald-400/20 text-emerald-50";
+  }
+
+  if (reason === "BOOKED") {
+    return "border-rose-300/50 bg-rose-500/20 text-rose-100 opacity-80";
+  }
+
+  return "border-stone-500/50 bg-stone-700/40 text-stone-300 opacity-80";
+}
 
 export function AdminCalendarGrid(props: {
   monthKey: string;
@@ -79,7 +129,8 @@ export function AdminCalendarGrid(props: {
           return (
             <Link
               key={day.dateKey}
-              href={`/admin/calendar?month=${props.monthKey}&date=${day.dateKey}&view=${props.selectedView}`}
+              href={`/admin/calendar?month=${props.monthKey}&date=${day.dateKey}&view=${props.selectedView}#day-detail`}
+              scroll={false}
               className={`min-h-36 rounded-2xl border p-3 text-sm transition hover:border-white/30 ${tone} ${
                 day.isCurrentMonth ? "text-white" : "text-stone-500"
               } ${isSelected ? "ring-2 ring-amber-300/70" : ""}`}
@@ -118,6 +169,7 @@ function StatusChip({ label, tone }: { label: string; tone: string }) {
 }
 
 export function AdminDayDetail(props: {
+  canReschedule: boolean;
   monthKey: string;
   dateKey: string;
   view: "schedule" | "facility";
@@ -127,6 +179,7 @@ export function AdminDayDetail(props: {
   const facilitiesWithBookings = props.daySchedules.filter((schedule) => schedule.bookings.length > 0);
   const facilityOptions = facilitiesWithBookings.length > 0 ? facilitiesWithBookings : props.daySchedules;
   const selectedFacility = facilityOptions.find((schedule) => schedule.facilityId === props.facilityId) ?? facilityOptions[0] ?? props.daySchedules[0];
+  const selectedHourBlocks = selectedFacility ? buildHourBlocks(selectedFacility.slots, selectedFacility.slotIntervalMinutes) : [];
 
   return (
     <section id="day-detail" className="space-y-6 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
@@ -188,8 +241,9 @@ export function AdminDayDetail(props: {
                   {schedule.bookings.map((booking) => (
                     <div key={booking.id} className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone-300">
                       <p className="font-medium text-white">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, schedule.timezone)}</p>
-                      <p className="mt-1">{booking.user.fullName} • {booking.user.email}</p>
+                      <p className="mt-1">{booking.user.fullName}{booking.user.email ? ` • ${booking.user.email}` : ""}</p>
                       <p className="mt-1 text-stone-400">{booking.status.replaceAll("_", " ")}</p>
+                      {props.canReschedule ? <Link className="mt-2 inline-flex text-amber-200 hover:underline" href={`/admin/bookings/${booking.id}`}>View booking</Link> : null}
                     </div>
                   ))}
                 </div>
@@ -245,35 +299,28 @@ export function AdminDayDetail(props: {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <StatusChip label={`${selectedFacility.summary.availableSlotCount} available`} tone="bg-sky-400/25 text-sky-100" />
-                  <StatusChip label={`${selectedFacility.summary.bookedSlotCount} booked`} tone="bg-emerald-400/25 text-emerald-100" />
-                  <StatusChip label={`${selectedFacility.summary.blockedSlotCount} blocked`} tone="bg-rose-400/25 text-rose-100" />
+                  <StatusChip label={`${selectedHourBlocks.filter((block) => block.reason === "AVAILABLE").length} available`} tone="bg-emerald-400/25 text-emerald-100" />
+                  <StatusChip label={`${selectedHourBlocks.filter((block) => block.reason === "BOOKED").length} booked`} tone="bg-rose-400/25 text-rose-100" />
+                  <StatusChip label={`${selectedHourBlocks.filter((block) => block.reason === "BLOCKED").length} blocked`} tone="bg-stone-600/60 text-stone-200" />
                 </div>
               </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
               <div className="mb-4 flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em]">
-                <span className="rounded-full bg-sky-400/25 px-3 py-1 text-sky-100">Available</span>
-                <span className="rounded-full bg-emerald-400/25 px-3 py-1 text-emerald-100">Booked</span>
-                <span className="rounded-full bg-rose-400/25 px-3 py-1 text-rose-100">Blocked</span>
+                <span className="rounded-full bg-emerald-400/25 px-3 py-1 text-emerald-100">Available</span>
+                <span className="rounded-full bg-rose-400/25 px-3 py-1 text-rose-100">Booked</span>
+                <span className="rounded-full bg-stone-600/60 px-3 py-1 text-stone-200">Blocked / Closed</span>
               </div>
-              {selectedFacility.slots.length === 0 ? (
-                <p className="text-sm text-stone-400">No operating slots on this date.</p>
+              {selectedHourBlocks.length === 0 ? (
+                <p className="text-sm text-stone-400">No hourly operating slots on this date.</p>
               ) : (
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                  {selectedFacility.slots.map((slot) => {
-                    const tone =
-                      slot.reason === "AVAILABLE"
-                        ? "border-sky-300/50 bg-sky-500/20 text-sky-100"
-                        : slot.reason === "BOOKED"
-                          ? "border-emerald-300/50 bg-emerald-500/20 text-emerald-100"
-                          : "border-rose-300/50 bg-rose-500/20 text-rose-100";
-
+                  {selectedHourBlocks.map((slot) => {
                     return (
-                      <div key={`${slot.startMinutes}-${slot.endMinutes}`} className={`rounded-xl border px-3 py-2 text-sm ${tone}`}>
+                      <div key={`${slot.startMinutes}-${slot.endMinutes}`} className={`rounded-xl border px-3 py-2 text-sm ${getHourSlotTone(slot.reason)}`}>
                         <div className="font-medium">{formatSlotRange(slot.startMinutes, slot.endMinutes)}</div>
-                        <div className="mt-1 text-xs uppercase tracking-[0.16em]">{slot.reason}</div>
+                        <div className="mt-1 text-xs uppercase tracking-[0.16em]">{slot.reason === "AVAILABLE" ? "Available" : slot.reason === "BOOKED" ? "Booked" : "Blocked"}</div>
                       </div>
                     );
                   })}
@@ -289,7 +336,8 @@ export function AdminDayDetail(props: {
                   {selectedFacility.bookings.map((booking) => (
                     <div key={booking.id} className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone-300">
                       <p className="font-medium text-white">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, selectedFacility.timezone)}</p>
-                      <p className="mt-1">{booking.user.fullName} • {booking.user.email}</p>
+                      <p className="mt-1">{booking.user.fullName}{booking.user.email ? ` • ${booking.user.email}` : ""}</p>
+                      {props.canReschedule ? <Link className="mt-2 inline-flex text-amber-200 hover:underline" href={`/admin/bookings/${booking.id}`}>View booking</Link> : null}
                     </div>
                   ))}
                 </div>

@@ -1,16 +1,18 @@
 import { PaymentStatus } from "@prisma/client";
 import { formatInTimeZone } from "date-fns-tz";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AdminNav } from "@/components/admin/admin-nav";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 import { PaymentQueuePagination } from "@/components/admin/payment-queue-pagination";
 import { PaymentQueueTable, type PaymentQueueRow } from "@/components/admin/payment-queue-table";
 import { DashboardStat } from "@/components/shared/dashboard-stat";
 import { SectionHeading } from "@/components/shared/section-heading";
-import { requireAdminSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { formatDateTimeRange } from "@/lib/time/slots";
-import { getAdminPaymentQueueData } from "@/server/admin/queries";
+import { getAdminPaymentQueueData, getReschedulePaymentQueueData } from "@/server/admin/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,8 @@ type AdminPaymentsPageProps = {
   searchParams: Promise<{
     page?: string;
     pageSize?: string;
+    reschedulePage?: string;
+    reschedulePageSize?: string;
   }>;
 };
 
@@ -68,34 +72,64 @@ function parsePageSize(value: string | undefined) {
 }
 
 export default async function AdminPaymentsPage({ searchParams }: AdminPaymentsPageProps) {
-  await requireAdminSession();
+  await requirePermission("payments.view");
   const params = await searchParams;
   const page = parsePositiveInteger(params.page, 1);
   const pageSize = parsePageSize(params.pageSize);
-  const { payments, totalCount, submittedCount, actionRequiredCount, duplicateCount } = await getAdminPaymentQueueData({ page, pageSize });
+  const reschedulePage = parsePositiveInteger(params.reschedulePage, 1);
+  const reschedulePageSize = parsePageSize(params.reschedulePageSize);
+  const [{ payments, totalCount, submittedCount, actionRequiredCount, duplicateCount }, rescheduleQueue] = await Promise.all([
+    getAdminPaymentQueueData({ page, pageSize }),
+    getReschedulePaymentQueueData({ page: reschedulePage, pageSize: reschedulePageSize })
+  ]);
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rescheduleTotalPages = Math.max(1, Math.ceil(rescheduleQueue.totalCount / reschedulePageSize));
 
   if (page > totalPages) {
     redirect(`/admin/payments?page=${totalPages}&pageSize=${pageSize}`);
   }
+  if (reschedulePage > rescheduleTotalPages) {
+    const next = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      reschedulePage: String(rescheduleTotalPages),
+      reschedulePageSize: String(reschedulePageSize)
+    });
+    redirect(`/admin/payments?${next.toString()}`);
+  }
 
-  const rows: PaymentQueueRow[] = payments.map((payment) => ({
-    id: payment.id,
-    customerName: payment.booking.user.fullName,
-    customerContact: payment.booking.user.phone ?? payment.booking.user.email,
-    schedule: formatDateTimeRange(payment.booking.startAtUtc, payment.booking.endAtUtc, payment.booking.timezone),
-    facilityName: payment.booking.facility.name,
-    amountDue: formatCurrency(payment.amountMinor, "PHP"),
-    amountClaimed: payment.amountPaidMinor ? formatCurrency(payment.amountPaidMinor, "PHP") : null,
-    bookingReference: payment.providerReference ?? `PAY-${payment.id.slice(0, 6).toUpperCase()}`,
-    transferReference: payment.externalReference,
-    paymentMethod: formatPaymentMethod(payment.method),
-    status: payment.status,
-    statusLabel: paymentLabels[payment.status],
-    statusClassName: paymentTone[payment.status],
-    submitted: payment.submittedAt ? formatInTimeZone(payment.submittedAt, payment.booking.timezone, "MMM d, h:mm a") : "Not submitted",
-    duplicateReference: payment.duplicateReference
-  }));
+  const rows: PaymentQueueRow[] = payments.map((payment) => {
+    const order = payment.bookingOrder;
+    const booking = payment.booking;
+    const customer = order?.user ?? booking?.user;
+    const firstOrderBooking = order?.bookings[0];
+    const timezone = firstOrderBooking?.timezone ?? booking?.timezone ?? "Asia/Manila";
+    const schedule = order
+      ? `${order.bookings.length} bookings in consolidated order`
+      : booking
+        ? formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)
+        : "Booking unavailable";
+    const facilityName = order
+      ? order.bookings.map((item) => item.facility.name).filter((name, index, names) => names.indexOf(name) === index).join(", ")
+      : booking?.facility.name ?? "Unknown facility";
+
+    return {
+      id: payment.id,
+      customerName: customer?.fullName ?? "Unknown customer",
+      customerContact: customer?.phone ?? customer?.email ?? "Contact unavailable",
+      schedule,
+      facilityName,
+      amountDue: formatCurrency(payment.amountMinor, "PHP"),
+      bookingReference: order?.reference ?? payment.providerReference ?? `PAY-${payment.id.slice(0, 6).toUpperCase()}`,
+      transferReference: payment.externalReference,
+      paymentMethod: formatPaymentMethod(payment.method),
+      status: payment.status,
+      statusLabel: paymentLabels[payment.status],
+      statusClassName: paymentTone[payment.status],
+      submitted: payment.submittedAt ? formatInTimeZone(payment.submittedAt, timezone, "MMM d, h:mm a") : "Not submitted",
+      duplicateReference: payment.duplicateReference
+    };
+  });
 
   return (
     <main className="space-y-8 pb-16">
@@ -124,6 +158,24 @@ export default async function AdminPaymentsPage({ searchParams }: AdminPaymentsP
           <>
             <PaymentQueueTable rows={rows} />
             <PaymentQueuePagination page={page} pageSize={pageSize} totalCount={totalCount} />
+          </>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/5">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div><h2 className="text-lg font-semibold text-white">Reschedule adjustment payments</h2><p className="mt-1 text-sm text-stone-400">Additional amounts submitted for replacement-slot verification.</p></div>
+          <p className="text-sm text-stone-400">{rescheduleQueue.totalCount} records</p>
+        </div>
+        {rescheduleQueue.payments.length === 0 ? <p className="p-6 text-sm text-stone-400">No reschedule adjustment payments are waiting for review.</p> : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="bg-stone-950/60 text-xs uppercase tracking-[0.16em] text-stone-500"><tr><th className="px-5 py-3">Customer</th><th className="px-5 py-3">Move</th><th className="px-5 py-3">Replacement schedule</th><th className="px-5 py-3">Additional amount</th><th className="px-5 py-3">Reference</th><th className="px-5 py-3">Action</th></tr></thead>
+                <tbody className="divide-y divide-white/10">{rescheduleQueue.payments.map((payment) => <tr key={payment.id} className="text-stone-300"><td className="px-5 py-4"><p className="font-medium text-white">{payment.bookingReschedule.booking.user.fullName}</p><p className="text-xs text-stone-500">{payment.bookingReschedule.booking.user.phone ?? payment.bookingReschedule.booking.user.email}</p></td><td className="px-5 py-4">{payment.bookingReschedule.originalFacility.name} → {payment.bookingReschedule.replacementFacility.name}</td><td className="px-5 py-4">{formatDateTimeRange(payment.bookingReschedule.replacementStartAtUtc, payment.bookingReschedule.replacementEndAtUtc, payment.bookingReschedule.replacementTimezone)}</td><td className="px-5 py-4 text-white">{formatCurrency(payment.amountMinor, "PHP")}</td><td className="px-5 py-4"><p>{payment.providerReference}</p><p className="text-xs text-stone-500">{payment.externalReference ?? "No transfer reference"}</p></td><td className="px-5 py-4"><Link className="text-amber-200 hover:underline" href={`/admin/reschedule-payments/${payment.id}`}>Review</Link></td></tr>)}</tbody>
+              </table>
+            </div>
+            <AdminPagination basePath="/admin/payments" page={reschedulePage} pageSize={reschedulePageSize} totalCount={rescheduleQueue.totalCount} pageParam="reschedulePage" pageSizeParam="reschedulePageSize" />
           </>
         )}
       </section>

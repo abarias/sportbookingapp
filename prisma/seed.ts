@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, UserRole, FacilityType, BookingStatus, PaymentProvider, PaymentStatus, PricingBillingMode } from "@prisma/client";
+import { PrismaClient, Prisma, UserRole, FacilityType, BookingStatus, PaymentProvider, PaymentStatus, PricingBillingMode, PricingDayType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -8,6 +8,8 @@ const defaultAdminEmail = "admin@sportbooking.local";
 const defaultAdminPassword = "Admin12345!";
 const defaultCustomerEmail = "player@sportbooking.local";
 const defaultCustomerPassword = "Player12345!";
+const concurrencyCustomerEmail = "player-two@sportbooking.local";
+const concurrencyCustomerPassword = "Player12345!";
 const defaultOperatingHours = [
   { dayOfWeek: 0, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
   { dayOfWeek: 1, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
@@ -182,6 +184,15 @@ async function main() {
     role: UserRole.ADMIN
   });
 
+  await prisma.user.update({ where: { id: admin.id }, data: { adminAccessActive: true } });
+  const superAdminRole = await prisma.role.findUnique({ where: { systemKey: "SUPER_ADMIN" }, select: { id: true } });
+  if (!superAdminRole) throw new Error("RBAC migration is not deployed: Super Admin role is missing.");
+  await prisma.userRoleAssignment.upsert({
+    where: { userId_roleId: { userId: admin.id, roleId: superAdminRole.id } },
+    update: {},
+    create: { userId: admin.id, roleId: superAdminRole.id, assignedByUserId: admin.id }
+  });
+
   const customer = await upsertUser({
     email: customerEmail,
     password: customerPassword,
@@ -191,6 +202,18 @@ async function main() {
     phoneVerifiedAt: new Date(),
     role: UserRole.CUSTOMER
   });
+
+  if (isLocalDatabaseUrl(process.env.DATABASE_URL)) {
+    await upsertUser({
+      email: concurrencyCustomerEmail,
+      password: concurrencyCustomerPassword,
+      fullName: "Sample Player Two",
+      phone: "+639181112223",
+      emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
+      role: UserRole.CUSTOMER
+    });
+  }
 
   const facilityRecords = await Promise.all(
     facilities.map(async (facility) =>
@@ -219,11 +242,16 @@ async function main() {
             deleteMany: {},
             create: [
               {
+                name: "Default rate",
+                customerLabel: "Standard base rate",
+                dayType: PricingDayType.DEFAULT,
                 currency: "PHP",
                 amountMinor: facility.priceMinor,
                 billingMode: PricingBillingMode.PER_HOUR,
                 minimumMinutes: 60,
-                isActive: true
+                isActive: true,
+                createdByUserId: admin.id,
+                updatedByUserId: admin.id
               }
             ]
           }
@@ -249,11 +277,16 @@ async function main() {
           pricingRules: {
             create: [
               {
+                name: "Default rate",
+                customerLabel: "Standard base rate",
+                dayType: PricingDayType.DEFAULT,
                 currency: "PHP",
                 amountMinor: facility.priceMinor,
                 billingMode: PricingBillingMode.PER_HOUR,
                 minimumMinutes: 60,
-                isActive: true
+                isActive: true,
+                createdByUserId: admin.id,
+                updatedByUserId: admin.id
               }
             ]
           }
@@ -268,6 +301,21 @@ async function main() {
   if (!centerCourt || !pickleballCourt) {
     throw new Error("Seed facilities were not created correctly.");
   }
+
+  await prisma.pricingRule.createMany({
+    data: [
+      { facilityId: centerCourt.id, name: "Weekday daytime", customerLabel: "Weekday daytime base rate", dayType: PricingDayType.WEEKDAY, startMinutes: 480, endMinutes: 1020, currency: "PHP", amountMinor: 150000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 10, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
+      { facilityId: centerCourt.id, name: "Weekday evening", customerLabel: "Weekday evening base rate", dayType: PricingDayType.WEEKDAY, startMinutes: 1020, endMinutes: 1440, currency: "PHP", amountMinor: 200000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 20, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
+      { facilityId: centerCourt.id, name: "Weekend rate", customerLabel: "Weekend base rate", dayType: PricingDayType.WEEKEND, startMinutes: 0, endMinutes: 1440, currency: "PHP", amountMinor: 200000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 30, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
+      { facilityId: centerCourt.id, name: "Holiday rate", customerLabel: "Holiday base rate", dayType: PricingDayType.HOLIDAY, startMinutes: 0, endMinutes: 1440, currency: "PHP", amountMinor: 230000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 50, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id }
+    ]
+  });
+
+  const sampleHolidayDate = new Date("2026-12-25T00:00:00.000Z");
+  await prisma.holiday.deleteMany({ where: { facilityId: null, date: sampleHolidayDate, name: "Christmas Day" } });
+  await prisma.holiday.create({
+    data: { name: "Christmas Day", date: sampleHolidayDate, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id }
+  });
 
   await prisma.appSetting.upsert({
     where: { key: "booking.paymentHoldMinutes" },
