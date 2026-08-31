@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 import { prisma } from "@/lib/db/prisma";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { enqueueOrderNotification } from "@/lib/notifications/orders";
@@ -214,7 +215,7 @@ async function evaluateCartItems(tx: Prisma.TransactionClient, userId: string, n
         currentAmountMinor: item.quotedAmountMinor,
         priceChanged: false,
         availability: "UNAVAILABLE" as const,
-        availabilityMessage: error instanceof Error ? error.message : "This schedule is unavailable."
+        availabilityMessage: getSafeActionError(error, "This schedule is unavailable.", "cart.item-availability.failed", { cartItemId: item.id })
       };
     }
   }));
@@ -451,7 +452,8 @@ export async function checkoutActiveCart(input: { userId: string; idempotencyKey
       await writeCheckoutFailureAudit(input, "One or more schedules are no longer available.");
       throw new Error("One or more schedules are no longer available. No bookings were created.");
     }
-    await writeCheckoutFailureAudit(input, error instanceof Error ? error.message : "Checkout failed.");
+    const safeReason = getSafeActionError(error, "Checkout failed.", "cart.checkout.service-failed", { userId: input.userId });
+    await writeCheckoutFailureAudit(input, safeReason);
     throw error;
   }
 }

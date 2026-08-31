@@ -65,7 +65,8 @@ export function MobileNavMenu({ navItems, adminItems, showAdminItems, sessionCon
         <div
           className="absolute right-0 z-50 mt-3 max-h-[calc(100dvh-5.5rem)] w-[min(82vw,22rem)] overflow-y-auto overscroll-contain rounded-3xl border border-white/10 bg-stone-950 p-4 text-sm text-stone-300 shadow-2xl shadow-black/50"
           onClick={(event) => {
-            if (event.target instanceof Element && event.target.closest("a, button")) {
+            const target = event.target instanceof Element ? event.target : null;
+            if (target?.closest("a") || (target?.closest("button") && !target.closest("form"))) {
               setIsOpen(false);
             }
           }}

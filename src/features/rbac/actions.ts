@@ -10,6 +10,7 @@ import { writeAuditLog } from "@/lib/audit/log";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimitPolicies } from "@/lib/config/rate-limits";
 import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 
 async function enforceRbacMutation(userId: string, action: string) {
   await enforceRequestRateLimit({ action: `admin.rbac.${action}`, userId, policy: rateLimitPolicies.adminMutation() });
@@ -112,7 +113,7 @@ export async function saveRoleAction(_state: RbacActionState, formData: FormData
     if (error instanceof Error && error.message.includes("protected Super Admin")) {
       await writeAuditLog(prisma, { actorUserId, action: "role.protected_modification_blocked", entityType: "Role", entityId: parsed.data.roleId ?? null });
     }
-    return { error: error instanceof Error ? error.message : "Role could not be saved." };
+    return { error: getSafeActionError(error, "Role could not be saved.", "rbac.role.save.failed", { roleId: parsed.data.roleId }) };
   }
 }
 
@@ -180,7 +181,7 @@ export async function deleteRoleAction(_state: RbacActionState, formData: FormDa
     if (error instanceof Error && error.message === "System roles cannot be deleted.") {
       await writeAuditLog(prisma, { actorUserId: authorization.session.user.id, action: "role.protected_deletion_blocked", entityType: "Role", entityId: parsed.data.roleId });
     }
-    return { error: error instanceof Error ? error.message : "Role could not be deleted." };
+    return { error: getSafeActionError(error, "Role could not be deleted.", "rbac.role.delete.failed", { roleId: parsed.data.roleId }) };
   }
 }
 
@@ -249,6 +250,6 @@ export async function saveAdminUserRolesAction(_state: RbacActionState, formData
     if (error instanceof Error && error.message.includes("permissions that you do not hold")) {
       await writeAuditLog(prisma, { actorUserId: authorization.session.user.id, action: "admin_user.privilege_escalation_blocked", entityType: "User", entityId: parsed.data.userId });
     }
-    return { error: error instanceof Error ? error.message : "Administrative access could not be updated." };
+    return { error: getSafeActionError(error, "Administrative access could not be updated.", "rbac.admin-user.update.failed", { userId: parsed.data.userId }) };
   }
 }

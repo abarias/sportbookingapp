@@ -9,6 +9,7 @@ import { storePaymentProof } from "@/lib/storage/payment-proofs";
 import { submitOrderPaymentProof } from "@/server/orders/service";
 import { rateLimitPolicies } from "@/lib/config/rate-limits";
 import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 
 export type OrderPaymentProofActionState = {
   success?: string;
@@ -50,6 +51,6 @@ export async function submitOrderPaymentProofAction(
     redirect(`/orders/${parsed.data.bookingOrderId}/payment?submitted=1`);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error && String(error.digest).startsWith("NEXT_REDIRECT")) throw error;
-    return { error: error instanceof Error ? error.message : "Payment proof could not be submitted." };
+    return { error: getSafeActionError(error, "Payment proof could not be submitted.", "order-payment-proof.submit.failed") };
   }
 }

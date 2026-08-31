@@ -12,9 +12,10 @@ import { canCustomerCancelBooking, resolveCancellationEnabled, resolveCancellati
 
 export const dynamic = "force-dynamic";
 
-export default async function CustomerBookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CustomerBookingDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cancelled?: string }> }) {
   const session = await requireUserSession();
   const { id } = await params;
+  const query = await searchParams;
   const [booking, cancellationEnabledSetting, cancellationWindowSetting] = await Promise.all([
     prisma.booking.findFirst({
       where: { id, userId: session.user.id },
@@ -43,13 +44,14 @@ export default async function CustomerBookingDetailPage({ params }: { params: Pr
   return (
     <main className="space-y-8 pb-16">
       <SectionHeading eyebrow="Booking" title={booking.reference ?? `Booking ${booking.id.slice(0, 8).toUpperCase()}`} description="Current schedule and booking history." />
+      {query.cancelled === "1" ? <p aria-live="polite" className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">Booking cancelled successfully. Any refund handling will be coordinated by staff.</p> : null}
       <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
         <p className="text-sm uppercase tracking-[0.18em] text-amber-300">{booking.status.replaceAll("_", " ")}</p>
         <h2 className="mt-2 text-2xl font-semibold text-white">{booking.facility.name}</h2>
         <p className="mt-2 text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p>
         <p className="mt-3 text-amber-100">{formatCurrency(booking.amountMinor, "PHP")} VAT exclusive</p>
         {booking.bookingOrder ? <Link className="mt-5 inline-flex text-sm text-amber-200 hover:underline" href={`/orders/${booking.bookingOrder.id}`}>Part of order {booking.bookingOrder.reference}</Link> : null}
-        {isCancellable ? <div className="mt-5"><CancelBookingButton bookingId={booking.id} /></div> : null}
+        {isCancellable ? <div className="mt-5"><CancelBookingButton bookingId={booking.id} returnTo={`/bookings/${booking.id}`} /></div> : null}
       </section>
       {booking.reschedules.length ? (
         <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6">

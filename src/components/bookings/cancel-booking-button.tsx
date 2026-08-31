@@ -21,7 +21,7 @@ function SubmitButton() {
   );
 }
 
-export function CancelBookingButton({ bookingId }: { bookingId: string }) {
+export function CancelBookingButton({ bookingId, returnTo = "/bookings" }: { bookingId: string; returnTo?: string }) {
   const [state, action] = useActionState(cancelBookingAction, initialState);
 
   return (
@@ -35,6 +35,7 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
       }}
     >
       <input name="bookingId" type="hidden" value={bookingId} />
+      <input name="returnTo" type="hidden" value={returnTo} />
       <SubmitButton />
       {state.error ? <p className="text-xs text-rose-300">{state.error}</p> : null}
       {state.success ? <p className="text-xs text-emerald-300">{state.success}</p> : null}

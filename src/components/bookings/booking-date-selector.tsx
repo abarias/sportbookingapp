@@ -11,12 +11,12 @@ export function BookingDateSelector({ dateKey, minDateKey, maxDateKey, replaceCa
   return (
     <form className="flex flex-col gap-3 sm:flex-row sm:items-end">
       {replaceCartItemId ? <input name="replaceCartItem" type="hidden" value={replaceCartItemId} /> : null}
-      <div className="flex-1 space-y-2">
+      <div className="min-w-0 flex-1 space-y-2">
         <label className="text-sm font-medium text-stone-200" htmlFor="date">
           Booking date
         </label>
         <input
-          className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-sm text-white"
+          className="box-border h-11 w-full max-w-full min-w-0 rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-sm text-white"
           defaultValue={dateKey}
           id="date"
           max={maxDateKey}
