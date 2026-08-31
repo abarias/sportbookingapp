@@ -609,6 +609,15 @@ test.describe("release smoke", () => {
     expect(hasHorizontalOverflow).toBe(false);
   });
 
+  test("customer can sign out from the mobile menu", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signIn(page, customer);
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await page.getByRole("button", { name: "Sign Out" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("link", { name: "Sign In" })).toBeVisible();
+  });
+
   test("admin can complete a new-customer cash walk-in booking", async ({ page }) => {
     await signIn(page, admin);
     const { availableSlot } = await findAvailableSlot(page, "/admin/walk-ins", 28);
