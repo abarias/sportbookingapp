@@ -15,6 +15,7 @@ import {
 } from "@/server/cart/service";
 import { rateLimitPolicies } from "@/lib/config/rate-limits";
 import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 
 export type CartActionState = {
   success?: string;
@@ -53,7 +54,7 @@ export async function addToCartAction(_state: CartActionState, formData: FormDat
     redirect(`/cart?${replaceCartItemId ? "updated" : "added"}=1`);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error && String(error.digest).startsWith("NEXT_REDIRECT")) throw error;
-    return { error: error instanceof Error ? error.message : "The schedule could not be added to your cart." };
+    return { error: getSafeActionError(error, "The schedule could not be added to your cart.", "cart.item-add.failed") };
   }
 }
 
@@ -65,7 +66,7 @@ export async function removeCartItemAction(_state: CartActionState, formData: Fo
     revalidatePath("/cart");
     return { success: "Schedule removed from your cart." };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "The schedule could not be removed." };
+    return { error: getSafeActionError(error, "The schedule could not be removed.", "cart.item-remove.failed") };
   }
 }
 
@@ -78,7 +79,7 @@ export async function clearCartAction(state: CartActionState, formData: FormData
     revalidatePath("/cart");
     return { success: "Your cart is now empty." };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "The cart could not be cleared." };
+    return { error: getSafeActionError(error, "The cart could not be cleared.", "cart.clear.failed") };
   }
 }
 
@@ -91,7 +92,7 @@ export async function acknowledgeCartPricesAction(state: CartActionState, formDa
     revalidatePath("/cart");
     return { success: "Updated prices accepted. You can continue to checkout." };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Cart prices could not be refreshed." };
+    return { error: getSafeActionError(error, "Cart prices could not be refreshed.", "cart.prices-refresh.failed") };
   }
 }
 
@@ -108,6 +109,6 @@ export async function checkoutCartAction(_state: CartActionState, formData: Form
     redirect(`/orders/${order.id}/payment?created=1`);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error && String(error.digest).startsWith("NEXT_REDIRECT")) throw error;
-    return { error: error instanceof Error ? error.message : "Checkout could not be completed." };
+    return { error: getSafeActionError(error, "Checkout could not be completed.", "cart.checkout.failed") };
   }
 }

@@ -19,6 +19,7 @@ import {
 } from "@/server/bookings/rescheduling";
 import { rateLimitPolicies } from "@/lib/config/rate-limits";
 import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 
 export type RescheduleActionState = {
   error?: string;
@@ -99,7 +100,7 @@ export async function initiateRescheduleAction(_state: RescheduleActionState, fo
       canOverrideAdjustment: authorization.permissions.has("bookings.reschedule.override_adjustment")
     });
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Booking could not be rescheduled." };
+    return { error: getSafeActionError(error, "Booking could not be rescheduled.", "reschedule.initiate.failed") };
   }
   revalidateReschedulePages(parsed.data.bookingId);
   scheduleNotificationDelivery();
@@ -130,7 +131,7 @@ export async function submitReschedulePaymentProofAction(_state: RescheduleActio
     scheduleNotificationDelivery();
     return { success: "Additional payment proof submitted for verification.", rescheduleId: reschedule.id };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Additional payment proof could not be submitted." };
+    return { error: getSafeActionError(error, "Additional payment proof could not be submitted.", "reschedule-payment-proof.submit.failed") };
   }
 }
 
@@ -145,7 +146,7 @@ export async function verifyReschedulePaymentAction(_state: RescheduleActionStat
     scheduleNotificationDelivery();
     return { success: "Additional payment verified and booking rescheduled.", rescheduleId: reschedule.id };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Additional payment could not be verified." };
+    return { error: getSafeActionError(error, "Additional payment could not be verified.", "reschedule-payment.verify.failed") };
   }
 }
 
@@ -160,7 +161,7 @@ export async function rejectReschedulePaymentAction(_state: RescheduleActionStat
     scheduleNotificationDelivery();
     return { success: "Additional payment rejected. The original booking remains confirmed.", rescheduleId: reschedule.id };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Additional payment could not be rejected." };
+    return { error: getSafeActionError(error, "Additional payment could not be rejected.", "reschedule-payment.reject.failed") };
   }
 }
 
@@ -188,6 +189,6 @@ export async function resolveRescheduleAdjustmentAction(_state: RescheduleAction
     scheduleNotificationDelivery();
     return { success: "Price adjustment resolution recorded.", rescheduleId: reschedule.id };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Adjustment resolution could not be recorded." };
+    return { error: getSafeActionError(error, "Adjustment resolution could not be recorded.", "reschedule-adjustment.resolve.failed") };
   }
 }
