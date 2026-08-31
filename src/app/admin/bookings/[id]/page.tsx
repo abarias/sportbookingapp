@@ -17,6 +17,7 @@ import { canFitDuration } from "@/server/bookings/core";
 import { previewBookingReschedule } from "@/server/bookings/rescheduling";
 import { getFacilityDayAvailability } from "@/server/bookings/service";
 import { prisma } from "@/lib/db/prisma";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -137,7 +138,7 @@ export default async function AdminBookingDetailPage({ params, searchParams }: P
     try {
       preview = await previewBookingReschedule({ bookingId: booking.id, replacementFacilityId: selectedFacility.id, dateKey: selectedDate, startMinutes: selectedStart });
     } catch (error) {
-      previewError = error instanceof Error ? error.message : "The replacement schedule could not be validated.";
+      previewError = getSafeActionError(error, "The replacement schedule could not be validated.", "admin.reschedule.preview.failed", { bookingId: booking.id });
     }
   }
 
