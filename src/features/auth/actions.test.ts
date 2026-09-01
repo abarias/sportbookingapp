@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     getRequestIpHash: vi.fn(),
+    requireUserSession: vi.fn(),
     prisma,
     redirect: vi.fn(),
     sendVerificationEmail: vi.fn(),
@@ -51,6 +52,10 @@ vi.mock("@/lib/notifications/email", () => ({
 
 vi.mock("@/lib/security/request", () => ({
   getRequestIpHash: mocks.getRequestIpHash
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  requireUserSession: mocks.requireUserSession
 }));
 
 vi.mock("next/navigation", () => ({
@@ -91,6 +96,7 @@ function uniqueEmailError() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("RATE_LIMIT_DISABLED", "false");
   mocks.getRequestIpHash.mockResolvedValue("ip_hash");
   mocks.prisma.registrationAttempt.count.mockResolvedValue(0);
   mocks.prisma.registrationAttempt.create.mockResolvedValue({});

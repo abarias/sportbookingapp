@@ -112,6 +112,12 @@ export function LoginForm({ callbackUrl = "/facilities", registered = false }: L
         </Link>
       </p>
       <p className="text-sm text-stone-400">
+        Forgot your password?{" "}
+        <Link href="/forgot-password" className="text-amber-300 hover:text-amber-200">
+          Reset it here
+        </Link>
+      </p>
+      <p className="text-sm text-stone-400">
         Need to verify your email?{" "}
         <Link href="/verify-email" className="text-amber-300 hover:text-amber-200">
           Get a new code
