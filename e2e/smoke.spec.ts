@@ -377,6 +377,12 @@ test.describe("release smoke", () => {
     await adminPage.getByRole("button", { name: "Request new proof" }).click();
     await expect(adminPage).toHaveURL(/outcome=action-required/);
 
+    await customerPage.goto("/account");
+    await expect(customerPage.getByRole("heading", { name: "Your account and updates" })).toBeVisible();
+    await expect(customerPage.getByText("Payment Needs Attention", { exact: true }).first()).toBeVisible();
+    await customerPage.locator(`a[href="/bookings/${bookingId}/payment"]`).click();
+    await expect(customerPage).toHaveURL(new RegExp(`/bookings/${bookingId}/payment`));
+
     await customerPage.goto(`/bookings/${bookingId}/payment`);
     await expect(customerPage.getByText("Payment Needs Attention", { exact: true })).toBeVisible();
     await expect(customerPage.getByText(/clearer receipt that shows the transfer reference/i)).toBeVisible();
@@ -722,6 +728,64 @@ test.describe("release smoke", () => {
     await expect(page.getByText(/common password|password/i).last()).toBeVisible();
     await expect(page.getByLabel("Full name")).toHaveValue("UAT Registration User");
     await expect(page.getByLabel("Mobile number")).toHaveValue("09171234567");
+  });
+
+  test("customer can recover and change their password from the account page", async ({ page }) => {
+    const email = `delivered+account-${Date.now()}@resend.dev`;
+    const initialPassword = "BlueCourt12345!";
+    const changedPassword = "GreenRacket12345!";
+
+    await page.goto("/register");
+    await page.getByLabel("Full name").fill("UAT Account User");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Mobile number").fill("09171234567");
+    await page.getByRole("textbox", { name: "Password", exact: true }).fill(initialPassword);
+    await page.getByLabel("Confirm password").fill(initialPassword);
+    await page.getByRole("button", { name: "Create customer account" }).click();
+    const registrationCode = (await page.getByText(/Development code:/i).textContent())?.match(/\b\d{6}\b/)?.[0];
+    expect(registrationCode).toMatch(/^\d{6}$/);
+    await page.getByLabel("Email verification code").fill(registrationCode!);
+    await page.getByRole("button", { name: "Verify email" }).click();
+    await expect(page).toHaveURL(/\/login\?registered=1/);
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(initialPassword);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/facilities/);
+
+    await page.goto("/account");
+    await expect(page.getByRole("heading", { name: "Your account and updates" })).toBeVisible();
+    await expect(page.getByText(email, { exact: true })).toBeVisible();
+    await page.getByRole("heading", { name: "Change password" }).click();
+    await page.getByLabel("Current password").fill(initialPassword);
+    await page.getByLabel("New password", { exact: true }).fill(changedPassword);
+    await page.getByLabel("Confirm new password").fill(changedPassword);
+    await page.getByRole("button", { name: "Change password" }).click();
+    await expect(page.getByText("Password changed successfully.", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Sign Out" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await page.goto("/forgot-password");
+    await page.getByLabel("Email").fill(email);
+    await page.getByRole("button", { name: "Send reset link" }).click();
+    await expect(page.getByText("If an account matches that email, we sent instructions to reset its password.", { exact: true })).toBeVisible();
+    const resetLink = page.getByRole("link", { name: "Open the local reset link" });
+    await expect(resetLink).toBeVisible();
+    await resetLink.click();
+    await page.getByLabel("New password", { exact: true }).fill(initialPassword);
+    await page.getByLabel("Confirm new password").fill(initialPassword);
+    await page.getByRole("button", { name: "Set new password" }).click();
+    await expect(page.getByText(/Your password has been reset/i)).toBeVisible();
+  });
+
+  test("admin can use account security without seeing the customer inbox", async ({ page }) => {
+    await signIn(page, admin);
+    await page.goto("/account");
+
+    await expect(page.getByRole("heading", { name: "Your account" })).toBeVisible();
+    await expect(page.getByText("Profile", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Change password" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Booking and payment updates" })).toHaveCount(0);
+    await expect(page.getByText("Your account and updates", { exact: true })).toHaveCount(0);
   });
 
   test("customer can register, verify email, and sign in", async ({ page }) => {

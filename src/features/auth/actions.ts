@@ -1,15 +1,20 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
-import { hashPassword } from "@/lib/auth/password";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getAuthConfig, minutesToMilliseconds } from "@/lib/config/auth";
 import { isLocalMockOtpAllowed } from "@/lib/config/env";
-import { sendVerificationEmail } from "@/lib/notifications/email";
+import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/notifications/email";
 import { getRequestIpHash } from "@/lib/security/request";
+import { requireUserSession } from "@/lib/auth/session";
+import { getPasswordValidationMessage } from "@/features/auth/password-policy";
+import { enforceRequestRateLimit, isRateLimitDisabled } from "@/lib/security/rate-limit";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
 import { registerSchema, resendVerificationEmailSchema, verifyEmailSchema } from "@/features/auth/schemas";
 
 export type RegisterActionState = {
@@ -30,6 +35,12 @@ export type ResendVerificationEmailActionState = {
   pendingEmail?: string;
   devVerificationCode?: string;
   fieldErrors?: Partial<Record<"email", string>>;
+};
+
+export type PasswordActionState = {
+  error?: string;
+  success?: string;
+  resetUrl?: string;
 };
 
 function normalizeEmail(email: string) {
@@ -57,6 +68,7 @@ async function recordRegistrationAttempt(params: {
 }
 
 async function isRegistrationRateLimited(email: string, ipHash: string) {
+  if (isRateLimitDisabled()) return false;
   const authConfig = getAuthConfig();
   const since = new Date(Date.now() - minutesToMilliseconds(authConfig.registrationWindowMinutes));
   const attempts = await prisma.registrationAttempt.count({
@@ -70,6 +82,7 @@ async function isRegistrationRateLimited(email: string, ipHash: string) {
 }
 
 async function isResendVerificationRateLimited(email: string, ipHash: string) {
+  if (isRateLimitDisabled()) return false;
   const authConfig = getAuthConfig();
   const since = new Date(Date.now() - minutesToMilliseconds(authConfig.resendVerificationWindowMinutes));
   const attempts = await prisma.registrationAttempt.count({
@@ -420,4 +433,84 @@ export async function resendVerificationEmailAction(
     pendingEmail: email,
     devVerificationCode: process.env.NODE_ENV === "production" ? undefined : verificationCode
   };
+}
+
+function hashResetToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function getApplicationUrl() {
+  return process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+}
+
+export async function requestPasswordResetAction(
+  _state: PasswordActionState,
+  formData: FormData
+): Promise<PasswordActionState> {
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
+  const genericMessage = "If an account matches that email, we sent instructions to reset its password.";
+  if (!email || !email.includes("@")) return { error: "Enter a valid email address." };
+
+  await enforceRequestRateLimit({ action: "auth.password-reset", anonymousKey: email, policy: rateLimitPolicies.login() });
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, fullName: true } });
+  if (!user) return { success: genericMessage };
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+  await prisma.$transaction([
+    prisma.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } }),
+    prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash: hashResetToken(token), expiresAt } })
+  ]);
+  const resetUrl = `${getApplicationUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+  try {
+    await sendPasswordResetEmail({ to: user.email, fullName: user.fullName, resetUrl, expiresInMinutes: 30 });
+  } catch (error) {
+    console.error("[auth:password-reset] email delivery failed", error);
+  }
+  return { success: genericMessage, resetUrl: isLocalMockOtpAllowed() ? resetUrl : undefined };
+}
+
+export async function resetPasswordAction(
+  _state: PasswordActionState,
+  formData: FormData
+): Promise<PasswordActionState> {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  if (!token) return { error: "This password reset link is invalid or expired." };
+  const tokenRecord = await prisma.passwordResetToken.findFirst({ where: { tokenHash: hashResetToken(token), usedAt: null, expiresAt: { gt: new Date() } }, include: { user: { select: { id: true, email: true, fullName: true } } } });
+  if (!tokenRecord) return { error: "This password reset link is invalid or expired." };
+  const passwordError = getPasswordValidationMessage({ password, fullName: tokenRecord.user.fullName, email: tokenRecord.user.email, confirmPassword });
+  if (passwordError) return { error: passwordError };
+  if (password !== confirmPassword) return { error: "Passwords do not match." };
+  const now = new Date();
+  try {
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.passwordResetToken.updateMany({ where: { id: tokenRecord.id, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now } });
+      if (claimed.count !== 1) throw new Error("RESET_TOKEN_ALREADY_USED");
+      await tx.user.update({ where: { id: tokenRecord.user.id }, data: { passwordHash: await hashPassword(password) } });
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "RESET_TOKEN_ALREADY_USED") return { error: "This password reset link is invalid or expired." };
+    throw error;
+  }
+  return { success: "Your password has been reset. You can now sign in." };
+}
+
+export async function changePasswordAction(
+  _state: PasswordActionState,
+  formData: FormData
+): Promise<PasswordActionState> {
+  const session = await requireUserSession();
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { passwordHash: true, fullName: true, email: true } });
+  if (!user || !(await verifyPassword(currentPassword, user.passwordHash))) return { error: "Your current password is incorrect." };
+  if (password === currentPassword) return { error: "Your new password must be different from your current password." };
+  const passwordError = getPasswordValidationMessage({ password, fullName: user.fullName, email: user.email, confirmPassword });
+  if (passwordError) return { error: passwordError };
+  if (password !== confirmPassword) return { error: "Passwords do not match." };
+  await prisma.user.update({ where: { id: session.user.id }, data: { passwordHash: await hashPassword(password) } });
+  return { success: "Password changed successfully." };
 }
