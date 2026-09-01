@@ -9,6 +9,8 @@ import { AdminSessionGuard } from "@/components/layout/admin-session-guard";
 import { getCurrentAdminAuthorization } from "@/lib/auth/authorization";
 import { visibleAdminNavigation } from "@/lib/auth/admin-navigation";
 import { getActiveCartCount } from "@/server/cart/service";
+import { getCustomerAccountNotificationState } from "@/server/account/queries";
+import { PrimaryNavLink } from "@/components/layout/primary-nav-link";
 
 type AppShellProps = Readonly<{
   children: React.ReactNode;
@@ -18,10 +20,13 @@ export async function AppShell({ children }: AppShellProps) {
   const session = await auth();
   const authorization = session?.user ? await getCurrentAdminAuthorization() : null;
   const cartCount = session?.user?.role === "CUSTOMER" ? await getActiveCartCount(session.user.id) : 0;
+  const hasAccountNotifications = session?.user?.role === "CUSTOMER" ? await getCustomerAccountNotificationState(session.user.id) : false;
+  const canOpenAccount = session?.user?.role === "CUSTOMER" || Boolean(authorization);
   const navItems = [
     { href: "/facilities", label: "Facilities" },
     ...(session?.user?.role === "CUSTOMER" ? [{ href: "/cart", label: `Cart (${cartCount})` }] : []),
-    { href: "/bookings", label: "My Bookings" }
+    { href: "/bookings", label: "My Bookings" },
+    ...(canOpenAccount ? [{ href: "/account", label: "My Account", showBadge: session?.user?.role === "CUSTOMER" && hasAccountNotifications }] : [])
   ];
   const adminItems = authorization ? visibleAdminNavigation(authorization.permissions) : [];
   const showAdminItems = adminItems.length > 0;
@@ -43,9 +48,7 @@ export async function AppShell({ children }: AppShellProps) {
           </Link>
           <nav className="hidden items-center gap-4 text-sm text-stone-300 md:flex">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className="hover:text-white">
-                {item.label}
-              </Link>
+              <PrimaryNavLink key={item.href} href={item.href} label={item.label} showBadge={item.showBadge} />
             ))}
             {showAdminItems ? (
               <DesktopAdminMenu items={adminItems} />

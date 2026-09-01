@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type NavItem = {
   href: string;
   label: string;
+  showBadge?: boolean;
 };
 
 type MobileNavMenuProps = {
@@ -17,6 +19,7 @@ type MobileNavMenuProps = {
 
 export function MobileNavMenu({ navItems, adminItems, showAdminItems, sessionControls }: MobileNavMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,8 +76,8 @@ export function MobileNavMenu({ navItems, adminItems, showAdminItems, sessionCon
         >
           <div className="space-y-1">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className="block rounded-2xl px-3 py-3 hover:bg-white/10 hover:text-white">
-                {item.label}
+              <Link key={item.href} href={item.href} className="relative block rounded-2xl px-3 py-3 hover:bg-white/10 hover:text-white">
+                {item.label}{item.showBadge && pathname !== "/account" ? <span aria-label="New account update" className="absolute right-4 top-3 h-2.5 w-2.5 rounded-full bg-amber-300 ring-2 ring-stone-950" /> : null}
               </Link>
             ))}
           </div>

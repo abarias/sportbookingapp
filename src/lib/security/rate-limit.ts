@@ -20,7 +20,7 @@ function hashSubject(subject: string) {
   return crypto.createHash("sha256").update(`${pepper}:${subject}`).digest("hex");
 }
 
-function isDisabled() {
+export function isRateLimitDisabled() {
   return process.env.RATE_LIMIT_DISABLED === "true" && !isStrictProductionEnvironment();
 }
 
@@ -30,7 +30,7 @@ export async function enforceRateLimit(input: {
   policy: RateLimitPolicy;
   now?: Date;
 }) {
-  if (isDisabled()) return;
+  if (isRateLimitDisabled()) return;
 
   const now = input.now ?? new Date();
   const windowMilliseconds = input.policy.windowSeconds * 1_000;

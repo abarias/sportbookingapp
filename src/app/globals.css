@@ -25,3 +25,12 @@ body {
 a {
   @apply transition-colors;
 }
+
+/* WebKit date controls can otherwise keep an intrinsic width on narrow screens. */
+input[type="date"] {
+  min-inline-size: 0;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  min-inline-size: 0;
+}

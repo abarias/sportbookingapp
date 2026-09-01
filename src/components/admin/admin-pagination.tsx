@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
-function RowsPerPageMenu({ pageSize, onChange }: { pageSize: number; onChange: (pageSize: number) => void }) {
+function RowsPerPageMenu({ pageSize, onChange, compact }: { pageSize: number; onChange: (pageSize: number) => void; compact: boolean }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -21,7 +21,7 @@ function RowsPerPageMenu({ pageSize, onChange }: { pageSize: number; onChange: (
   }, [open]);
 
   return (
-    <div className="relative min-w-0 flex-1" ref={menuRef}>
+    <div className={compact ? "relative min-w-0 flex-1" : "relative min-w-24 flex-none"} ref={menuRef}>
       <button
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -72,10 +72,10 @@ export function AdminPagination({ basePath, page, pageSize, totalCount, pagePara
   return (
     <div className={`flex flex-col gap-4 border-t border-white/10 px-5 py-4 text-sm text-stone-300 ${compact ? "items-stretch" : "md:flex-row md:items-center md:justify-between"}`}>
       <p className={compact ? "text-xs text-stone-400" : undefined}>Showing {startRecord}-{endRecord} of {totalCount}</p>
-      <div className={`flex gap-3 ${compact ? "w-full flex-col items-stretch" : "flex-wrap items-center"}`}>
+      <div className={`flex gap-3 ${compact ? "w-full flex-col items-stretch" : "flex-col sm:flex-row sm:items-center"}`}>
         <label className={`flex gap-2 text-stone-400 ${compact ? "w-full items-center justify-between" : "items-center"}`}>
           Rows per page
-          <RowsPerPageMenu pageSize={pageSize} onChange={(nextPageSize) => navigate(1, nextPageSize)} />
+          <RowsPerPageMenu compact={compact} pageSize={pageSize} onChange={(nextPageSize) => navigate(1, nextPageSize)} />
         </label>
         <div className={`flex items-center gap-2 ${compact ? "grid grid-cols-[1fr_auto_1fr]" : ""}`}>
           <button className={`rounded-xl border border-white/10 px-3 py-2 text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 ${compact ? "w-full text-xs" : ""}`} disabled={page <= 1} onClick={() => navigate(page - 1)} type="button">Previous</button>

@@ -8,7 +8,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? "line" : "list",
+  reporter: process.env.CI ? [["line"], ["html", { outputFolder: "playwright-report", open: "never" }]] : "list",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${e2ePort}`,
     trace: "on-first-retry",
