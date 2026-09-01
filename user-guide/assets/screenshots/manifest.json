@@ -1,0 +1,205 @@
+{
+  "baseURL": "http://localhost:3000",
+  "screenshots": [
+    {
+      "file": "customer-register.png",
+      "route": "/register",
+      "description": "Customer registration form",
+      "capturedAt": "2026-09-01T07:56:40.103Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "customer-forgot-password.png",
+      "route": "/forgot-password",
+      "description": "Customer password recovery form",
+      "capturedAt": "2026-09-01T07:56:41.865Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "customer-facilities.png",
+      "route": "/facilities",
+      "description": "Public facility listing",
+      "capturedAt": "2026-09-01T07:56:43.923Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "customer-facility-detail.png",
+      "route": "/facilities/center-court",
+      "description": "Public facility detail and booking workspace",
+      "capturedAt": "2026-09-01T07:56:48.006Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "customer-facility-detail-mobile.png",
+      "route": "/facilities/center-court",
+      "description": "Mobile facility detail and booking workspace",
+      "capturedAt": "2026-09-01T07:56:51.307Z",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "customer-bookings.png",
+      "route": "/bookings",
+      "description": "Customer booking timeline",
+      "capturedAt": "2026-09-01T07:56:56.549Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "customer-cart.png",
+      "route": "/cart",
+      "description": "Customer consolidated booking cart",
+      "capturedAt": "2026-09-01T07:56:58.365Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "customer-account.png",
+      "route": "/account",
+      "description": "Customer profile and booking/payment inbox",
+      "capturedAt": "2026-09-01T07:57:00.570Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-overview.png",
+      "route": "/admin",
+      "description": "Administrative operational overview",
+      "capturedAt": "2026-09-01T07:57:04.507Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-calendar.png",
+      "route": "/admin/calendar",
+      "description": "Administrative facility calendar",
+      "capturedAt": "2026-09-01T07:57:06.930Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-walkins.png",
+      "route": "/admin/walk-ins",
+      "description": "Walk-in booking workspace",
+      "capturedAt": "2026-09-01T07:57:09.161Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-facilities.png",
+      "route": "/admin/facilities",
+      "description": "Facility management workspace",
+      "capturedAt": "2026-09-01T07:57:11.477Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-pricing.png",
+      "route": "/admin/pricing",
+      "description": "Dynamic pricing management workspace",
+      "capturedAt": "2026-09-01T07:57:13.661Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-holidays.png",
+      "route": "/admin/holidays",
+      "description": "Holiday calendar",
+      "capturedAt": "2026-09-01T07:57:15.645Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-payments.png",
+      "route": "/admin/payments",
+      "description": "Payment verification queues",
+      "capturedAt": "2026-09-01T07:57:17.653Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-customers.png",
+      "route": "/admin/customers?search=Sample%20Player",
+      "description": "Customer management workspace",
+      "capturedAt": "2026-09-01T07:57:19.613Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-reports.png",
+      "route": "/admin/reports",
+      "description": "Operational and financial reports",
+      "capturedAt": "2026-09-01T07:57:21.902Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-roles.png",
+      "route": "/admin/roles",
+      "description": "Role and permission management",
+      "capturedAt": "2026-09-01T07:57:23.957Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-users.png",
+      "route": "/admin/admin-users?search=MVP%20Admin",
+      "description": "Administrative user management",
+      "capturedAt": "2026-09-01T07:57:26.059Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "admin-audit.png",
+      "route": "/admin/audit-logs",
+      "description": "Administrative audit logs",
+      "capturedAt": "2026-09-01T07:57:28.059Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  ]
+}
