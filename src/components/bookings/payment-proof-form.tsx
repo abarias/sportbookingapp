@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 
 import { submitPaymentProofAction, type PaymentProofActionState } from "@/features/bookings/actions";
 import { Button } from "@/components/ui/button";
-import { PaymentMethodMenu } from "@/components/bookings/payment-method-menu";
 
 const initialState: PaymentProofActionState = {};
 const maxProofFileSizeBytes = 5 * 1024 * 1024;
@@ -17,9 +17,15 @@ function SubmitButton() {
 }
 
 export function PaymentProofForm({ bookingId }: { bookingId: string }) {
+  const router = useRouter();
   const [state, action] = useActionState(submitPaymentProofAction, initialState);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [method, setMethod] = useState("manual_gcash");
+
+  useEffect(() => {
+    if (state.error?.includes("reservation hold has expired")) {
+      router.refresh();
+    }
+  }, [router, state.error]);
 
   return (
     <form
@@ -42,26 +48,22 @@ export function PaymentProofForm({ bookingId }: { bookingId: string }) {
       }}
     >
       <input name="bookingId" type="hidden" value={bookingId} />
+      <input name="method" type="hidden" value="manual_bank_transfer" />
       <div>
         <h2 className="text-lg font-semibold text-white">Submit payment proof</h2>
         <p className="mt-1 text-sm text-stone-400">Uploading a receipt does not confirm your booking yet. Staff will verify the payment first.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <fieldset className="space-y-2 text-sm text-stone-200">
-          <legend>Payment method</legend>
-          <PaymentMethodMenu name="method" onChange={setMethod} value={method} />
-          {state.fieldErrors?.method ? <p className="text-sm text-rose-300">{state.fieldErrors.method}</p> : null}
-        </fieldset>
         <label className="space-y-2 text-sm text-stone-200">
           <span>Transfer reference number</span>
-          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-white" name="externalReference" required />
+          <input className="h-11 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 text-base text-white" name="externalReference" required />
           {state.fieldErrors?.externalReference ? <p className="text-sm text-rose-300">{state.fieldErrors.externalReference}</p> : null}
         </label>
         <label className="space-y-2 text-sm text-stone-200 md:col-span-2">
           <span>Receipt screenshot or image</span>
           <input
             accept="image/*"
-            className="w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-sm text-white"
+            className="w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-base text-white"
             name="proofImage"
             onChange={(event) => {
               const file = event.currentTarget.files?.[0];

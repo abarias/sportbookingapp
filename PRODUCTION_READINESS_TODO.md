@@ -288,6 +288,18 @@ Areas that are reasonably mature for a controlled pilot include booking/payment 
   * **Estimated effort:** L
   * **Release blocker:** No
 
+* [ ] **IMPORTANT: Design a customer-safe payment-proof resubmission and dispute workflow**
+
+  * **Priority:** P1
+  * **Category:** Payment, Booking Integrity, Customer Support, UX
+  * **Evidence:** `PaymentStatus.ACTION_REQUIRED` and staff review notes already support requesting clearer or corrected proof, but there is no documented resubmission SLA, reminder flow, dispute case, or recovery policy for customers who may have already paid.
+  * **Problem:** A new-proof request can leave a customer uncertain about how long they have to respond. Automatically expiring the booking or rejecting the payment after an arbitrary deadline could create avoidable disputes, especially when the bank transfer succeeded but the uploaded evidence was unclear.
+  * **Recommended action:** Keep the original inventory hold deadline separate from proof remediation. If proof was submitted before the original hold expired, move the payment to `ACTION_REQUIRED` and do not silently forfeit the customer's payment claim because a replacement proof was not uploaded quickly. Show the exact staff reason, provide a resubmit action, send reminders, and route non-response to a visible support/reconciliation queue. If inventory must eventually be released, mark the booking/order as released-pending-payment-review rather than deleting the payment trail; after payment is verified, offer restoration to the original slot when available, an equivalent replacement slot, or a refund/escalation according to a published policy. Any hard deadline should be a clearly disclosed operational escalation deadline with reminders and a support override, not an automatic loss of a verified payment.
+  * **Acceptance criteria:** Customers see the request reason, submission history, next action, and support contact; reminders are retry-safe and auditable; original hold expiry and proof-remediation state are modeled independently; a late or corrected proof remains reviewable; staff can extend, restore, reassign, or refund with an audit trail; tests cover successful resubmission, no response, late proof after inventory release, duplicate proof, and payment verified after release.
+  * **Dependencies:** Customer-support policy, payment reconciliation procedure, notification system, and explicit decision on restoration/refund authority.
+  * **Estimated effort:** L
+  * **Release blocker:** No
+
 * [x] **Paginate and filter admin/customer queries**
 
   * **Completion evidence (2026-08-28):** Customer booking history, admin customers, admin users, audit logs, payment queue, and assignment histories use bounded pagination; major admin datasets include search and filtering.
@@ -462,10 +474,10 @@ Areas that are reasonably mature for a controlled pilot include booking/payment 
 
   * **Priority:** P2
   * **Category:** Testing
-  * **Evidence:** `e2e/smoke.spec.ts` and `playwright.config.ts` cover public facility browsing, seeded customer booking checkout, adding a schedule to the cart, consolidated checkout, consolidated proof submission, customer booking timeline access, a customer-to-admin payment verification handoff using a unique synthetic transfer reference, a 390px customer booking-page overflow check, a completed new-customer cash walk-in booking, admin payment-queue/walk-in workspace access, and customer denial of `/admin`; `.github/workflows/quality-gates.yml` provisions a disposable database and runs the suite. Local execution on 2026-08-31 passed all 9 tests.
-  * **Problem:** Release-critical registration/email verification, cancellation, rescheduling, broader permission journeys, and failure-path coverage remain unautomated. The new tests cover only the happy path for payment verification and walk-in creation plus one representative mobile viewport.
+  * **Evidence:** `e2e/smoke.spec.ts` and `playwright.config.ts` cover public facility browsing, seeded customer booking checkout, customer proof submission, customer-to-admin payment verification, customer payment rejection and recovery messaging, customer cancellation with slot release, payment-proof remediation after an authorized staff action request, successful same-price/lower-price/higher-price administrative rescheduling with original-slot, adjustment, and additional-payment verification behavior, adding a schedule to the cart, consolidated checkout and proof submission, concurrent conflicting cart checkout with exactly one successful order, expired consolidated-order recovery and slot release, a 390px customer booking-page overflow check, a completed new-customer cash walk-in booking, weak-password registration field preservation, unique Resend test-recipient registration and email verification with invalid-code handling, direct denial checks for sensitive admin routes, a past-booking rescheduling guard, customer booking timeline access, and least-privilege Receptionist, Booking Admin, and Social Media browser journeys. `prisma/seed.ts` provisions role-specific accounts and the expired-order fixture only for local and CI databases. `.github/workflows/quality-gates.yml` provisions a disposable database and runs the suite. The three previously failing availability/auth scenarios, registration verification, and payment-rejection recovery scenarios passed locally on 2026-09-01.
+  * **Problem:** Downstream failure/recovery coverage outside expired consolidated orders remains unautomated. Browser coverage remains representative rather than a complete persona matrix.
   * **Production impact:** Login, booking, admin management, or cancellation regressions can ship.
-  * **Recommended action:** Extend the Playwright suite with isolated synthetic fixtures for registration/email verification, completed walk-ins, cancellation, rescheduling, permission matrix checks, conflict handling, expiry, and failed submissions. Add desktop/mobile coverage for the most important pages.
+  * **Recommended action:** Extend the Playwright suite with isolated synthetic fixtures for registration/email verification, permission matrix checks, expiry, failed submissions, and downstream recovery. Add desktop/mobile coverage for the most important pages.
   * **Acceptance criteria:** CI runs the complete agreed release journey matrix against a seeded test DB, blocks release on failures, and reports each required persona/workflow explicitly.
   * **Dependencies:** CI and test DB.
   * **Estimated effort:** L

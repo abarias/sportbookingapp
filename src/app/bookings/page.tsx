@@ -19,6 +19,7 @@ type BookingsPageProps = {
   searchParams: Promise<{
     created?: string;
     mockPaid?: string;
+    cancelled?: string;
     historyPage?: string;
     historyPageSize?: string;
   }>;
@@ -254,6 +255,11 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
           {params.mockPaid === "1"
             ? "Your reservation is confirmed and your payment has been recorded."
             : "Booking created successfully."}
+        </section>
+      ) : null}
+      {params.cancelled === "1" ? (
+        <section aria-live="polite" className="rounded-[1.75rem] border border-emerald-400/15 bg-emerald-400/10 p-4 text-sm text-emerald-100">
+          Booking cancelled successfully. Any refund handling will be coordinated by staff.
         </section>
       ) : null}
       <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-sm text-stone-300">

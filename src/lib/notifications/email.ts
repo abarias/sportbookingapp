@@ -9,6 +9,13 @@ type VerificationEmailParams = {
   expiresInMinutes: number;
 };
 
+type PasswordResetEmailParams = {
+  to: string;
+  fullName: string;
+  resetUrl: string;
+  expiresInMinutes: number;
+};
+
 type EmailDeliveryResult = {
   delivered: boolean;
   provider: "console" | "resend";
@@ -82,6 +89,26 @@ export async function sendVerificationEmail(params: VerificationEmailParams) {
     provider: "resend",
     providerMessageId: result.data?.id
   } satisfies EmailDeliveryResult;
+}
+
+export async function sendPasswordResetEmail(params: PasswordResetEmailParams) {
+  const resendConfig = getResendConfig();
+  if (!resendConfig) {
+    if (!isLocalMockOtpAllowed()) throw new Error("Email delivery is not configured. Set RESEND_API_KEY and EMAIL_FROM.");
+    console.info(`[email:password-reset] to=${params.to} expiresIn=${params.expiresInMinutes}m url=${params.resetUrl}`);
+    return { delivered: false as const, provider: "console" as const };
+  }
+
+  const resend = new Resend(resendConfig.apiKey);
+  const result = await resend.emails.send({
+    from: resendConfig.from,
+    to: params.to,
+    subject: "Reset your MMG Stellar password",
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1c1917"><h1>Reset your password</h1><p>Hi ${params.fullName},</p><p>Use the link below to choose a new password. It expires in ${params.expiresInMinutes} minutes.</p><p><a href="${params.resetUrl}">Reset password</a></p><p>If you did not request this, you can ignore this email.</p></div>`,
+    text: [`Hi ${params.fullName},`, "", `Reset your password: ${params.resetUrl}`, "", `This link expires in ${params.expiresInMinutes} minutes.`, "", "If you did not request this, you can ignore this email."].join("\n")
+  });
+  if (result.error) throw new Error(`Resend email delivery failed: ${result.error.message}`);
+  return { delivered: true as const, provider: "resend" as const, providerMessageId: result.data?.id };
 }
 
 export async function sendBookingLifecycleEmail(params: { to: string; fullName: string; subject: string; heading: string; lines: string[] }) {

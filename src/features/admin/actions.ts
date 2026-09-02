@@ -20,6 +20,7 @@ import { rejectSubmittedPayment, requestPaymentAction, verifySubmittedPayment } 
 import { rejectOrderPayment, requestOrderPaymentAction, verifyOrderPayment } from "@/server/orders/service";
 import { rateLimitPolicies } from "@/lib/config/rate-limits";
 import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 
 async function enforceAdminMutation(userId: string, action: string) {
   await enforceRequestRateLimit({ action: `admin.${action}`, userId, policy: rateLimitPolicies.adminMutation() });
@@ -242,7 +243,7 @@ export async function updateFacilityAction(
     try {
       imageUrls = [...retainedUrls, ...await persistFacilityUploads(formData, existing.name)];
     } catch (error) {
-      return { section, message: error instanceof Error ? error.message : "Facility images could not be uploaded." };
+      return { section, message: getSafeActionError(error, "Facility images could not be uploaded.", "facility.images-update.failed", { facilityId }) };
     }
   }
 
@@ -374,7 +375,7 @@ export async function createFacilityAction(
   try {
     uploadedUrls = await persistFacilityUploads(formData, String(formData.get("slug") || formData.get("name") || "facility"));
   } catch (error) {
-    return { message: error instanceof Error ? error.message : "Facility images could not be uploaded." };
+    return { message: getSafeActionError(error, "Facility images could not be uploaded.", "facility.create-upload.failed") };
   }
   const weekdays = buildWeekdays(formData);
   const cancellationWindowHoursOverride = parseNullablePositiveInteger(formData.get("cancellationWindowHoursOverride"));
@@ -727,7 +728,7 @@ export async function createWalkInBookingAction(
     }
 
     return {
-      message: error instanceof Error ? error.message : "Booking could not be created."
+      message: getSafeActionError(error, "Booking could not be created.", "admin.walk-in-booking.create.failed")
     };
   }
 
@@ -774,7 +775,7 @@ export async function verifyPaymentAction(
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=verified`);
   } catch (error) {
     if (isRedirectError(error)) throw error;
-    return { error: error instanceof Error ? error.message : "Payment could not be verified." };
+    return { error: getSafeActionError(error, "Payment could not be verified.", "admin.payment.verify.failed") };
   }
 }
 
@@ -814,7 +815,7 @@ export async function rejectPaymentAction(
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=rejected`);
   } catch (error) {
     if (isRedirectError(error)) throw error;
-    return { error: error instanceof Error ? error.message : "Payment could not be rejected." };
+    return { error: getSafeActionError(error, "Payment could not be rejected.", "admin.payment.reject.failed") };
   }
 }
 
@@ -852,6 +853,6 @@ export async function requestPaymentActionRequiredAction(
     redirect(`/admin/payments/${parsed.data.paymentId}?outcome=action-required`);
   } catch (error) {
     if (isRedirectError(error)) throw error;
-    return { error: error instanceof Error ? error.message : "Payment could not be updated." };
+    return { error: getSafeActionError(error, "Payment could not be updated.", "admin.payment.action-required.failed") };
   }
 }

@@ -137,6 +137,7 @@ model User {
   verifiedPayments           Payment[]                @relation("PaymentVerifier")
   otpRequests                OtpRequest[]
   emailVerificationTokens    EmailVerificationToken[]
+  passwordResetTokens        PasswordResetToken[]
   registrationAttempts       RegistrationAttempt[]
   createdPricingRules        PricingRule[]            @relation("PricingRuleCreator")
   updatedPricingRules        PricingRule[]            @relation("PricingRuleUpdater")
@@ -153,6 +154,7 @@ model User {
   resolvedReschedules        BookingReschedule[]      @relation("RescheduleResolver")
   verifiedReschedulePayments ReschedulePayment[]      @relation("ReschedulePaymentVerifier")
   notificationDeliveries     NotificationDelivery[]
+  accountInboxViewedAt       DateTime?
   carts                      Cart[]
   bookingOrders              BookingOrder[]
   createdAt                  DateTime                 @default(now())
@@ -296,6 +298,19 @@ model EmailVerificationToken {
 
   @@index([userId, expiresAt])
   @@index([email])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
 }
 
 model RegistrationAttempt {

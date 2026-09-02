@@ -3,6 +3,7 @@ import type { Facility, FacilityOperatingHour, PricingRule } from "@prisma/clien
 import { prisma } from "@/lib/db/prisma";
 import { getDayOfWeek } from "@/lib/time/slots";
 import { calculatePrice, deriveRateCard } from "@/server/pricing/engine";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 
 type PriceableFacility = Pick<Facility, "id" | "timezone" | "slotIntervalMinutes"> & {
   operatingHours: FacilityOperatingHour[];
@@ -37,7 +38,7 @@ export async function getFacilityPricingView(facility: PriceableFacility, dateKe
           holidays
         }));
       } catch (error) {
-        pricingError = error instanceof Error ? error.message : "Pricing is not available for this date.";
+        pricingError = getSafeActionError(error, "Pricing is not available for this date.", "pricing.rate-card.failed", { facilityId: facility.id, dateKey });
         quotes.length = 0;
         break;
       }
