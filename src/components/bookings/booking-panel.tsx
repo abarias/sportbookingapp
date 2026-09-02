@@ -8,6 +8,7 @@ import { addToCartAction, type CartActionState } from "@/features/cart/actions";
 import { createBookingAction, type BookingActionState } from "@/features/bookings/actions";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatting/currency";
+import { createIdempotencyKey } from "@/lib/idempotency";
 import { minutesToTimeLabel } from "@/lib/time/slots";
 import type { DaySlot } from "@/server/bookings/core";
 import type { PriceCalculation, PriceSegment } from "@/server/pricing/types";
@@ -150,7 +151,7 @@ export function BookingPanel({
   const [selectionEnd, setSelectionEnd] = useState<number | null>(initialStartMinutes !== undefined && initialDurationMinutes !== undefined ? initialStartMinutes + initialDurationMinutes : null);
   const [state, action] = useActionState(addToCartAction, initialState);
   const [bookingState, bookingAction] = useActionState<BookingActionState, FormData>(createBookingAction, {});
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(createIdempotencyKey);
 
   const hourBlocks = useMemo(() => buildHourBlocks(slots, slotIntervalMinutes), [slotIntervalMinutes, slots]);
   const selectedBlocks = useMemo(

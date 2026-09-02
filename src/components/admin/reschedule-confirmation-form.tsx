@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { initiateRescheduleAction, type RescheduleActionState } from "@/features/rescheduling/actions";
 import { formatCurrency } from "@/lib/formatting/currency";
+import { createIdempotencyKey } from "@/lib/idempotency";
 
 function ConfirmButton() {
   const { pending } = useFormStatus();
@@ -20,7 +21,7 @@ export function RescheduleConfirmationForm(props: {
   canOverrideAdjustment: boolean;
 }) {
   const [state, action] = useActionState(initiateRescheduleAction, {} as RescheduleActionState);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(createIdempotencyKey);
 
   return (
     <form
