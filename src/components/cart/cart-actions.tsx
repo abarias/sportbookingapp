@@ -10,6 +10,7 @@ import {
   removeCartItemAction,
   type CartActionState
 } from "@/features/cart/actions";
+import { createIdempotencyKey } from "@/lib/idempotency";
 
 const initialState: CartActionState = {};
 
@@ -30,7 +31,7 @@ export function RemoveCartItemButton({ cartItemId }: { cartItemId: string }) {
 }
 
 export function CartSummaryActions({ canCheckout, hasPriceChanges }: { canCheckout: boolean; hasPriceChanges: boolean }) {
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(createIdempotencyKey);
   const [checkoutState, checkoutAction] = useActionState(checkoutCartAction, initialState);
   const [clearState, clearAction] = useActionState(clearCartAction, initialState);
   const [priceState, priceAction] = useActionState(acknowledgeCartPricesAction, initialState);
