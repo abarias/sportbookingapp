@@ -131,7 +131,7 @@ test.describe("release smoke", () => {
 
     const futureDate = new Date(Date.now() + 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     for (const page of [firstPage, secondPage]) {
-      await page.goto("/facilities/pickleball-court-2");
+      await page.goto("/facilities/pickleball-court-1");
       await page.getByLabel("Booking date").fill(futureDate);
       await page.getByRole("button", { name: "Check availability" }).click();
       await page.waitForURL(new RegExp(`date=${futureDate}`));
@@ -139,7 +139,7 @@ test.describe("release smoke", () => {
       page.once("dialog", (dialog) => dialog.accept());
       await page.getByRole("button", { name: "Add to cart" }).click();
       await expect(page).toHaveURL(/\/cart\?added=1/);
-      await expect(page.getByRole("heading", { name: "Pickleball Court 2" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Pickleball Court 1" })).toBeVisible();
     }
 
     firstPage.once("dialog", (dialog) => dialog.accept());
@@ -158,7 +158,7 @@ test.describe("release smoke", () => {
     await expect(winner).toHaveURL(/\/orders\/[^/]+\/payment/);
     await expect(loser).toHaveURL(/\/cart/);
     await expect(loser.getByText(/Checkout could not be completed|no longer available/i)).toBeVisible();
-    await expect(loser.getByRole("heading", { name: "Pickleball Court 2" })).toBeVisible();
+    await expect(loser.getByRole("heading", { name: "Pickleball Court 1" })).toBeVisible();
 
     const orderId = winner.url().match(/\/orders\/([^/]+)\/payment/)?.[1];
     expect(orderId).toBeTruthy();
