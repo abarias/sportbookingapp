@@ -1,16 +1,18 @@
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { PaymentStatus } from "@prisma/client";
-import { formatDistanceToNowStrict } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
 import { PaymentProofForm } from "@/components/bookings/payment-proof-form";
+import { PaymentHoldCountdown } from "@/components/bookings/payment-hold-countdown";
+import { CustomerBankTransferDetails } from "@/components/payments/customer-bank-transfer-details";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { getPaymentProofUrl } from "@/lib/storage/payment-proofs";
 import { parsePriceSnapshot } from "@/server/pricing/snapshot";
+import { expirePendingBookings } from "@/server/bookings/expiration";
 import { minutesToTimeLabel } from "@/lib/time/slots";
 import { formatDateTimeRange } from "@/lib/time/slots";
 
@@ -51,6 +53,7 @@ export default async function BookingPaymentPage({ params, searchParams }: Payme
 
   const { id } = await params;
   const query = await searchParams;
+  await expirePendingBookings({ batchSize: 100 });
   const booking = await prisma.booking.findFirst({
     where: {
       id,
@@ -79,20 +82,31 @@ export default async function BookingPaymentPage({ params, searchParams }: Payme
     (booking.payment.status === PaymentStatus.AWAITING_PAYMENT || booking.payment.status === PaymentStatus.ACTION_REQUIRED) && !isExpiredHold;
 
   return (
-    <main className="space-y-8 pb-16">
+    <main className="space-y-5 pb-16 sm:space-y-8">
       <SectionHeading
+        compact
         eyebrow="Payment"
-        title="Complete your reservation payment"
+        title="Complete your payment"
         description="Your slot is held while payment is pending. Staff confirmation is required before the booking is final."
       />
       {query.submitted === "1" ? <p aria-live="polite" className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">Payment proof submitted successfully. Staff will verify your payment before confirming the booking.</p> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <p className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-amber-100">Payment status: {getPaymentLabel(booking.payment.status)}</p>
+        {booking.paymentHoldExpiresAt && isAwaitingPayment && !isExpiredHold ? (
+          <PaymentHoldCountdown deadlineLabel={formatInTimeZone(booking.paymentHoldExpiresAt, booking.timezone, "h:mm a")} expiresAt={booking.paymentHoldExpiresAt.toISOString()} initialRemainingMs={booking.paymentHoldExpiresAt.getTime() - now.getTime()} />
+        ) : isExpiredHold ? (
+          <p className="rounded-2xl border border-rose-400/40 bg-rose-400/10 px-4 py-3 text-sm font-medium leading-6 text-rose-100">
+            This unpaid reservation hold has expired. Please create a new booking. If bank transfer has already been made, please contact MMG Stellar Admin.
+          </p>
+        ) : null}
+      </div>
 
-      <section className="space-y-6">
-        <div className="space-y-5 rounded-[1.75rem] border border-white/10 bg-white/5 p-6">
+      <section className="space-y-5 sm:space-y-6">
+        <CustomerBankTransferDetails amountMinor={booking.amountMinor} reference={booking.payment.providerReference ?? "Booking payment"} showStatus={false} statusLabel={getPaymentLabel(booking.payment.status)} />
+        <div className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-4 sm:space-y-5 sm:p-6">
           <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-amber-300">{getPaymentLabel(booking.payment.status)}</p>
-            <h1 className="mt-3 font-serif text-3xl text-white">{booking.facility.name}</h1>
-            <p className="mt-2 text-sm text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p>
+            <h1 className="mt-1 text-lg font-semibold text-white">{booking.facility.name}</h1>
+            <p className="mt-1 text-sm text-stone-300">{formatDateTimeRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}</p>
           </div>
           {priceSnapshot?.segments.length ? (
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
@@ -108,40 +122,12 @@ export default async function BookingPaymentPage({ params, searchParams }: Payme
               {priceSnapshot.holidayName ? <p className="mt-3 text-sm text-amber-200">Holiday pricing: {priceSnapshot.holidayName}</p> : null}
             </div>
           ) : null}
-          <div className="grid gap-3 text-sm text-stone-300 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
-              <p className="text-stone-500">Reference</p>
-              <p className="mt-1 text-lg font-semibold text-white">{booking.payment.providerReference}</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
-              <p className="text-stone-500">Amount due</p>
-              <p className="mt-1 text-lg font-semibold text-white">{formatCurrency(booking.amountMinor, "PHP")}</p>
-              <p className="text-xs text-stone-400">VAT-exclusive base amount</p>
-            </div>
-          </div>
-          {booking.paymentHoldExpiresAt && isAwaitingPayment && !isExpiredHold ? (
-            <p className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
-              Reserved for you for {formatDistanceToNowStrict(booking.paymentHoldExpiresAt)}. Submit payment proof before{" "}
-              {formatInTimeZone(booking.paymentHoldExpiresAt, booking.timezone, "h:mm a")}.
-            </p>
-          ) : null}
-          {isExpiredHold ? (
-            <p className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-100">
-              This unpaid reservation hold has expired. Please create a new booking. If payment has already been made, please contact MMG Stellar support.
-            </p>
-          ) : null}
           {booking.payment.reviewNote ? (
             <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
               <p className="font-medium text-white">Staff message</p>
               <p>{booking.payment.reviewNote}</p>
             </div>
           ) : null}
-          <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4 text-sm leading-7 text-stone-300">
-            <p className="font-medium text-white">Payment instructions</p>
-            <p>GCash: 0917 000 0000 - MMG Stellar</p>
-            <p>Bank transfer: BPI 0000-0000-00 - MMG Stellar</p>
-            <p>Include booking reference {booking.payment.providerReference} in the transfer remarks when possible.</p>
-          </div>
           {paymentProofUrl ? (
             <div className="rounded-2xl border border-white/10 bg-stone-950/40 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -171,7 +157,7 @@ export default async function BookingPaymentPage({ params, searchParams }: Payme
           ) : null}
         </div>
 
-        {canSubmitProof ? <PaymentProofForm bookingId={booking.id} /> : <section className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-stone-300"><h2 className="text-lg font-semibold text-white">Payment status</h2><p className="mt-2">{getPaymentLabel(booking.payment.status)}</p></section>}
+        {canSubmitProof ? <PaymentProofForm bookingId={booking.id} /> : null}
       </section>
     </main>
   );
