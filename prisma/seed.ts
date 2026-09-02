@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma, UserRole, FacilityType, BookingOrderStatus, BookingStatus, CartStatus, PaymentProvider, PaymentStatus, PricingBillingMode, PricingDayType } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { seedFaqs } from "./faq-content";
 
 const prisma = new PrismaClient();
 
@@ -178,6 +179,7 @@ async function main() {
   const customerPassword = process.env.SEED_CUSTOMER_PASSWORD ?? defaultCustomerPassword;
 
   assertSeedTargetIsSafe({ adminEmail, adminPassword, customerEmail, customerPassword });
+  await seedFaqs(prisma);
 
   const admin = await upsertUser({
     email: adminEmail,

@@ -83,6 +83,9 @@ jobs:
       - name: Run database concurrency smoke test
         run: npm run test:concurrency
 
+      - name: Verify FAQ database publishing and security
+        run: npm run test:faq:db
+
       - name: Install Chromium for browser tests
         run: npx playwright install --with-deps chromium
 
