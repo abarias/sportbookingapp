@@ -419,3 +419,7 @@ Administrators manage schedule overrides and the manual holiday calendar under `
 ## Architecture Notes
 
 See [docs/architecture.md](docs/architecture.md) for the MVP architecture, schema direction, and core tradeoffs.
+
+## Customer FAQ
+
+The public `/faq` page uses database-backed topics and questions from `FAQs.pdf`. Apply migrations with `npm run db:deploy`, then load the reviewed 9-topic/36-question content with `npm run db:seed:faq`. The import is safe to rerun and preserves later edits. See [FAQ architecture, security, content conventions, and tests](docs/faq.md) for publication/ordering controls and future admin-editor guidance.

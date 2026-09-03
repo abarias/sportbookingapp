@@ -13,6 +13,8 @@
     "db:validate": "prisma validate",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:faq": "tsx prisma/seed-faq.ts",
+    "test:faq:db": "tsx scripts/faq-integration.ts",
     "storage:check": "tsx scripts/verify-storage.ts",
     "test:concurrency": "tsx scripts/concurrency-smoke.ts",
     "admin:bootstrap": "tsx scripts/bootstrap-admin.ts",
