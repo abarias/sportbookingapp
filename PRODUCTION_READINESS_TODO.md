@@ -288,6 +288,18 @@ Areas that are reasonably mature for a controlled pilot include booking/payment 
   * **Estimated effort:** L
   * **Release blocker:** No
 
+* [ ] **IMPORTANT: Design a customer-safe payment-proof resubmission and dispute workflow**
+
+  * **Priority:** P1
+  * **Category:** Payment, Booking Integrity, Customer Support, UX
+  * **Evidence:** `PaymentStatus.ACTION_REQUIRED` and staff review notes already support requesting clearer or corrected proof, but there is no documented resubmission SLA, reminder flow, dispute case, or recovery policy for customers who may have already paid.
+  * **Problem:** A new-proof request can leave a customer uncertain about how long they have to respond. Automatically expiring the booking or rejecting the payment after an arbitrary deadline could create avoidable disputes, especially when the bank transfer succeeded but the uploaded evidence was unclear.
+  * **Recommended action:** Keep the original inventory hold deadline separate from proof remediation. If proof was submitted before the original hold expired, move the payment to `ACTION_REQUIRED` and do not silently forfeit the customer's payment claim because a replacement proof was not uploaded quickly. Show the exact staff reason, provide a resubmit action, send reminders, and route non-response to a visible support/reconciliation queue. If inventory must eventually be released, mark the booking/order as released-pending-payment-review rather than deleting the payment trail; after payment is verified, offer restoration to the original slot when available, an equivalent replacement slot, or a refund/escalation according to a published policy. Any hard deadline should be a clearly disclosed operational escalation deadline with reminders and a support override, not an automatic loss of a verified payment.
+  * **Acceptance criteria:** Customers see the request reason, submission history, next action, and support contact; reminders are retry-safe and auditable; original hold expiry and proof-remediation state are modeled independently; a late or corrected proof remains reviewable; staff can extend, restore, reassign, or refund with an audit trail; tests cover successful resubmission, no response, late proof after inventory release, duplicate proof, and payment verified after release.
+  * **Dependencies:** Customer-support policy, payment reconciliation procedure, notification system, and explicit decision on restoration/refund authority.
+  * **Estimated effort:** L
+  * **Release blocker:** No
+
 * [x] **Paginate and filter admin/customer queries**
 
   * **Completion evidence (2026-08-28):** Customer booking history, admin customers, admin users, audit logs, payment queue, and assignment histories use bounded pagination; major admin datasets include search and filtering.

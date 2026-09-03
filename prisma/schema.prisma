@@ -2,6 +2,36 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model FaqTopic {
+  id           String    @id @default(cuid())
+  title        String
+  slug         String    @unique
+  description  String?
+  displayOrder Int       @default(0)
+  isPublished  Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  items        FaqItem[]
+
+  @@index([isPublished, displayOrder, slug])
+}
+
+model FaqItem {
+  id           String   @id @default(cuid())
+  topicId      String
+  slug         String
+  question     String
+  answer       Json
+  displayOrder Int      @default(0)
+  isPublished  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  topic        FaqTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, slug])
+  @@index([topicId, isPublished, displayOrder, slug])
+}
+
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")

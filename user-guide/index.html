@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Official MMG Stellar booking platform user guide" />
+    <title>MMG Stellar Booking Platform Guide</title>
+    <link rel="icon" href="assets/MMG_STELLAR_favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to guide content</a>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="MMG Stellar user guide home">
+        <img src="assets/MMG_STELLAR_logo.png" alt="MMG Stellar" />
+        <span><strong>Booking Platform</strong><small>Official user guide</small></span>
+      </a>
+      <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav id="site-nav" aria-label="Guide navigation">
+        <a href="#getting-started">Start here</a>
+        <a href="#personas">Personas</a>
+        <a href="#scenarios">Scenarios</a>
+        <a href="#support">Help</a>
+      </nav>
+    </header>
+    <main id="main-content"></main>
+    <footer>
+      <p><strong>MMG Stellar Booking Platform</strong> · Official user guide</p>
+      <p>This guide describes the implemented platform as of <span id="guide-version"></span>. Access may vary when a Super Admin changes role permissions.</p>
+    </footer>
+    <dialog id="image-dialog" aria-label="Screenshot preview">
+      <button type="button" class="dialog-close" aria-label="Close screenshot">Close</button>
+      <img alt="" />
+      <p></p>
+    </dialog>
+    <script src="data/content.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -6,6 +6,7 @@ import { getSecurityHeaders } from "./src/lib/security/headers";
 assertServerEnvironment();
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.68.108"],
   async headers() {
     return [{
       source: "/:path*",

@@ -79,7 +79,11 @@ test.describe("release smoke", () => {
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: /Book now/i }).click();
     await expect(page).toHaveURL(/\/bookings\/[^/]+\/payment/);
-    await expect(page.getByText(/payment/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Complete your payment" })).toBeVisible();
+    await expect(page.getByText("Pay by bank transfer", { exact: true })).toBeVisible();
+    await expect(page.locator('input[name="method"]')).toHaveValue("manual_bank_transfer");
+    await expect(page.getByText("Payment status: Reserved - Awaiting Payment", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Reserved for you for \d+m \d{2}s\. Submit proof before/)).toBeVisible();
   });
 
   test("customer can add another facility schedule to the cart", async ({ page }) => {
@@ -103,6 +107,13 @@ test.describe("release smoke", () => {
     await page.getByRole("button", { name: "Confirm consolidated checkout" }).click();
     await expect(page).toHaveURL(/\/orders\/[^/]+\/payment\?created=1/);
     await expect(page.getByText(/Checkout completed/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Complete one payment for every schedule." })).toBeVisible();
+    await expect(page.getByText("Pay by bank transfer", { exact: true })).toBeVisible();
+    await expect(page.locator('input[name="method"]')).toHaveValue("manual_bank_transfer");
+    await expect(page.getByText("Payment status: Reserved - Awaiting Consolidated Payment", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Reserved for you for \d+m \d{2}s\. Submit proof before/)).toBeVisible();
+    await expect(page.getByText("Order reference", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Consolidated amount due", { exact: true })).toHaveCount(0);
 
     await page.locator('input[name="externalReference"]').fill(`UAT-${Date.now()}`);
     await page.locator('input[name="proofImage"]').setInputFiles(path.resolve("public/MMG_STELLAR_logo.png"));
@@ -131,7 +142,7 @@ test.describe("release smoke", () => {
 
     const futureDate = new Date(Date.now() + 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     for (const page of [firstPage, secondPage]) {
-      await page.goto("/facilities/pickleball-court-2");
+      await page.goto("/facilities/pickleball-court-1");
       await page.getByLabel("Booking date").fill(futureDate);
       await page.getByRole("button", { name: "Check availability" }).click();
       await page.waitForURL(new RegExp(`date=${futureDate}`));
@@ -139,7 +150,7 @@ test.describe("release smoke", () => {
       page.once("dialog", (dialog) => dialog.accept());
       await page.getByRole("button", { name: "Add to cart" }).click();
       await expect(page).toHaveURL(/\/cart\?added=1/);
-      await expect(page.getByRole("heading", { name: "Pickleball Court 2" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Pickleball Court 1" })).toBeVisible();
     }
 
     firstPage.once("dialog", (dialog) => dialog.accept());
@@ -158,12 +169,18 @@ test.describe("release smoke", () => {
     await expect(winner).toHaveURL(/\/orders\/[^/]+\/payment/);
     await expect(loser).toHaveURL(/\/cart/);
     await expect(loser.getByText(/Checkout could not be completed|no longer available/i)).toBeVisible();
-    await expect(loser.getByRole("heading", { name: "Pickleball Court 2" })).toBeVisible();
+    await expect(loser.getByRole("heading", { name: "Pickleball Court 1" })).toBeVisible();
 
     const orderId = winner.url().match(/\/orders\/([^/]+)\/payment/)?.[1];
     expect(orderId).toBeTruthy();
     const orderReference = (await winner.getByRole("heading", { name: /^Order / }).textContent())?.replace(/^Order\s+/, "").trim();
     expect(orderReference).toBeTruthy();
+    await expect(winner.getByText("Pay by bank transfer", { exact: true })).toBeVisible();
+    await expect(winner.locator('input[name="method"]')).toHaveValue("manual_bank_transfer");
+    await expect(winner.getByText("Payment status: Reserved - Awaiting Consolidated Payment", { exact: true })).toBeVisible();
+    await expect(winner.getByText(/Reserved for you for \d+m \d{2}s\. Submit proof before/)).toBeVisible();
+    await expect(winner.getByText("Order reference", { exact: true })).toHaveCount(0);
+    await expect(winner.getByText("Consolidated amount due", { exact: true })).toHaveCount(0);
     const proofReference = `UAT-CART-CONFLICT-${Date.now()}`;
     await winner.locator('input[name="externalReference"]').fill(proofReference);
     await winner.locator('input[name="proofImage"]').setInputFiles(path.resolve("public/MMG_STELLAR_logo.png"));
@@ -199,7 +216,7 @@ test.describe("release smoke", () => {
     await signIn(page, customer);
     await page.goto("/orders/seed-expired-order/payment");
 
-    await expect(page.getByText("Order Expired", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Payment status: Order Expired", { exact: true })).toBeVisible();
     await expect(page.getByText(/This consolidated hold expired and all included schedules were released/i)).toBeVisible();
     await expect(page.getByRole("button", { name: "Submit consolidated proof" })).toHaveCount(0);
 
@@ -283,7 +300,7 @@ test.describe("release smoke", () => {
     await expect(adminPage.getByText(/Payment rejected successfully/i)).toBeVisible();
 
     await customerPage.goto(`/bookings/${bookingId}/payment`);
-    await expect(customerPage.getByText("Payment Rejected", { exact: true }).first()).toBeVisible();
+    await expect(customerPage.getByText("Payment status: Payment Rejected", { exact: true })).toBeVisible();
     await expect(customerPage.getByText(rejectionReason, { exact: true })).toBeVisible();
     await expect(customerPage.getByRole("button", { name: "Submit proof for verification" })).toHaveCount(0);
 
@@ -384,7 +401,7 @@ test.describe("release smoke", () => {
     await expect(customerPage).toHaveURL(new RegExp(`/bookings/${bookingId}/payment`));
 
     await customerPage.goto(`/bookings/${bookingId}/payment`);
-    await expect(customerPage.getByText("Payment Needs Attention", { exact: true })).toBeVisible();
+    await expect(customerPage.getByText("Payment status: Payment Needs Attention", { exact: true })).toBeVisible();
     await expect(customerPage.getByText(/clearer receipt that shows the transfer reference/i)).toBeVisible();
     const replacementReference = `UAT-RESUBMIT-${Date.now()}`;
     await customerPage.locator('input[name="externalReference"]').fill(replacementReference);
@@ -568,7 +585,21 @@ test.describe("release smoke", () => {
     await adminPage.goto(`/admin/bookings/${bookingId}`);
     await adminPage.getByLabel("Replacement facility").selectOption({ label: "Center Court" });
     await adminPage.waitForURL(/facilityId=.*date=/);
-    const replacementSlot = adminPage.locator("#replacement-slots a").filter({ hasText: "Available" }).first();
+    const replacementFacilityId = await adminPage.getByLabel("Replacement facility").inputValue();
+    let replacementSlot = adminPage.locator("#replacement-slots a").filter({ hasText: "Available" }).first();
+    let replacementDate: string | null = null;
+    for (let offset = 30; offset < 75; offset += 1) {
+      const candidateDate = new Date(Date.now() + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      await adminPage.getByLabel("Replacement date").fill(candidateDate);
+      await adminPage.getByRole("button", { name: "Check availability" }).click();
+      await adminPage.waitForURL(new RegExp(`facilityId=${escapeRegExp(replacementFacilityId)}&date=${candidateDate}`));
+      replacementSlot = adminPage.locator("#replacement-slots a").filter({ hasText: "Available" }).first();
+      if (await replacementSlot.count()) {
+        replacementDate = candidateDate;
+        break;
+      }
+    }
+    expect(replacementDate).toBeTruthy();
     await expect(replacementSlot).toBeVisible();
     await replacementSlot.click();
     await expect(adminPage.getByRole("heading", { name: "Document why this booking is moving" })).toBeVisible();
@@ -655,7 +686,7 @@ test.describe("release smoke", () => {
     await signIn(page, customer);
     await page.goto("/bookings/seed-pending-booking/payment");
 
-    await expect(page.getByText("Reservation Expired", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Payment status: Reservation Expired", { exact: true })).toBeVisible();
     await expect(page.getByText(/This unpaid reservation hold has expired/i)).toBeVisible();
     await expect(page.getByRole("button", { name: "Submit proof for verification" })).toHaveCount(0);
   });
