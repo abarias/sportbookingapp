@@ -12,7 +12,36 @@ export function RateCard({ rows, compact = false }: { rows: RateCardRow[]; compa
       {rows.length === 0 ? (
         <p className="p-5 text-sm text-stone-400">A public rate card is not currently available. Contact the facility before booking.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <div className="divide-y divide-white/10 lg:hidden">
+            {rows.map((row) => (
+              <article className="space-y-3 p-5" key={row.key}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-medium text-white">{row.applicableDays}</h3>
+                    {row.effectiveLabel ? <p className="mt-1 text-xs text-amber-200">{row.effectiveLabel}</p> : null}
+                  </div>
+                  <p className="shrink-0 text-right font-semibold text-white">
+                    {formatCurrency(row.amountMinor, "PHP")}
+                    <span className="block text-xs font-normal text-stone-400">{row.unitLabel}</span>
+                  </p>
+                </div>
+                <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs uppercase tracking-[0.14em] text-stone-500">Time</dt>
+                    <dd className="mt-1 text-stone-300">{row.timeLabel}</dd>
+                  </div>
+                  {!compact ? (
+                    <div>
+                      <dt className="text-xs uppercase tracking-[0.14em] text-stone-500">Rate</dt>
+                      <dd className="mt-1 text-stone-300">{row.rateLabel}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto lg:block">
           <table className="w-full min-w-[620px] text-left text-sm">
             <thead className="bg-white/5 text-xs uppercase tracking-[0.14em] text-stone-400">
               <tr>
@@ -39,7 +68,8 @@ export function RateCard({ rows, compact = false }: { rows: RateCardRow[]; compa
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
       <p className="border-t border-white/10 p-4 text-xs leading-5 text-stone-400">Final base price depends on the selected date, time, and duration.</p>
     </section>

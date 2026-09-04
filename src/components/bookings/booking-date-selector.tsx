@@ -1,13 +1,14 @@
 "use client";
 
 import { CalendarDays } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type BookingDateSelectorProps = {
   dateKey: string;
   minDateKey: string;
   maxDateKey: string;
   replaceCartItemId?: string;
+  focusTargetId?: string;
 };
 
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -19,8 +20,26 @@ function formatDateValue(dateKey: string) {
   return monthLabel && day ? `${monthLabel} ${Number(day)}, ${year}` : dateKey;
 }
 
-export function BookingDateSelector({ dateKey, minDateKey, maxDateKey, replaceCartItemId }: BookingDateSelectorProps) {
+export function BookingDateSelector({ dateKey, minDateKey, maxDateKey, replaceCartItemId, focusTargetId }: BookingDateSelectorProps) {
   const [selectedDate, setSelectedDate] = useState(dateKey);
+
+  useEffect(() => {
+    if (!focusTargetId || typeof window === "undefined" || !window.matchMedia("(max-width: 1023px)").matches) {
+      return;
+    }
+
+    const target = document.getElementById(focusTargetId);
+    if (!target) {
+      return;
+    }
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const frame = window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [dateKey, focusTargetId]);
 
   return (
     <form className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-end">

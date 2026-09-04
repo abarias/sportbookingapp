@@ -31,7 +31,7 @@ type HourBlock = {
   startMinutes: number;
   endMinutes: number;
   isAvailable: boolean;
-  reason: "AVAILABLE" | "BOOKED" | "BLOCKED";
+  reason: "AVAILABLE" | "BOOKED" | "BLOCKED" | "CURRENT";
 };
 
 const initialState: CartActionState = {};
@@ -76,7 +76,7 @@ function buildHourBlocks(slots: DaySlot[], slotIntervalMinutes: number) {
     }
 
     const isAvailable = candidateSlots.every((slot) => slot.isAvailable);
-    const reason = isAvailable ? "AVAILABLE" : candidateSlots.some((slot) => slot.reason === "BOOKED") ? "BOOKED" : "BLOCKED";
+    const reason = isAvailable ? "AVAILABLE" : candidateSlots.some((slot) => slot.reason === "CURRENT") ? "CURRENT" : candidateSlots.some((slot) => slot.reason === "BOOKED") ? "BOOKED" : "BLOCKED";
 
     blocks.push({
       startMinutes: firstSlot.startMinutes,
@@ -129,6 +129,10 @@ function getSlotTone(block: HourBlock, isSelected: boolean) {
 
   if (block.reason === "BOOKED") {
     return "cursor-not-allowed border-rose-300/50 bg-rose-500/20 text-rose-100 opacity-80";
+  }
+
+  if (block.reason === "CURRENT") {
+    return "cursor-not-allowed border-sky-300/60 bg-sky-400/20 text-sky-50 opacity-90";
   }
 
   return "cursor-not-allowed border-rose-300/50 bg-rose-500/20 text-rose-100 opacity-80";
@@ -231,14 +235,14 @@ export function BookingPanel({
   }
 
   return (
-    <div className="w-full max-w-full min-w-0 overflow-hidden rounded-[2rem] border border-amber-300/25 bg-stone-950/70 shadow-[0_24px_90px_rgba(251,191,36,0.10)]">
+    <div className="scroll-mt-24 w-full max-w-full min-w-0 overflow-hidden rounded-[2rem] border border-amber-300/25 bg-stone-950/70 shadow-[0_24px_90px_rgba(251,191,36,0.10)]" id="book-this-facility">
       <div className="border-b border-white/10 bg-amber-300/10 p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm uppercase tracking-[0.22em] text-amber-200">Book this facility</p>
             <h2 className="mt-2 font-serif text-3xl text-white">Choose hourly slots</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-300">
-              Select one or more consecutive available hourly slots for {dateLabel}. Adding a schedule to your cart does not reserve it; availability is confirmed at checkout.
+              Select one or more consecutive available hourly slots for {dateLabel}. Click Book now to immediately book this facility. Click Add to cart to book multiple facilities. Adding a schedule to your cart does not reserve it; availability is confirmed at checkout.
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-stone-950/60 px-4 py-3 text-sm text-stone-300">
@@ -252,6 +256,7 @@ export function BookingPanel({
         <div className="flex min-w-0 flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-stone-400">
           <span className="rounded-full bg-emerald-400/25 px-3 py-1 text-emerald-100">Available</span>
           <span className="rounded-full bg-amber-300 px-3 py-1 text-stone-950">Selected</span>
+          <span className="rounded-full bg-sky-400/25 px-3 py-1 text-sky-100">Current booking</span>
           <span className="rounded-full bg-rose-400/25 px-3 py-1 text-rose-100">Booked</span>
         </div>
 
@@ -266,7 +271,7 @@ export function BookingPanel({
               const quote = priceQuotes.find((item) => item.segments[0]?.startMinutes === block.startMinutes);
               const isBookable = block.isAvailable && Boolean(quote);
               const displayBlock = isBookable ? block : block.isAvailable ? { ...block, isAvailable: false, reason: "BLOCKED" as const } : block;
-              const label = block.isAvailable && !quote ? "Pricing unavailable" : block.reason === "AVAILABLE" ? "Available" : "Booked";
+              const label = block.isAvailable && !quote ? "Pricing unavailable" : block.reason === "AVAILABLE" ? "Available" : block.reason === "CURRENT" ? "Current booking" : "Booked";
 
               return (
                 <button
