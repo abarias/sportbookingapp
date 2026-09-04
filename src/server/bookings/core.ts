@@ -7,13 +7,13 @@ export type DaySlot = {
   startMinutes: number;
   endMinutes: number;
   isAvailable: boolean;
-  reason: "AVAILABLE" | "BOOKED" | "BLOCKED";
+  reason: "AVAILABLE" | "BOOKED" | "BLOCKED" | "CURRENT";
 };
 
 type BuildDaySlotsArgs = {
   openingRange: MinuteInterval;
   slotIntervalMinutes: number;
-  busyIntervals: Array<MinuteInterval & { reason: "BOOKED" | "BLOCKED" }>;
+  busyIntervals: Array<MinuteInterval & { reason: "BOOKED" | "BLOCKED" | "CURRENT" }>;
 };
 
 export function rangesOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {

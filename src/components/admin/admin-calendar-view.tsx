@@ -17,7 +17,7 @@ type DaySchedule = {
     startMinutes: number;
     endMinutes: number;
     isAvailable: boolean;
-    reason: "AVAILABLE" | "BOOKED" | "BLOCKED";
+    reason: "AVAILABLE" | "BOOKED" | "BLOCKED" | "CURRENT";
   }>;
   bookings: Array<{
     id: string;
