@@ -42,7 +42,7 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
   const editStartMinutes = Number.isInteger(requestedStart) && requestedStart >= 0 && requestedStart < 1440 && requestedStart % 60 === 0 ? requestedStart : undefined;
   const editDurationMinutes = Number.isInteger(requestedDuration) && requestedDuration >= 60 && requestedDuration <= 240 && requestedDuration % 60 === 0 ? requestedDuration : undefined;
   const dateKey = normalizeDateKeyWithinBookingWindow(query.date, facility.timezone);
-  const availability = await getFacilityDayAvailability(facility, dateKey);
+  const availability = await getFacilityDayAvailability(facility, dateKey, { currentUserId: session?.user?.id });
   const pricingView = await getFacilityPricingView(facility, dateKey);
   const primaryPrice = facility.pricingRules.find((rule) => rule.dayType === "DEFAULT");
 
@@ -61,18 +61,23 @@ export default async function FacilityDetailPage({ params, searchParams }: Facil
                   {primaryPrice ? `Base rates from ${formatCurrency(primaryPrice.amountMinor, "PHP")} per hour · VAT exclusive · 1-hour minimum` : "Pricing is temporarily unavailable"}
                 </p>
               </div>
-              <p className="rounded-full bg-amber-300/15 px-4 py-2 text-sm font-medium text-amber-100">
-                Select hourly slots below
-              </p>
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 sm:p-6">
-            <BookingDateSelector dateKey={dateKey} maxDateKey={bookingWindow.maxDateKey} minDateKey={bookingWindow.minDateKey} replaceCartItemId={query.replaceCartItem} />
-            <p className="mt-4 text-sm text-stone-400">
-              Showing hourly booking slots for {dateLabel} in {facility.timezone}. Bookings are open through {formatDateLabel(bookingWindow.maxDateKey, facility.timezone)}.
-            </p>
-          </div>
+          {session?.user ? (
+            <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 sm:p-6">
+              <BookingDateSelector
+                dateKey={dateKey}
+                focusTargetId={query.date ? "book-this-facility" : undefined}
+                maxDateKey={bookingWindow.maxDateKey}
+                minDateKey={bookingWindow.minDateKey}
+                replaceCartItemId={query.replaceCartItem}
+              />
+              <p className="mt-4 text-sm text-stone-400">
+                Showing hourly booking slots for {dateLabel} in {facility.timezone}. Bookings are open through {formatDateLabel(bookingWindow.maxDateKey, facility.timezone)}.
+              </p>
+            </div>
+          ) : null}
 
           <BookingPanel
             dateKey={dateKey}
