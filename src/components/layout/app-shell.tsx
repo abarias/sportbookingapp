@@ -26,7 +26,7 @@ export async function AppShell({ children }: AppShellProps) {
     { href: "/facilities", label: "Facilities" },
     { href: "/faq", label: "FAQs" },
     ...(session?.user?.role === "CUSTOMER" ? [{ href: "/cart", label: `Cart (${cartCount})` }] : []),
-    { href: "/bookings", label: "My Bookings" },
+    ...(session?.user ? [{ href: "/bookings", label: "My Bookings" }] : []),
     ...(canOpenAccount ? [{ href: "/account", label: "My Account", showBadge: session?.user?.role === "CUSTOMER" && hasAccountNotifications }] : [])
   ];
   const adminItems = authorization ? visibleAdminNavigation(authorization.permissions) : [];

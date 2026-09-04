@@ -123,6 +123,10 @@ export function activeBookingWhere(now: Date): Prisma.BookingWhereInput {
   };
 }
 
+function isCustomerOwnedPayment(status: PaymentStatus | null | undefined) {
+  return status === PaymentStatus.SUBMITTED || status === PaymentStatus.ACTION_REQUIRED || status === PaymentStatus.VERIFIED || status === PaymentStatus.PAID;
+}
+
 function findActiveReplacementHolds(
   tx: Prisma.TransactionClient,
   input: { facilityId: string; startAtUtc: Date; endAtUtc: Date; now: Date }
@@ -286,7 +290,7 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
     closesAtMinutes: number;
     isClosed: boolean;
   }>;
-}, dateKey: string, options: { excludeBookingId?: string } = {}): Promise<FacilityDayAvailability> {
+}, dateKey: string, options: { excludeBookingId?: string; currentUserId?: string } = {}): Promise<FacilityDayAvailability> {
   const openingRange = getDailyOpeningRange(facility, dateKey);
 
   if (!openingRange) {
@@ -318,8 +322,11 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
         }
       },
       select: {
+        userId: true,
         startAtUtc: true,
-        endAtUtc: true
+        endAtUtc: true,
+        payment: { select: { status: true } },
+        bookingOrder: { select: { payment: { select: { status: true } } } }
       }
     }),
     prisma.bookingReschedule.findMany({
@@ -356,11 +363,15 @@ export async function getFacilityDayAvailability(facility: Pick<Facility, "id" |
   ]);
 
   const busyIntervals = [
-    ...bookings.map((booking) => ({
-      startMinutes: getLocalMinutesForDate(booking.startAtUtc, dateKey, facility.timezone),
-      endMinutes: getLocalMinutesForDate(booking.endAtUtc, dateKey, facility.timezone),
-      reason: "BOOKED" as const
-    })),
+    ...bookings.map((booking) => {
+      const isCurrentBooking = options.currentUserId === booking.userId && (isCustomerOwnedPayment(booking.payment?.status) || isCustomerOwnedPayment(booking.bookingOrder?.payment?.status));
+
+      return {
+        startMinutes: getLocalMinutesForDate(booking.startAtUtc, dateKey, facility.timezone),
+        endMinutes: getLocalMinutesForDate(booking.endAtUtc, dateKey, facility.timezone),
+        reason: isCurrentBooking ? "CURRENT" as const : "BOOKED" as const
+      };
+    }),
     ...replacementHolds.map((hold) => ({
       startMinutes: getLocalMinutesForDate(hold.replacementStartAtUtc, dateKey, facility.timezone),
       endMinutes: getLocalMinutesForDate(hold.replacementEndAtUtc, dateKey, facility.timezone),
