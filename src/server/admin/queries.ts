@@ -1,5 +1,5 @@
 import { BookingStatus, PaymentStatus } from "@prisma/client";
-import { subDays } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import { prisma } from "@/lib/db/prisma";
 
@@ -170,35 +170,115 @@ export async function getAdminCustomersData() {
 }
 
 export async function getAdminReportsData() {
-  const reportStart = subDays(new Date(), 30);
+  const now = new Date();
+  const reportEndDate = formatInTimeZone(now, "Asia/Manila", "yyyy-MM-dd");
+  const reportStartDate = formatInTimeZone(
+    new Date(`${reportEndDate}T00:00:00.000Z`).getTime() - 29 * 24 * 60 * 60 * 1000,
+    "UTC",
+    "yyyy-MM-dd"
+  );
+  const reportEndDateExclusive = new Date(`${reportEndDate}T00:00:00.000Z`);
+  reportEndDateExclusive.setUTCDate(reportEndDateExclusive.getUTCDate() + 1);
+  const reportEndDateExclusiveKey = reportEndDateExclusive.toISOString().slice(0, 10);
+  const reportStart = fromZonedTime(`${reportStartDate}T00:00:00`, "Asia/Manila");
+  const reportEnd = fromZonedTime(`${reportEndDateExclusiveKey}T00:00:00`, "Asia/Manila");
+  const dateKeys = Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(`${reportStartDate}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + index);
+    return date.toISOString().slice(0, 10);
+  });
 
   const [bookings, facilities] = await Promise.all([
     prisma.booking.findMany({
       where: {
         startAtUtc: {
-          gte: reportStart
+          gte: reportStart,
+          lt: reportEnd
         }
       },
       include: {
-        facility: {
-          include: {
-            operatingHours: true
-          }
-        },
         payment: true
       }
     }),
     prisma.facility.findMany({
       where: { isEnabled: true },
       include: {
-        operatingHours: true
+        operatingHours: true,
+        blockedSchedules: {
+          where: {
+            startAtUtc: { lt: reportEnd },
+            endAtUtc: { gt: reportStart }
+          },
+          select: { startAtUtc: true, endAtUtc: true }
+        }
       }
     })
   ]);
 
+  const utilization = facilities.map((facility) => {
+    let bookableMilliseconds = 0;
+    let bookedMilliseconds = 0;
+    const facilityBookings = bookings.filter((booking) => booking.facilityId === facility.id && booking.status === BookingStatus.CONFIRMED);
+
+    for (const dateKey of dateKeys) {
+      const weekday = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
+      const schedule = facility.operatingHours.find((hours) => hours.dayOfWeek === weekday && !hours.isClosed);
+      if (!schedule || schedule.closesAtMinutes <= schedule.opensAtMinutes) continue;
+
+      const startOfDate = new Date(`${dateKey}T00:00:00.000Z`);
+      const toLocalInstant = (minutes: number) => {
+        const localDateTime = new Date(startOfDate);
+        localDateTime.setUTCMinutes(minutes);
+        return fromZonedTime(`${localDateTime.toISOString().slice(0, 16)}:00`, facility.timezone);
+      };
+      const openStart = toLocalInstant(schedule.opensAtMinutes).getTime();
+      const openEnd = toLocalInstant(schedule.closesAtMinutes).getTime();
+      const blocked = facility.blockedSchedules
+        .map((block) => ({
+          start: Math.max(block.startAtUtc.getTime(), openStart),
+          end: Math.min(block.endAtUtc.getTime(), openEnd)
+        }))
+        .filter((range) => range.start < range.end)
+        .sort((left, right) => left.start - right.start);
+      let blockedMilliseconds = 0;
+      let mergedBlock: { start: number; end: number } | null = null;
+
+      for (const range of blocked) {
+        if (!mergedBlock) {
+          mergedBlock = { ...range };
+        } else if (range.start <= mergedBlock.end) {
+          mergedBlock.end = Math.max(mergedBlock.end, range.end);
+        } else {
+          blockedMilliseconds += mergedBlock.end - mergedBlock.start;
+          mergedBlock = { ...range };
+        }
+      }
+      if (mergedBlock) blockedMilliseconds += mergedBlock.end - mergedBlock.start;
+
+      bookableMilliseconds += Math.max(0, openEnd - openStart - blockedMilliseconds);
+      for (const booking of facilityBookings) {
+        bookedMilliseconds += Math.max(
+          0,
+          Math.min(booking.endAtUtc.getTime(), openEnd) - Math.max(booking.startAtUtc.getTime(), openStart)
+        );
+      }
+    }
+
+    const bookedMinutes = bookedMilliseconds / 60_000;
+    return {
+      facilityId: facility.id,
+      name: facility.name,
+      bookableMinutes: bookableMilliseconds / 60_000,
+      bookedMinutes,
+      rate: bookableMilliseconds > 0 ? (bookedMilliseconds / bookableMilliseconds) * 100 : 0
+    };
+  });
+
   return {
     bookings,
     facilities,
-    reportStart
+    reportStart,
+    reportEnd: new Date(reportEnd.getTime() - 1),
+    utilization
   };
 }
