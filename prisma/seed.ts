@@ -1,5 +1,6 @@
-import { PrismaClient, Prisma, UserRole, FacilityType, BookingStatus, PaymentProvider, PaymentStatus, PricingBillingMode } from "@prisma/client";
+import { PrismaClient, Prisma, UserRole, FacilityType, BookingOrderStatus, BookingStatus, CartStatus, PaymentProvider, PaymentStatus, PricingBillingMode, PricingDayType } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { seedFaqs } from "./faq-content";
 
 const prisma = new PrismaClient();
 
@@ -8,6 +9,13 @@ const defaultAdminEmail = "admin@sportbooking.local";
 const defaultAdminPassword = "Admin12345!";
 const defaultCustomerEmail = "player@sportbooking.local";
 const defaultCustomerPassword = "Player12345!";
+const concurrencyCustomerEmail = "player-two@sportbooking.local";
+const concurrencyCustomerPassword = "Player12345!";
+const localStaffAccounts = [
+  { email: "receptionist@sportbooking.local", password: "Receptionist12345!", fullName: "Sample Receptionist", phone: "+639181112224", systemRoleKey: "RECEPTIONIST" },
+  { email: "booking-admin@sportbooking.local", password: "BookingAdmin12345!", fullName: "Sample Booking Admin", phone: "+639181112225", systemRoleKey: "BOOKING_ADMIN" },
+  { email: "social-media@sportbooking.local", password: "SocialMedia12345!", fullName: "Sample Social Media", phone: "+639181112226", systemRoleKey: "SOCIAL_MEDIA" }
+] as const;
 const defaultOperatingHours = [
   { dayOfWeek: 0, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
   { dayOfWeek: 1, opensAtMinutes: 8 * 60, closesAtMinutes: 22 * 60, isClosed: false },
@@ -171,6 +179,7 @@ async function main() {
   const customerPassword = process.env.SEED_CUSTOMER_PASSWORD ?? defaultCustomerPassword;
 
   assertSeedTargetIsSafe({ adminEmail, adminPassword, customerEmail, customerPassword });
+  await seedFaqs(prisma);
 
   const admin = await upsertUser({
     email: adminEmail,
@@ -182,6 +191,15 @@ async function main() {
     role: UserRole.ADMIN
   });
 
+  await prisma.user.update({ where: { id: admin.id }, data: { adminAccessActive: true } });
+  const superAdminRole = await prisma.role.findUnique({ where: { systemKey: "SUPER_ADMIN" }, select: { id: true } });
+  if (!superAdminRole) throw new Error("RBAC migration is not deployed: Super Admin role is missing.");
+  await prisma.userRoleAssignment.upsert({
+    where: { userId_roleId: { userId: admin.id, roleId: superAdminRole.id } },
+    update: {},
+    create: { userId: admin.id, roleId: superAdminRole.id, assignedByUserId: admin.id }
+  });
+
   const customer = await upsertUser({
     email: customerEmail,
     password: customerPassword,
@@ -191,6 +209,38 @@ async function main() {
     phoneVerifiedAt: new Date(),
     role: UserRole.CUSTOMER
   });
+
+  if (isLocalDatabaseUrl(process.env.DATABASE_URL)) {
+    await upsertUser({
+      email: concurrencyCustomerEmail,
+      password: concurrencyCustomerPassword,
+      fullName: "Sample Player Two",
+      phone: "+639181112223",
+      emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
+      role: UserRole.CUSTOMER
+    });
+
+    for (const account of localStaffAccounts) {
+      const staffUser = await upsertUser({
+        email: account.email,
+        password: account.password,
+        fullName: account.fullName,
+        phone: account.phone,
+        emailVerifiedAt: new Date(),
+        phoneVerifiedAt: new Date(),
+        role: UserRole.ADMIN
+      });
+      const role = await prisma.role.findUnique({ where: { systemKey: account.systemRoleKey }, select: { id: true } });
+      if (!role) throw new Error(`RBAC migration is not deployed: ${account.systemRoleKey} role is missing.`);
+      await prisma.user.update({ where: { id: staffUser.id }, data: { adminAccessActive: true } });
+      await prisma.userRoleAssignment.upsert({
+        where: { userId_roleId: { userId: staffUser.id, roleId: role.id } },
+        update: {},
+        create: { userId: staffUser.id, roleId: role.id, assignedByUserId: admin.id }
+      });
+    }
+  }
 
   const facilityRecords = await Promise.all(
     facilities.map(async (facility) =>
@@ -219,11 +269,16 @@ async function main() {
             deleteMany: {},
             create: [
               {
+                name: "Default rate",
+                customerLabel: "Standard base rate",
+                dayType: PricingDayType.DEFAULT,
                 currency: "PHP",
                 amountMinor: facility.priceMinor,
                 billingMode: PricingBillingMode.PER_HOUR,
                 minimumMinutes: 60,
-                isActive: true
+                isActive: true,
+                createdByUserId: admin.id,
+                updatedByUserId: admin.id
               }
             ]
           }
@@ -249,11 +304,16 @@ async function main() {
           pricingRules: {
             create: [
               {
+                name: "Default rate",
+                customerLabel: "Standard base rate",
+                dayType: PricingDayType.DEFAULT,
                 currency: "PHP",
                 amountMinor: facility.priceMinor,
                 billingMode: PricingBillingMode.PER_HOUR,
                 minimumMinutes: 60,
-                isActive: true
+                isActive: true,
+                createdByUserId: admin.id,
+                updatedByUserId: admin.id
               }
             ]
           }
@@ -268,6 +328,130 @@ async function main() {
   if (!centerCourt || !pickleballCourt) {
     throw new Error("Seed facilities were not created correctly.");
   }
+
+  if (isLocalDatabaseUrl(process.env.DATABASE_URL)) {
+    const expiredOrderCart = await prisma.cart.upsert({
+      where: { id: "seed-expired-order-cart" },
+      update: { userId: customer.id, status: CartStatus.CHECKED_OUT, currency: "PHP", expiresAt: null },
+      create: { id: "seed-expired-order-cart", userId: customer.id, status: CartStatus.CHECKED_OUT, currency: "PHP", expiresAt: null }
+    });
+    const expiredOrder = await prisma.bookingOrder.upsert({
+      where: { id: "seed-expired-order" },
+      update: {
+        userId: customer.id,
+        cartId: expiredOrderCart.id,
+        reference: "PG-OR-EXPIRED-UAT",
+        status: BookingOrderStatus.PENDING_PAYMENT,
+        currency: "PHP",
+        vatTreatment: "VAT_EXCLUSIVE",
+        baseAmountMinor: 90000,
+        amountPaidMinor: null,
+        outstandingAmountMinor: 90000,
+        checkoutSnapshot: { version: 1, source: "seed", baseAmountMinor: 90000 } as Prisma.InputJsonValue,
+        checkoutAt: new Date("2026-04-13T03:00:00.000Z"),
+        paymentDeadline: new Date("2026-04-13T03:15:00.000Z"),
+        proofSubmittedAt: null,
+        verifiedAt: null,
+        rejectedAt: null,
+        expiredAt: null,
+        cancelledAt: null,
+        version: 1
+      },
+      create: {
+        id: "seed-expired-order",
+        userId: customer.id,
+        cartId: expiredOrderCart.id,
+        reference: "PG-OR-EXPIRED-UAT",
+        status: BookingOrderStatus.PENDING_PAYMENT,
+        currency: "PHP",
+        vatTreatment: "VAT_EXCLUSIVE",
+        baseAmountMinor: 90000,
+        outstandingAmountMinor: 90000,
+        checkoutSnapshot: { version: 1, source: "seed", baseAmountMinor: 90000 } as Prisma.InputJsonValue,
+        checkoutAt: new Date("2026-04-13T03:00:00.000Z"),
+        paymentDeadline: new Date("2026-04-13T03:15:00.000Z"),
+        idempotencyKey: "seed-expired-order-idempotency"
+      }
+    });
+    await prisma.booking.upsert({
+      where: { id: "seed-expired-order-booking" },
+      update: {
+        reference: "PG-BK-EXPIRED-UAT",
+        userId: customer.id,
+        facilityId: pickleballCourt.id,
+        bookingOrderId: expiredOrder.id,
+        orderItemSequence: 1,
+        status: BookingStatus.HELD,
+        startAtUtc: new Date("2026-10-15T00:00:00.000Z"),
+        endAtUtc: new Date("2026-10-15T01:00:00.000Z"),
+        timezone,
+        slotCount: 2,
+        amountMinor: 90000,
+        currency: "PHP",
+        paymentHoldExpiresAt: new Date("2026-04-13T03:15:00.000Z"),
+        cancelledAt: null,
+        cancellationReason: null
+      },
+      create: {
+        id: "seed-expired-order-booking",
+        reference: "PG-BK-EXPIRED-UAT",
+        userId: customer.id,
+        facilityId: pickleballCourt.id,
+        bookingOrderId: expiredOrder.id,
+        orderItemSequence: 1,
+        status: BookingStatus.HELD,
+        startAtUtc: new Date("2026-10-15T00:00:00.000Z"),
+        endAtUtc: new Date("2026-10-15T01:00:00.000Z"),
+        timezone,
+        slotCount: 2,
+        amountMinor: 90000,
+        currency: "PHP",
+        paymentHoldExpiresAt: new Date("2026-04-13T03:15:00.000Z")
+      }
+    });
+    await prisma.payment.upsert({
+      where: { bookingOrderId: expiredOrder.id },
+      update: {
+        provider: PaymentProvider.MANUAL,
+        providerReference: "PG-OR-EXPIRED-UAT",
+        method: "manual_gcash",
+        status: PaymentStatus.AWAITING_PAYMENT,
+        amountMinor: 90000,
+        currency: "PHP",
+        expiresAt: new Date("2026-04-13T03:15:00.000Z"),
+        proofImageUrl: null,
+        submittedAt: null,
+        verifiedAt: null,
+        rejectedAt: null,
+        reviewNote: null
+      },
+      create: {
+        bookingOrderId: expiredOrder.id,
+        provider: PaymentProvider.MANUAL,
+        providerReference: "PG-OR-EXPIRED-UAT",
+        method: "manual_gcash",
+        status: PaymentStatus.AWAITING_PAYMENT,
+        amountMinor: 90000,
+        currency: "PHP",
+        expiresAt: new Date("2026-04-13T03:15:00.000Z")
+      }
+    });
+  }
+
+  await prisma.pricingRule.createMany({
+    data: [
+      { facilityId: centerCourt.id, name: "Weekday daytime", customerLabel: "Weekday daytime base rate", dayType: PricingDayType.WEEKDAY, startMinutes: 480, endMinutes: 1020, currency: "PHP", amountMinor: 150000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 10, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
+      { facilityId: centerCourt.id, name: "Weekday evening", customerLabel: "Weekday evening base rate", dayType: PricingDayType.WEEKDAY, startMinutes: 1020, endMinutes: 1440, currency: "PHP", amountMinor: 200000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 20, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
+      { facilityId: centerCourt.id, name: "Weekend rate", customerLabel: "Weekend base rate", dayType: PricingDayType.WEEKEND, startMinutes: 0, endMinutes: 1440, currency: "PHP", amountMinor: 200000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 30, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id },
+      { facilityId: centerCourt.id, name: "Holiday rate", customerLabel: "Holiday base rate", dayType: PricingDayType.HOLIDAY, startMinutes: 0, endMinutes: 1440, currency: "PHP", amountMinor: 230000, billingMode: PricingBillingMode.PER_HOUR, minimumMinutes: 60, priority: 0, displayOrder: 50, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id }
+    ]
+  });
+
+  const sampleHolidayDate = new Date("2026-12-25T00:00:00.000Z");
+  await prisma.holiday.deleteMany({ where: { facilityId: null, date: sampleHolidayDate, name: "Christmas Day" } });
+  await prisma.holiday.create({
+    data: { name: "Christmas Day", date: sampleHolidayDate, isActive: true, createdByUserId: admin.id, updatedByUserId: admin.id }
+  });
 
   await prisma.appSetting.upsert({
     where: { key: "booking.paymentHoldMinutes" },
@@ -353,7 +537,7 @@ async function main() {
     update: {
       userId: customer.id,
       facilityId: pickleballCourt.id,
-      status: BookingStatus.PENDING_PAYMENT,
+      status: BookingStatus.HELD,
       startAtUtc: new Date("2026-04-20T08:00:00.000Z"),
       endAtUtc: new Date("2026-04-20T09:00:00.000Z"),
       timezone,
@@ -366,7 +550,7 @@ async function main() {
       id: "seed-pending-booking",
       userId: customer.id,
       facilityId: pickleballCourt.id,
-      status: BookingStatus.PENDING_PAYMENT,
+      status: BookingStatus.HELD,
       startAtUtc: new Date("2026-04-20T08:00:00.000Z"),
       endAtUtc: new Date("2026-04-20T09:00:00.000Z"),
       timezone,
@@ -374,6 +558,41 @@ async function main() {
       amountMinor: 90000,
       currency: "PHP",
       paymentHoldExpiresAt: new Date("2026-04-13T03:15:00.000Z")
+    }
+  });
+
+  await prisma.payment.upsert({
+    where: { bookingId: "seed-pending-booking" },
+    update: {
+      provider: PaymentProvider.MANUAL,
+      providerReference: "mock_seed_pending_001",
+      method: "manual_gcash",
+      status: PaymentStatus.AWAITING_PAYMENT,
+      amountMinor: 90000,
+      currency: "PHP",
+      paidAt: null,
+      submittedAt: null,
+      verifiedAt: null,
+      verifiedByUserId: null,
+      rejectedAt: null,
+      actionRequiredAt: null,
+      expiresAt: new Date("2026-04-13T03:15:00.000Z"),
+      proofImageUrl: null,
+      externalReference: null,
+      normalizedExternalReference: null,
+      reviewNote: null,
+      rawPayload: { source: "seed" } as Prisma.InputJsonValue
+    },
+    create: {
+      bookingId: "seed-pending-booking",
+      provider: PaymentProvider.MANUAL,
+      providerReference: "mock_seed_pending_001",
+      method: "manual_gcash",
+      status: PaymentStatus.AWAITING_PAYMENT,
+      amountMinor: 90000,
+      currency: "PHP",
+      expiresAt: new Date("2026-04-13T03:15:00.000Z"),
+      rawPayload: { source: "seed" } as Prisma.InputJsonValue
     }
   });
 

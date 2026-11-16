@@ -1,0 +1,16 @@
+{
+  "name": "mmg-stellar-user-guide",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/serve.mjs dist 4175",
+    "verify": "node scripts/verify.mjs",
+    "browser:smoke": "node scripts/browser-smoke.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs",
+    "pdf": "node scripts/generate-pdfs.mjs",
+    "release": "npm run verify && npm run pdf && npm run build && npm run browser:smoke"
+  }
+}

@@ -49,7 +49,7 @@ const paymentLabels: Record<PaymentStatus, string> = {
 
 export function BookingStatusBadge({ bookingStatus, paymentStatus }: BookingStatusBadgeProps) {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
+    <div className="w-fit max-w-full self-start justify-self-end flex flex-wrap justify-end gap-2">
       <span className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.18em] ${bookingTone[bookingStatus]}`}>
         {bookingLabels[bookingStatus]}
       </span>

@@ -1,20 +1,15 @@
 import Link from "next/link";
 
+import { getCurrentAdminAuthorization } from "@/lib/auth/authorization";
+import { visibleAdminNavigation, type AdminNavigationKey } from "@/lib/auth/admin-navigation";
+
 type AdminNavProps = {
-  current: "overview" | "calendar" | "walk-ins" | "facilities" | "payments" | "customers" | "reports";
+  current: AdminNavigationKey;
 };
 
-const items = [
-  { key: "overview", href: "/admin", label: "Overview" },
-  { key: "calendar", href: "/admin/calendar", label: "Calendar" },
-  { key: "walk-ins", href: "/admin/walk-ins", label: "Walk-ins" },
-  { key: "facilities", href: "/admin/facilities", label: "Facilities" },
-  { key: "payments", href: "/admin/payments", label: "Payments" },
-  { key: "customers", href: "/admin/customers", label: "Customers" },
-  { key: "reports", href: "/admin/reports", label: "Reports" }
-] as const;
-
-export function AdminNav({ current }: AdminNavProps) {
+export async function AdminNav({ current }: AdminNavProps) {
+  const authorization = await getCurrentAdminAuthorization();
+  const items = authorization ? visibleAdminNavigation(authorization.permissions) : [];
   return (
     <nav className="hidden flex-wrap gap-3 md:flex">
       {items.map((item) => (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getPaymentMode, isStrictProductionEnvironment, validateServerEnvironment } from "./env";
+import { getPaymentMode, isLocalMockOtpAllowed, isStrictProductionEnvironment, validateServerEnvironment } from "./env";
 
 type TestEnv = Record<string, string | undefined>;
 
@@ -13,6 +13,7 @@ function buildValidProductionEnv(overrides: TestEnv = {}): TestEnv {
     RESEND_API_KEY: "re_123456789",
     EMAIL_FROM: "Sport Booking <bookings@example.com>",
     CRON_SECRET: "a-production-cron-secret-at-least-32-chars",
+    HEALTHCHECK_SECRET: "a-healthcheck-secret-with-at-least-32-chars",
     PAYMENT_MODE: "manual",
     PAYMENT_HOLD_MINUTES: "15",
     ...overrides
@@ -38,6 +39,13 @@ describe("server environment validation", () => {
     expect(isStrictProductionEnvironment({ VERCEL_ENV: "preview" })).toBe(false);
   });
 
+  it("allows mock OTP only in a local non-production runtime", () => {
+    expect(isLocalMockOtpAllowed({ NODE_ENV: "development" })).toBe(true);
+    expect(isLocalMockOtpAllowed({ NODE_ENV: "development", AUTH_ALLOW_MOCK_OTP: "false" })).toBe(false);
+    expect(isLocalMockOtpAllowed({ NODE_ENV: "production" })).toBe(false);
+    expect(isLocalMockOtpAllowed({ NODE_ENV: "production", VERCEL_ENV: "preview" })).toBe(false);
+  });
+
   it("defaults to mock payments in development and manual payments in strict production", () => {
     expect(getPaymentMode({})).toBe("mock");
     expect(getPaymentMode({ VERCEL_ENV: "production" })).toBe("manual");
@@ -60,6 +68,7 @@ describe("server environment validation", () => {
         RESEND_API_KEY: "",
         EMAIL_FROM: "",
         CRON_SECRET: "",
+        HEALTHCHECK_SECRET: "",
         PAYMENT_MODE: "invalid"
       })
     );
@@ -74,6 +83,7 @@ describe("server environment validation", () => {
         "RESEND_API_KEY must be configured for production email verification.",
         "EMAIL_FROM must be configured with a verified sender address.",
         "CRON_SECRET must be a strong non-placeholder value with at least 32 characters.",
+        "HEALTHCHECK_SECRET must be a strong non-placeholder value with at least 32 characters.",
         "PAYMENT_MODE must be one of: manual, gateway, mock."
       ])
     );
@@ -89,6 +99,18 @@ describe("server environment validation", () => {
       "PAYMENT_MODE=mock is blocked in production unless ALLOW_PRODUCTION_MOCK_PAYMENTS=true is explicitly set."
     );
     expect(allowed.errors).toEqual([]);
+  });
+
+  it("does not allow rate limiting to be disabled in production", () => {
+    const result = validateServerEnvironment(buildValidProductionEnv({ RATE_LIMIT_DISABLED: "true" }));
+
+    expect(result.errors).toContain("RATE_LIMIT_DISABLED=true is not allowed in production.");
+  });
+
+  it("rejects the mock OTP escape hatch in strict environments", () => {
+    const result = validateServerEnvironment(buildValidProductionEnv({ AUTH_ALLOW_MOCK_OTP: "true" }));
+
+    expect(result.errors).toContain("AUTH_ALLOW_MOCK_OTP=true is only allowed in local development.");
   });
 
   it("requires gateway secrets when gateway payments are enabled", () => {

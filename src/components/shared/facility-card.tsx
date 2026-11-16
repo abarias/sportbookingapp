@@ -36,7 +36,7 @@ export function FacilityCard({ facility }: FacilityCardProps) {
         </div>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Starting at</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Base rate from · VAT exclusive</p>
             <p className="text-lg font-semibold text-white">
               {formatCurrency(facility.price.amountMinor, facility.price.currency)}
             </p>

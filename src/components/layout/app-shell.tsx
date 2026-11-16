@@ -1,61 +1,71 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import { auth } from "@/auth";
 import { DesktopAdminMenu } from "@/components/layout/desktop-admin-menu";
 import { MobileNavMenu } from "@/components/layout/mobile-nav-menu";
 import { SessionNav } from "@/components/layout/session-nav";
-import { siteConfig } from "@/lib/config/site";
+import { AdminSessionGuard } from "@/components/layout/admin-session-guard";
+import { getCurrentAdminAuthorization } from "@/lib/auth/authorization";
+import { visibleAdminNavigation } from "@/lib/auth/admin-navigation";
+import { getActiveCartCount } from "@/server/cart/service";
+import { getCustomerAccountNotificationState } from "@/server/account/queries";
+import { PrimaryNavLink } from "@/components/layout/primary-nav-link";
 
 type AppShellProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-const navItems = [
-  { href: "/facilities", label: "Facilities" },
-  { href: "/bookings", label: "My Bookings" }
-] as const;
-
-const adminItems = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/calendar", label: "Calendar" },
-  { href: "/admin/walk-ins", label: "Walk-ins" },
-  { href: "/admin/facilities", label: "Facilities" },
-  { href: "/admin/payments", label: "Payments" },
-  { href: "/admin/customers", label: "Customers" },
-  { href: "/admin/reports", label: "Reports" }
-] as const;
-
 export async function AppShell({ children }: AppShellProps) {
   const session = await auth();
-  const showAdminItems = session?.user?.role === "ADMIN";
+  const authorization = session?.user ? await getCurrentAdminAuthorization() : null;
+  const cartCount = session?.user?.role === "CUSTOMER" ? await getActiveCartCount(session.user.id) : 0;
+  const hasAccountNotifications = session?.user?.role === "CUSTOMER" ? await getCustomerAccountNotificationState(session.user.id) : false;
+  const canOpenAccount = session?.user?.role === "CUSTOMER" || Boolean(authorization);
+  const navItems = [
+    { href: "/facilities", label: "Facilities" },
+    { href: "/faq", label: "FAQs" },
+    ...(session?.user?.role === "CUSTOMER" ? [{ href: "/cart", label: `Cart (${cartCount})` }] : []),
+    ...(session?.user ? [{ href: "/bookings", label: "My Bookings" }] : []),
+    ...(canOpenAccount ? [{ href: "/account", label: "My Account", showBadge: session?.user?.role === "CUSTOMER" && hasAccountNotifications }] : [])
+  ];
+  const adminItems = authorization ? visibleAdminNavigation(authorization.permissions) : [];
+  const showAdminItems = adminItems.length > 0;
+  const displaySession = session?.user?.role === "ADMIN" && !authorization ? null : session;
 
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-white/10 bg-stone-950/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" className="text-lg font-semibold tracking-tight text-white">
-            {siteConfig.name}
+          <Link href="/" aria-label="MMG Stellar home" className="shrink-0">
+            <Image
+              src="/MMG_STELLAR_logo.png"
+              alt="MMG Stellar"
+              width={144}
+              height={80}
+              priority
+              className="h-11 w-auto object-contain sm:h-12"
+            />
           </Link>
           <nav className="hidden items-center gap-4 text-sm text-stone-300 md:flex">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className="hover:text-white">
-                {item.label}
-              </Link>
+              <PrimaryNavLink key={item.href} href={item.href} label={item.label} showBadge={item.showBadge} />
             ))}
             {showAdminItems ? (
               <DesktopAdminMenu items={adminItems} />
             ) : null}
-            <SessionNav session={session} />
+            <SessionNav session={displaySession} />
           </nav>
           <MobileNavMenu
             adminItems={adminItems}
             navItems={navItems}
-            sessionControls={<SessionNav session={session} />}
+            sessionControls={<SessionNav session={displaySession} />}
             showAdminItems={showAdminItems}
           />
         </div>
       </header>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
+      <AdminSessionGuard enabled={session?.user?.role === "ADMIN"} />
+      <div className="mx-auto min-w-0 max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
     </div>
   );
 }

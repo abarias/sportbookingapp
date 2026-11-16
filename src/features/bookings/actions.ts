@@ -9,6 +9,9 @@ import { requireUserSession } from "@/lib/auth/session";
 import { storePaymentProof } from "@/lib/storage/payment-proofs";
 import { cancelBookingByCustomer, createBookingHold } from "@/server/bookings/service";
 import { submitManualPaymentProof } from "@/server/payments/service";
+import { rateLimitPolicies } from "@/lib/config/rate-limits";
+import { enforceRequestRateLimit } from "@/lib/security/rate-limit";
+import { getSafeActionError } from "@/lib/observability/action-errors";
 
 export type BookingActionState = {
   error?: string;
@@ -46,7 +49,8 @@ const createBookingSchema = z.object({
 });
 
 const cancelBookingSchema = z.object({
-  bookingId: z.string().min(1, "Booking is required.")
+  bookingId: z.string().min(1, "Booking is required."),
+  returnTo: z.string().regex(/^\/bookings(?:\/[^/?#]+)?$/, "Invalid return path.").default("/bookings")
 });
 
 const paymentProofSchema = z.object({
@@ -66,10 +70,6 @@ async function persistPaymentProofUpload(formData: FormData, bookingId: string) 
     throw new Error("Payment proof image must be 5MB or smaller.");
   }
 
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Payment proof must be an image file.");
-  }
-
   return storePaymentProof(file, bookingId);
 }
 
@@ -79,6 +79,7 @@ export async function createBookingAction(
 ): Promise<BookingActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "booking.create", userId: session.user.id, policy: rateLimitPolicies.booking() });
     const parsed = createBookingSchema.safeParse({
       facilityId: String(formData.get("facilityId") ?? ""),
       facilitySlug: String(formData.get("facilitySlug") ?? ""),
@@ -115,15 +116,7 @@ export async function createBookingAction(
       throw error;
     }
 
-    if (error instanceof Error) {
-      return {
-        error: error.message
-      };
-    }
-
-    return {
-      error: "Booking could not be created."
-    };
+    return { error: getSafeActionError(error, "Booking could not be created.", "booking.create.failed") };
   }
 }
 
@@ -133,6 +126,7 @@ export async function submitPaymentProofAction(
 ): Promise<PaymentProofActionState> {
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "payment-proof.submit", userId: session.user.id, policy: rateLimitPolicies.paymentProof() });
     const parsed = paymentProofSchema.safeParse({
       bookingId: String(formData.get("bookingId") ?? ""),
       method: String(formData.get("method") ?? ""),
@@ -166,13 +160,13 @@ export async function submitPaymentProofAction(
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
 
-    return {
-      success: "Payment proof submitted. Staff will verify your payment before confirming the booking."
-    };
+    redirect(`/bookings/${parsed.data.bookingId}/payment?submitted=1`);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Payment proof could not be submitted."
-    };
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    return { error: getSafeActionError(error, "Payment proof could not be submitted.", "payment-proof.submit.failed") };
   }
 }
 
@@ -180,10 +174,14 @@ export async function cancelBookingAction(
   _prevState: CancelBookingActionState,
   formData: FormData
 ): Promise<CancelBookingActionState> {
+  let returnTo = "/bookings";
+
   try {
     const session = await requireUserSession();
+    await enforceRequestRateLimit({ action: "booking.cancel", userId: session.user.id, policy: rateLimitPolicies.booking() });
     const parsed = cancelBookingSchema.safeParse({
-      bookingId: String(formData.get("bookingId") ?? "")
+      bookingId: String(formData.get("bookingId") ?? ""),
+      returnTo: String(formData.get("returnTo") ?? "/bookings")
     });
 
     if (!parsed.success) {
@@ -196,29 +194,20 @@ export async function cancelBookingAction(
       bookingId: parsed.data.bookingId,
       userId: session.user.id
     });
-
-    revalidatePath("/bookings");
-    revalidatePath("/admin");
-    revalidatePath("/admin/customers");
-    revalidatePath("/admin/reports");
-    revalidatePath("/facilities");
-
-    return {
-      success: "Booking cancelled successfully. Any refund handling will be coordinated by staff."
-    };
+    returnTo = parsed.data.returnTo;
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
 
-    if (error instanceof Error) {
-      return {
-        error: error.message
-      };
-    }
-
-    return {
-      error: "Booking could not be cancelled."
-    };
+    return { error: getSafeActionError(error, "Booking could not be cancelled.", "booking.cancel.failed") };
   }
+
+  revalidatePath("/bookings");
+  revalidatePath("/admin");
+  revalidatePath("/admin/customers");
+  revalidatePath("/admin/reports");
+  revalidatePath("/facilities");
+  revalidatePath(returnTo);
+  redirect(`${returnTo}?cancelled=1`);
 }

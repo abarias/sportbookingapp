@@ -45,8 +45,10 @@ export function PaymentReviewForm({ paymentId }: { paymentId: string }) {
         <textarea className="min-h-20 w-full rounded-2xl border border-white/10 bg-stone-900/80 px-4 py-3 text-sm text-white" name="reviewNote" placeholder="Rejection reason" required />
         <SubmitButton label="Reject payment" />
       </form>
-      {state.success ? <p className="text-sm text-emerald-300">{state.success}</p> : null}
-      {state.error ? <p className="text-sm text-rose-300">{state.error}</p> : null}
+      <div aria-live="polite">
+        {state.success ? <p className="rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100">{state.success}</p> : null}
+        {state.error ? <p className="rounded-2xl border border-rose-300/30 bg-rose-300/10 p-4 text-sm text-rose-100">{state.error}</p> : null}
+      </div>
     </div>
   );
 }

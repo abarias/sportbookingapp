@@ -1,0 +1,903 @@
+{
+  "source": {
+    "file": "FAQs.pdf",
+    "sha256": "7e7fc3411c01a9521feaaf2e3204a0b9ce0f559a2d6c7a3ef0b543636b2df1e2",
+    "section": "FAQs page text content",
+    "notes": [
+      "Payment Details preamble and topic index excluded; actual section headings used.",
+      "Internal @AB and @CLL editorial comments excluded.",
+      "Refund numbering skips 6; Facility Use repeats 4. No missing question fabricated; source order and sourceNumber retained.",
+      "Rescheduling answer continues on page 3; property-damage answer continues on page 5.",
+      "Original wording retained, including '60minutes', 'more than seven (7) from your game date', and 'same number hours of play'."
+    ]
+  },
+  "topics": [
+    {
+      "slug": "operating-hours",
+      "title": "OPERATING HOURS",
+      "items": [
+        {
+          "slug": "hours",
+          "question": "What are your operating hours?",
+          "sourceNumber": null,
+          "sourcePages": [
+            1
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "We are open Mondays to Sundays, 7:00am to 12:00mn. Operating hours may change during holidays, private events, maintenance, or special circumstances."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slug": "booking-reservations",
+      "title": "BOOKING & RESERVATIONS",
+      "items": [
+        {
+          "slug": "how-to-book",
+          "question": "How do I book a court/facility?",
+          "sourceNumber": 1,
+          "sourcePages": [
+            1
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "You can book by creating an account at "
+                  },
+                  {
+                    "text": "mmgstellar.stellarsports.com",
+                    "href": "https://mmgstellar.stellarsports.com",
+                    "strong": true
+                  },
+                  {
+                    "text": " or at our "
+                  },
+                  {
+                    "text": "front desk",
+                    "strong": true
+                  },
+                  {
+                    "text": ". Select your preferred facility, date, and time, then complete the required payment or booking confirmation."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "walk-ins",
+          "question": "Can I walk in without a reservation?",
+          "sourceNumber": 2,
+          "sourcePages": [
+            1
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes, subject to court availability. We recommend booking in advance, especially during peak hours."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "advance-booking",
+          "question": "How far in advance can I book?",
+          "sourceNumber": 3,
+          "sourcePages": [
+            1
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Bookings may be made up to two months in advance."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "specific-court",
+          "question": "Can I reserve a specific court?",
+          "sourceNumber": 4,
+          "sourcePages": [
+            1
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes, specific court requests are subject to availability and may not be guaranteed unless this has been confirmed. Reservation status may be checked in your MMG Stellar account."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "duration",
+          "question": "How long is each booking?",
+          "sourceNumber": 5,
+          "sourcePages": [
+            2
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Standard bookings are "
+                  },
+                  {
+                    "text": "60minutes",
+                    "strong": true
+                  },
+                  {
+                    "text": " per session. Extensions may be requested if the facility is available."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "multiple-recurring",
+          "question": "Can I book multiple courts or recurring sessions?",
+          "sourceNumber": 6,
+          "sourcePages": [
+            2
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes. For group, corporate, league, or recurring bookings, please contact by sending an email to "
+                  },
+                  {
+                    "text": "mmgstellartaguig@gmail.com",
+                    "href": "mailto:mmgstellartaguig@gmail.com",
+                    "strong": true
+                  },
+                  {
+                    "text": " for availability and applicable rates."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slug": "payment-rates",
+      "title": "PAYMENT & RATES",
+      "items": [
+        {
+          "slug": "rates",
+          "question": "How much does it cost to use the facility?",
+          "sourceNumber": 1,
+          "sourcePages": [
+            2
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Rates depend on the facility, duration, and time of booking. Please refer to our Booking Page for current pricing."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "payment-methods",
+          "question": "What payment methods do you accept?",
+          "sourceNumber": 2,
+          "sourcePages": [
+            2
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "We accept online payment via direct bank transfer in our booking website. While we accept cash, credit card and debit card payments onsite."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "payment-timing",
+          "question": "When is payment required?",
+          "sourceNumber": 3,
+          "sourcePages": [
+            2
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Full payment is required upon booking."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "additional-charges",
+          "question": "Are there additional charges?",
+          "sourceNumber": 4,
+          "sourcePages": [
+            2
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Additional charges may apply for equipment rental, lighting, extended hours, special setups, or other services. Any applicable charges will be communicated before confirmation."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slug": "cancellations-changes",
+      "title": "CANCELLATIONS & CHANGES",
+      "items": [
+        {
+          "slug": "cancel",
+          "question": "Can I cancel my booking?",
+          "sourceNumber": 1,
+          "sourcePages": [
+            2
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes. Cancellations are subject to our cancellation policy."
+                  }
+                ]
+              },
+              {
+                "type": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "text": "More than seven (7) days from reserved date – cancel or reschedule for free or refund less 5% admin fee"
+                    }
+                  ],
+                  [
+                    {
+                      "text": "Less than seven (7) days from reserved date – cancellation is non-refundable"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "reschedule",
+          "question": "Can I reschedule my booking?",
+          "sourceNumber": 2,
+          "sourcePages": [
+            2,
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes, subject to rescheduling policy and availability. Reschedule request made more than seven (7) days before original date for play will be accommodated. Reschedule request made less than seven (7) days is treated as a cancellation and is subject to the No Refund policy. A new booking and payment have to be made."
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Reschedule requests may be directed to our front desk by sending an SMS at "
+                  },
+                  {
+                    "text": "+63945 136 2137",
+                    "href": "tel:+639451362137"
+                  },
+                  {
+                    "text": "."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "partial-use",
+          "question": "What happens if I arrive late/leave early?",
+          "sourceNumber": 3,
+          "sourcePages": [
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Your booking will still end at the originally scheduled time. No refunds or extensions will be accommodated for partial use."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "no-show",
+          "question": "What happens if I don't show up?",
+          "sourceNumber": 4,
+          "sourcePages": [
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "No-shows mean payment is forfeited."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slug": "refunds",
+      "title": "REFUNDS",
+      "items": [
+        {
+          "slug": "eligibility",
+          "question": "Am I entitled to a refund if I cancel my booking?",
+          "sourceNumber": 1,
+          "sourcePages": [
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Refunds are subject to our cancellation and refund policy. If cancellations were made more than seven (7) from your game date, a refund may be done but will be subject to a 5% admin fee."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "processing-time",
+          "question": "How long does it take to receive a refund?",
+          "sourceNumber": 2,
+          "sourcePages": [
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Approved refunds will be processed within two to three business days. The actual posting time may depend on the payment method."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "late-cancellation",
+          "question": "Can I get a refund if I cancel at the last minute or do not show up?",
+          "sourceNumber": 3,
+          "sourcePages": [
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "No refund will be provided for late cancellations or no-shows, unless otherwise approved by management or covered by an applicable exception."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "facility-cancellation",
+          "question": "What happens if the facility cancels my booking?",
+          "sourceNumber": 4,
+          "sourcePages": [
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "If we cancel a confirmed booking due to facility closure, maintenance, safety concerns, or other circumstances, you may choose between rescheduling to another date with the same number hours of play or a full refund, subject to the applicable policy."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "weather",
+          "question": "What happens if bad weather affects my booking?",
+          "sourceNumber": 5,
+          "sourcePages": [
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "For weather-related cancellations, rescheduling to another date with the same number hours of play or refunds will be handled according to our weather policy."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "refund-method",
+          "question": "How will my refund be issued?",
+          "sourceNumber": 7,
+          "sourcePages": [
+            3
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Refunds will generally be returned under the name of the person who made the reservation through the most practicable manner (such as bank deposit or online transfer)"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slug": "facility-use",
+      "title": "FACILITY USE",
+      "items": [
+        {
+          "slug": "attire",
+          "question": "What should I wear?",
+          "sourceNumber": 1,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Please wear appropriate sports attire and non-marking sports shoes suitable for the facility."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "own-equipment",
+          "question": "Can I bring my own equipment?",
+          "sourceNumber": 2,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes, provided the equipment is appropriate for the facility and does not damage the courts, equipment, or property."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "equipment-rental",
+          "question": "Can I rent equipment from the facility?",
+          "sourceNumber": 3,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Limited equipment may be rented and is subject to availability, applicable fees may apply. Inquire at our front desk for more information."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "food-drinks",
+          "question": "Can I bring food and drinks?",
+          "sourceNumber": 4,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Food is not permitted in the playing areas. Water and non-alcoholic beverages may be consumed only in designated areas. Please dispose of waste properly."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "companions",
+          "question": "Can non-playing companions enter?",
+          "sourceNumber": 4,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Non-playing companions are allowed, subject to facility capacity and applicable guest rules. Additional guest fees may apply."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "coaches",
+          "question": "Can I bring a coach or instructor?",
+          "sourceNumber": 5,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes, subject to our facility policies. External coaches/instructors must be registered/approved in advance and may be subject to applicable fees."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slug": "safety-house-rules",
+      "title": "SAFETY & HOUSE RULES",
+      "items": [
+        {
+          "slug": "waiver",
+          "question": "Do I need to sign a waiver?",
+          "sourceNumber": 1,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes. All users may be required to complete a waiver before using the facility."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "minors",
+          "question": "Are minors allowed to use the facility?",
+          "sourceNumber": 2,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Minors may use the facility subject to parental/legal guardian supervision and consent."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "injury",
+          "question": "What should I do if I get injured?",
+          "sourceNumber": 3,
+          "sourcePages": [
+            4
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Please immediately notify our staff. We have first-aid/emergency procedures in place. Users are expected to follow all safety rules and use the facilities responsibly."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "property-damage",
+          "question": "What happens if I damage facility property?",
+          "sourceNumber": 4,
+          "sourcePages": [
+            4,
+            5
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Users may be held responsible for damage caused by misuse, negligence, or violation of facility rules. Applicable repair or replacement costs may be charged."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slug": "personal-belongings",
+      "title": "PERSONAL BELONGINGS",
+      "items": [
+        {
+          "slug": "belongings",
+          "question": "Can I leave my belongings in the facility?",
+          "sourceNumber": 1,
+          "sourcePages": [
+            5
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Personal belongings should be kept with the player or the player’s line of sight and must not be left unattended. The facility is not responsible for lost, stolen, or damaged personal belongings."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "lost-property",
+          "question": "What should I do if I lose something?",
+          "sourceNumber": 2,
+          "sourcePages": [
+            5
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Please report lost items to the front desk. Found items will be kept for thirty (30) days before disposal or donation."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "slug": "groups-events",
+      "title": "GROUPS & EVENTS",
+      "items": [
+        {
+          "slug": "group-bookings",
+          "question": "Do you accommodate private events or group bookings?",
+          "sourceNumber": 1,
+          "sourcePages": [
+            5
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes. We accommodate corporate events, tournaments, team training, parties, leagues, and other group activities, subject to availability and applicable rates. Send an email to "
+                  },
+                  {
+                    "text": "mmgstellartaguig@gmail.com",
+                    "href": "mailto:mmgstellartaguig@gmail.com"
+                  },
+                  {
+                    "text": " for a quote."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "exclusive-use",
+          "question": "Can I exclusively rent the facility?",
+          "sourceNumber": 2,
+          "sourcePages": [
+            5
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes, subject to availability. Exclusive-use bookings may have different rates, minimum hours, and additional requirements. Please contact "
+                  },
+                  {
+                    "text": "mmgstellartaguig@gmail.com",
+                    "href": "mailto:mmgstellartaguig@gmail.com"
+                  },
+                  {
+                    "text": " for a quotation."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "slug": "event-setup",
+          "question": "Can I bring equipment or set up decorations for an event?",
+          "sourceNumber": 3,
+          "sourcePages": [
+            5
+          ],
+          "answer": {
+            "version": 1,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "text": "Yes, subject to prior approval. However, we discourage elaborate catering, audio/sounds and lights set-up. Any installations, postings or mounting using adhesives, tape, nails, tacks or brackets require prior approval. Setup and teardown of decorations/installations will be the client’s responsibility. Additional charges may apply for power consumption, cleaning, security, or extended use."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "mmg-stellar-uat-guide",
+  "version": "2026.8.27",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/serve.mjs dist 4174",
+    "verify": "node scripts/verify.mjs",
+    "browser:smoke": "node scripts/browser-smoke.mjs",
+    "manifest": "node scripts/generate-screenshot-manifest.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs",
+    "pdf": "node scripts/generate-pdfs.mjs"
+  }
+}
