@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminReportsPage() {
   await requirePermission("reports.view");
-  const { bookings, facilities, orderPayments, additionalPayments, reschedules, reportStart } = await getAdminReportsData();
+  const { bookings, orderPayments, additionalPayments, reschedules, reportStart, reportEnd, utilization } = await getAdminReportsData();
 
   const confirmedBookings = bookings.filter((booking) => booking.status === "CONFIRMED");
   const paidRevenueMinor = bookings
@@ -29,37 +29,16 @@ export default async function AdminReportsPage() {
     bookingsByDay.set(key, (bookingsByDay.get(key) ?? 0) + 1);
   }
 
-  const utilization = facilities.map((facility) => {
-    const confirmed = confirmedBookings.filter((booking) => booking.facilityId === facility.id);
-    const bookedMinutes = confirmed.reduce((sum, booking) => sum + (booking.slotCount * facility.slotIntervalMinutes), 0);
-    const openMinutesPerWeek = facility.operatingHours.reduce((sum, hour) => {
-      if (hour.isClosed) {
-        return sum;
-      }
-
-      return sum + Math.max(hour.closesAtMinutes - hour.opensAtMinutes, 0);
-    }, 0);
-    const availableMinutesOver30Days = (openMinutesPerWeek / 7) * 30;
-    const rate = availableMinutesOver30Days > 0 ? Math.round((bookedMinutes / availableMinutesOver30Days) * 100) : 0;
-
-    return {
-      facilityId: facility.id,
-      name: facility.name,
-      bookedMinutes,
-      rate
-    };
-  });
-
   return (
     <main className="space-y-8 pb-16">
       <SectionHeading
         eyebrow="Admin"
         title="Reports"
-        description="Review bookings by day, paid revenue, and facility utilization across the last 30 days."
+        description="Review booking activity, paid revenue, and facility utilization for the last 30 calendar days."
       />
       <AdminNav current="reports" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <DashboardStat label="Reporting Window" value="30 days" hint={`Since ${formatInTimeZone(reportStart, "Asia/Manila", "MMM d")}`} />
+        <DashboardStat label="Reporting Window" value="30 days" hint={`${formatInTimeZone(reportStart, "Asia/Manila", "MMM d")}–${formatInTimeZone(reportEnd, "Asia/Manila", "MMM d, yyyy")}`} />
         <DashboardStat label="Bookings" value={String(bookings.length)} hint="All booking states" />
         <DashboardStat label="Confirmed" value={String(confirmedBookings.length)} hint="Reserved inventory" />
         <DashboardStat label="Paid Base Revenue" value={formatCurrency(paidRevenueMinor + consolidatedRevenueMinor + additionalRevenueMinor, "PHP")} hint={`${formatCurrency(consolidatedRevenueMinor, "PHP")} from consolidated orders; ${formatCurrency(additionalRevenueMinor, "PHP")} from verified reschedule adjustments`} />
@@ -87,9 +66,11 @@ export default async function AdminReportsPage() {
               <div key={row.facilityId} className="rounded-2xl border border-white/10 bg-stone-950/40 px-4 py-3 text-sm text-stone-300">
                 <div className="flex items-center justify-between">
                   <span className="text-white">{row.name}</span>
-                  <span>{row.rate}%</span>
+                  <span>{row.rate.toFixed(2)}%</span>
                 </div>
-                <p className="mt-1 text-stone-400">{Math.round(row.bookedMinutes / 60)} booked hours over 30 days</p>
+                <p className="mt-1 text-stone-400">
+                  {`${(row.bookedMinutes / 60).toFixed(2)} booked hours of ${(row.bookableMinutes / 60).toFixed(2)} bookable hours`}
+                </p>
               </div>
             ))}
           </div>
